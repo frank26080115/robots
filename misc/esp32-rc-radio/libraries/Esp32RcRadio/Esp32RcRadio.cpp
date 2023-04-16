@@ -102,6 +102,7 @@ void Esp32RcRadio::begin(uint16_t chan_map, uint32_t uid, uint32_t salt)
         Serial.printf("%d  ", hop_table[i]);
     }
     #endif
+    _cur_chan %= hop_tbl_len;
 
     if (has_wifi_init == false) // only start once
     {
@@ -129,8 +130,14 @@ void Esp32RcRadio::begin(uint16_t chan_map, uint32_t uid, uint32_t salt)
         #ifdef E32RCRAD_FORCE_PHY_RATE
         esp_wifi_config_80211_tx_rate(WIFI_IF_AP, WIFI_PHY_RATE_54M); // sets PHY rate
         #endif
+        #ifdef E32RCRAD_FORCE_BANDWIDTH
+        esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20);
+        #endif
         esp_wifi_start();
         esp_wifi_set_ps(WIFI_PS_NONE);
+        #ifdef E32RCRAD_FORCE_RFPOWER
+        esp_wifi_set_max_tx_power(84);
+        #endif
         gen_header();
     }
     else
