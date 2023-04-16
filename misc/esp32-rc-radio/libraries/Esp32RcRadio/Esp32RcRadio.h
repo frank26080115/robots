@@ -13,6 +13,7 @@
 #define E32RCRAD_CHAN_MAP_DEFAULT (0x3FFF & (~((uint32_t)((1 << 0) | (1 << 5) | (1 << 10) | (1 << 13)))))
 #define E32RCRAD_CHAN_MAP_DEFAULT_SINGLE 0x02
 //#define E32RCRAD_OBFUSCATE_ADDRS // does not work very well
+//#define E32RCRAD_FORCE_PHY_RATE
 //#define E32RCRAD_DEBUG_HOPTABLE
 //#define E32RCRAD_DEBUG_TX
 //#define E32RCRAD_DEBUG_RX

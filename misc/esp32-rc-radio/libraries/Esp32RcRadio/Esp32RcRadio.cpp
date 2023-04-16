@@ -14,6 +14,7 @@ typedef struct
     uint16_t duration;   // note: this field might be changed by API
     uint32_t addrs[3];   // MAC addresses for RX and TX, 6 bytes each, but since we are using 32 bit integers, we can stuff 3 items in here
     uint8_t  padding[2]; // this can be changed by the underlying api
+    uint8_t  chan_hint;  // what channel was actually used to TX
     uint8_t  payload[E32RCRAD_PAYLOAD_SIZE]; // our custom payload
     uint32_t chksum;     // userspace checksum over the payload, accounts for the salt, not to be confused with FCS
                          // combined with the salt, this is meant to prevent impersonation attacks
@@ -125,7 +126,9 @@ void Esp32RcRadio::begin(uint16_t chan_map, uint32_t uid, uint32_t salt)
         };
 
         esp_wifi_set_config(WIFI_IF_AP, &ap_config);
-        //esp_wifi_config_80211_tx_rate(WIFI_IF_AP, WIFI_PHY_RATE_1M_L); // sets PHY rate
+        #ifdef E32RCRAD_FORCE_PHY_RATE
+        esp_wifi_config_80211_tx_rate(WIFI_IF_AP, WIFI_PHY_RATE_54M); // sets PHY rate
+        #endif
         esp_wifi_start();
         esp_wifi_set_ps(WIFI_PS_NONE);
         gen_header();
@@ -219,6 +222,7 @@ void Esp32RcRadio::gen_header(void)
     ptr->duration = 0;
     ptr->padding[0] = 0;
     ptr->padding[1] = 0;
+    ptr->chan_hint = _cur_chan;
     #ifdef E32RCRAD_OBFUSCATE_ADDRS
     if (_salt != 0)
     {
@@ -380,6 +384,7 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     memcpy(buffer, (void*)parsed->payload, E32RCRAD_PAYLOAD_SIZE);
     rx_flag = true;
     stat_cnt_up();
+    _cur_chan = parsed->chan_hint; // sync with channel hop
     next_chan();
     reset_timeout_cnt();
     _stat_rx_rssi = ctrl.rssi;
