@@ -7,7 +7,7 @@ char msg_buf[E32RCRAD_PAYLOAD_SIZE];
 void setup()
 {
     Serial.begin(115200);
-    radio.begin(0, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
+    radio.begin(1, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()
@@ -30,13 +30,30 @@ void loop()
         }
     }
 
+    // report any text messages that have been received
+    if (radio.textAvail() > 0)
+    {
+        radio.textRead((char*)msg_buf); // read the new message into our application buffer
+        Serial.printf("TEXT[%u]: %s\r\n", radio.get_txt_cnt(), msg_buf);
+    }
+
+    #ifdef E32RCRAD_BIDIRECTIONAL
+    // send this message, with the current timestamp
+    sprintf(msg_buf, "Holy Cow %u", now);
+    radio.send((uint8_t*)msg_buf);
+    #endif
+
     // do a statistics report every one second
     if ((now - last_time_stat) >= 1000)
     {
         uint32_t rx_total, rx_good;
         signed rssi;
         radio.get_rx_stats(&rx_total, &rx_good, &rssi);
-        Serial.printf("STAT: %u , %u / %u , %d\r\n", radio.get_data_rate(), rx_good, rx_total, rssi);
+        Serial.printf("STAT: %u , %u / %u , %d", radio.get_data_rate(), rx_good, rx_total, rssi);
+        #ifdef E32RCRAD_COUNT_RX_SPENT_TIME
+        Serial.printf(" , %0.1f / %u", (float)(((float)radio.get_rx_spent_time()) / (((float)1000.0))), now);
+        #endif
+        Serial.printf("\r\n");
         last_time_stat = now;
     }
 }

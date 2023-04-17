@@ -8,6 +8,7 @@ Features:
  * frequency hopping
  * low latency
  * high enough data rate
+ * limited way of receiving replies (rate limited to save battery)
 
 This implementation abuses the esp_wifi_80211_tx function to send raw 802.11 packets, and the receiver uses promiscuous mode to sniff all packets, while filtering the ones we are interested in.
 
