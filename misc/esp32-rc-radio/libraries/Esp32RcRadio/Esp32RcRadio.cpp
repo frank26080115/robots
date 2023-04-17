@@ -28,6 +28,11 @@ typedef struct
 __attribute__ ((packed))
 e32rcrad_pkt_t;
 
+#define E32RCRAD_FRAME_CONTROL_ACTION 0x00D0
+#define E32RCRAD_FRAME_CONTROL_PROBE  0x0040
+#define E32RCRAD_FRAME_CONTROL_BA     0x0094 // not allowed
+#define E32RCRAD_FRAME_CONTROL        E32RCRAD_FRAME_CONTROL_ACTION
+
 static uint8_t tx_buffer[E32RCRAD_PAYLOAD_SIZE];     // application buffer
 static uint8_t rx_buffer[E32RCRAD_PAYLOAD_SIZE];     // application buffer
 static uint8_t frame_buffer[sizeof(e32rcrad_pkt_t)]; // the buffer that's actually sent (and also used for rx comparisons)
@@ -65,6 +70,9 @@ void Esp32RcRadio::var_reset(void)
     _stat_rx_cnt = 0;
     _stat_txt_cnt = 0;
     _stat_drate = 0;
+    #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+    memset(_stat_rx_errs, 0, 4*12);
+    #endif
     _stat_rx_total = 0;
     _stat_rx_good = 0;
     _last_rx_time = 0;
@@ -311,8 +319,7 @@ void Esp32RcRadio::next_chan(void)
 void Esp32RcRadio::gen_header(void)
 {
     e32rcrad_pkt_t* ptr = (e32rcrad_pkt_t*)frame_buffer;
-    //ptr->frame_ctrl = 0x0094; // block ack
-    ptr->frame_ctrl = 0x0040; // probe request
+    ptr->frame_ctrl = E32RCRAD_FRAME_CONTROL;
     ptr->duration = 0;
 
     uint32_t r =
@@ -449,7 +456,7 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     e32rcrad_pkt_t* parsed = (e32rcrad_pkt_t*)u8_ptr;
 
     #ifdef E32RCRAD_DEBUG_RX
-    if (dbg_ptr[0] == 0x40)
+    if (parsed->frame_ctrl == E32RCRAD_FRAME_CONTROL)
     {
         Serial.printf("RX[t %u]: ", millis());
         int i;
@@ -462,6 +469,9 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     #endif
 
     if (ctrl.sig_len < sizeof(e32rcrad_pkt_t)) {
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        _stat_rx_errs[0]++;
+        #endif
         return;
     }
 
@@ -478,19 +488,32 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     uint8_t  rx_flags = parsed->flags ^ r;
     uint32_t rx_seq   = parsed->seq_num ^ r;
 
-    if (parsed->frame_ctrl != 0x0040) { // frame type must match
+    if (parsed->frame_ctrl != E32RCRAD_FRAME_CONTROL) { // frame type must match
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        _stat_rx_errs[1]++;
+        //Serial.printf("\nE 0x%04X\n", parsed->frame_ctrl);
+        #endif
         return;
     }
     if (rx_uid != _uid) { // UID must match
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        _stat_rx_errs[2]++;
+        #endif
         return;
     }
     if (rx_sess == 0) { // invalid session ID
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        _stat_rx_errs[3]++;
+        #endif
         return;
     }
 
     // verify checksum of payload against claimed checksum
     uint32_t chksum = e32rcrad_getCheckSum(_salt, (uint8_t*)&(u8_ptr[4]), sizeof(e32rcrad_pkt_t) - 8);
     if (parsed->chksum != chksum) {
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        _stat_rx_errs[4]++;
+        #endif
         return;
     }
     // checksum needs to be valid for the next few security features to work and not be overwhelmed
@@ -505,8 +528,18 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
         }
         else if (_session_id == rx_sess)
         {
-            if (rx_seq <= _seq_num_prev) {
+            if (rx_seq <= _seq_num_prev)
+            {
                 // ignore duplicate or replay-attack
+                // still do a channel hop if it's a text
+                if ((rx_flags & (1 << E32RCRAD_FLAG_TEXT)) != 0) {
+                    _cur_chan = parsed->chan_hint ^ r; // sync with channel hop
+                    next_chan();
+                    _last_rxhop_time = now;
+                }
+                #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+                _stat_rx_errs[5]++;
+                #endif
                 return;
             }
             _seq_num_prev = rx_seq;
@@ -519,6 +552,9 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
             {
                 uint32_t j = invalid_sessions[i];
                 if (j == rx_sess) { // is invalid
+                    #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+                    _stat_rx_errs[6]++;
+                    #endif
                     return;
                 }
                 else if (j == 0) {
@@ -560,11 +596,24 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     {
         // a reply isn't critical, but make sure the session ID is correct
         if (_session_id != rx_sess) {
+            #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+            _stat_rx_errs[7]++;
+            #endif
             return;
         }
 
-        if (rx_seq <= _seq_num_prev) {
+        if (rx_seq <= _seq_num_prev)
+        {
             // ignore duplicate or replay-attack
+            // still do a channel hop if it's a text
+            if ((rx_flags & (1 << E32RCRAD_FLAG_TEXT)) != 0) {
+                _cur_chan = parsed->chan_hint ^ r; // sync with channel hop
+                next_chan();
+                _last_rxhop_time = now;
+            }
+            #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+            _stat_rx_errs[8]++;
+            #endif
             return;
         }
         _seq_num_prev = rx_seq;

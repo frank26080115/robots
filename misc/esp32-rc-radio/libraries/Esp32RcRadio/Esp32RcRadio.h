@@ -8,7 +8,7 @@
 #include <esp_wifi_types.h>
 
 #define E32RCRAD_PAYLOAD_SIZE   32
-#define E32RCRAD_TX_INTERV      100
+#define E32RCRAD_TX_INTERV      10
 #define E32RCRAD_TX_RETRANS     2
 #define E32RCRAD_TX_RETRANS_TXT 5
 #define E32RCRAD_CHAN_MAP_DEFAULT (0x3FFF & (~((uint32_t)((1 << 0) | (1 << 5) | (1 << 10) | (1 << 13)))))
@@ -19,7 +19,7 @@
 #define E32RCRAD_FINGER_QUOTES_RANDOMNESS
 #define E32RCRAD_FINGER_QUOTES_ENCRYPTION
 
-#define E32RCRAD_BIDIRECTIONAL
+//#define E32RCRAD_BIDIRECTIONAL
 
 //#define E32RCRAD_FORCE_PHY_RATE
 #define E32RCRAD_FORCE_BANDWIDTH
@@ -27,7 +27,8 @@
 //#define E32RCRAD_DEBUG_HOPTABLE
 //#define E32RCRAD_DEBUG_TX
 //#define E32RCRAD_DEBUG_RX
-#define E32RCRAD_COUNT_RX_SPENT_TIME
+//#define E32RCRAD_DEBUG_RX_ERRSTATS
+//#define E32RCRAD_COUNT_RX_SPENT_TIME
 
 enum
 {
@@ -64,6 +65,10 @@ class Esp32RcRadio
         inline void     add_rx_spent_time(uint32_t x) { _stat_rx_spent_time += x; };
         inline uint32_t get_txt_cnt      (void) { return _stat_txt_cnt; };
 
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        inline uint32_t* get_rx_err_stat(void) { return _stat_rx_errs; };
+        #endif
+
         // do not call this from application, it is called by a static callback routine
         void handle_rx(void* buf, wifi_promiscuous_pkt_type_t type);
 
@@ -86,6 +91,9 @@ class Esp32RcRadio
         uint32_t _stat_txt_cnt;
         uint32_t _stat_tmr;
         uint32_t _stat_drate;
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        uint32_t _stat_rx_errs[12];
+        #endif
 
         uint32_t _stat_rx_total;
         uint32_t _stat_rx_good;

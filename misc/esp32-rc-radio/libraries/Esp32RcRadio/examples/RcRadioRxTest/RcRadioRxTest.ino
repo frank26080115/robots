@@ -7,7 +7,7 @@ char msg_buf[E32RCRAD_PAYLOAD_SIZE];
 void setup()
 {
     Serial.begin(115200);
-    radio.begin(1, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
+    radio.begin(0x2000, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()
@@ -53,6 +53,19 @@ void loop()
         #ifdef E32RCRAD_COUNT_RX_SPENT_TIME
         Serial.printf(" , %0.1f / %u", (float)(((float)radio.get_rx_spent_time()) / (((float)1000.0))), now);
         #endif
+
+        #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
+        Serial.printf(" , RX-ERRs: ");
+        // print out the occurance of each type of error
+        uint32_t* rx_errs = radio.get_rx_err_stat();
+        int erridx;
+        for (erridx = 0; erridx < 12; erridx++)
+        {
+            Serial.printf(" %u ", rx_errs[erridx]);
+        }
+        memset(rx_errs, 0, 4*12); // clear errors for this second
+        #endif
+
         Serial.printf("\r\n");
         last_time_stat = now;
     }
