@@ -20,7 +20,9 @@ typedef struct
     uint8_t  chan_hint;  // what channel index was actually used to TX
     uint32_t seq_num;
     uint8_t  flags;      // contains things like a reply-request
+    #ifdef E32RCRAD_ADAPTIVE_INTERVAL
     uint8_t  interval;   // transmission interval that the receiver can adapt the timeout
+    #endif
     uint8_t  payload[E32RCRAD_PAYLOAD_SIZE]; // our custom payload
     uint32_t chksum;     // userspace checksum over the payload, accounts for the salt, not to be confused with FCS
                          // combined with the salt, this is meant to prevent impersonation attacks
@@ -60,7 +62,7 @@ Esp32RcRadio::Esp32RcRadio(bool is_tx)
 
 void Esp32RcRadio::var_reset(void)
 {
-    _tx_interval = E32RCRAD_TX_INTERV;
+    _tx_interval = E32RCRAD_TX_INTERV_DEF;
     _session_id = 0;
     _seq_num = 0;
     _seq_num_prev = 0;
@@ -70,6 +72,8 @@ void Esp32RcRadio::var_reset(void)
     _stat_rx_cnt = 0;
     _stat_txt_cnt = 0;
     _stat_drate = 0;
+    _stat_rx_lost = 0;
+    _stat_loss_rate = 0;
     #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
     memset(_stat_rx_errs, 0, 4*12);
     #endif
@@ -77,7 +81,12 @@ void Esp32RcRadio::var_reset(void)
     _stat_rx_good = 0;
     _last_rx_time = 0;
     _last_tx_time = 0;
-    _last_rxhop_time = 0;
+    _last_hop_time = 0;
+    _last_rx_time_4hop = 0;
+    _sync_hop_cnt = 0;
+    _tx_replyreq_tmr = 0;
+    _reply_request_rate = 0;
+    _reply_request_latch = false;
     _cur_chan = 0;
     _last_chan = -1;
     _text_send_timer = 0;
@@ -90,12 +99,10 @@ void Esp32RcRadio::begin(uint16_t chan_map, uint32_t uid, uint32_t salt)
 {
     instance = (Esp32RcRadio*)this;
     var_reset();
-    _chan_map = chan_map & 0x3FFF;
-    _chan_map = _chan_map == 0 ? E32RCRAD_CHAN_MAP_DEFAULT : _chan_map;
     _uid = uid;
     _salt = salt;
 
-    gen_hop_table();
+    set_chan_map(chan_map);
 
     if (has_wifi_init == false) // only start once
     {
@@ -131,6 +138,7 @@ void Esp32RcRadio::begin(uint16_t chan_map, uint32_t uid, uint32_t salt)
         #ifdef E32RCRAD_FORCE_RFPOWER
         esp_wifi_set_max_tx_power(84);
         #endif
+        prep_listener();
     }
     else
     {
@@ -192,6 +200,18 @@ void Esp32RcRadio::gen_hop_table(void)
     _cur_chan %= _hop_tbl_len;
 }
 
+void Esp32RcRadio::set_chan_map(uint16_t x)
+{
+    _chan_map = x & 0x3FFF;
+    _chan_map = _chan_map == 0 ? E32RCRAD_CHAN_MAP_DEFAULT : _chan_map;
+    gen_hop_table();
+}
+
+void Esp32RcRadio::set_tx_interval(uint16_t x)
+{
+    _tx_interval = x > E32RCRAD_TX_INTERV_MAX ? E32RCRAD_TX_INTERV_MAX : (x < E32RCRAD_TX_INTERV_MIN ? E32RCRAD_TX_INTERV_MIN : x);
+}
+
 void Esp32RcRadio::send(uint8_t* data, bool immediate)
 {
     memcpy(tx_buffer, data, E32RCRAD_PAYLOAD_SIZE);
@@ -251,14 +271,17 @@ void Esp32RcRadio::tx(void)
     _stat_tx_cnt++;
     _last_tx_time = millis();
 
+    #ifdef E32RCRAD_DEBUG_HOP
+    Serial.printf("TX %u %u\r\n", _last_tx_time, _seq_num);
+    #endif
+
     if (_is_tx)
     {
-        next_chan();
         #ifdef E32RCRAD_BIDIRECTIONAL
-        start_listener();
-        _statemachine = E32RCRAD_SM_LISTENING;
+        start_listener(); // start listening for a reply
         #endif
     }
+    _statemachine = E32RCRAD_SM_LISTENING;
 
     if (is_text)
     {
@@ -287,8 +310,12 @@ void Esp32RcRadio::next_chan(void)
     _cur_chan++;
     _cur_chan %= _hop_tbl_len;
     uint8_t nchan = _hop_table[_cur_chan];
-    if (nchan != _last_chan) // prevent wasting time changing to the same channel
+    //if (nchan != _last_chan) // prevent wasting time changing to the same channel
     {
+        #ifdef E32RCRAD_DEBUG_HOP
+        Serial.printf("HOP %u %u %u\r\n", millis(), _cur_chan, nchan);
+        #endif
+
         if (_is_tx == false) {
             esp_wifi_set_promiscuous(false);
         }
@@ -314,10 +341,14 @@ void Esp32RcRadio::next_chan(void)
         }
         _last_chan = nchan;
     }
+
+    _last_hop_time = millis();
 }
 
 void Esp32RcRadio::gen_header(void)
 {
+    uint32_t now = millis();
+
     e32rcrad_pkt_t* ptr = (e32rcrad_pkt_t*)frame_buffer;
     ptr->frame_ctrl = E32RCRAD_FRAME_CONTROL;
     ptr->duration = 0;
@@ -329,7 +360,9 @@ void Esp32RcRadio::gen_header(void)
             0
         #endif
         ;
-    // random number is used to simply make the packet look like it's encrypted
+    // the random number is used to make the MAC addresses random each time just in case it's a match for a real device
+    // we don't want that device to actually be confused
+    // it also makes the packet look like it's encrypted
     // it is not...
     // if the attacker reads this source code, the random number is pretty much useless
     ptr->padding[0] = r;
@@ -339,7 +372,9 @@ void Esp32RcRadio::gen_header(void)
     ptr->addrs[2]   = _session_id  ^ r;
     ptr->chan_hint  = _cur_chan    ^ r;
     ptr->seq_num    = _seq_num     ^ r;
+    #ifdef E32RCRAD_ADAPTIVE_INTERVAL
     ptr->interval   = _tx_interval ^ r;
+    #endif
     ptr->flags      = 0;
 
     #ifdef E32RCRAD_BIDIRECTIONAL
@@ -349,7 +384,11 @@ void Esp32RcRadio::gen_header(void)
     }
     else
     {
-        if ((_seq_num % (2 + (rand() % 4))) == 0) {
+        if ((now - _tx_replyreq_tmr) >= _reply_request_rate && _reply_request_rate != 0) {
+            _reply_request_latch = true;
+            _tx_replyreq_tmr = now;
+        }
+        if (_reply_request_latch) {
             ptr->flags |= (1 << E32RCRAD_FLAG_REPLYREQUEST);
         }
     }
@@ -363,20 +402,29 @@ void Esp32RcRadio::task(void)
     uint32_t now = millis();
     if (_is_tx == false)
     {
-        #ifdef E32RCRAD_BIDIRECTIONAL
-        if (_statemachine == E32RCRAD_SM_REPLYING || _text_send_timer > 0)
+        if (_statemachine == E32RCRAD_SM_REPLYING)
         {
-            esp_wifi_set_promiscuous(false);
+            //esp_wifi_set_promiscuous(false);
             tx();
-            start_listener();
             _statemachine = E32RCRAD_SM_LISTENING; // reply only once
         }
-        #endif
-
-        if ((now - _last_rxhop_time) >= (_tx_interval <= 0 ? 100 : (_tx_interval * 3)))
+        else if (_statemachine == E32RCRAD_SM_LISTENING && (now - _last_rx_time_4hop) >= _tx_interval) // reply has been sent, can switch channels
         {
-            // timeout waiting for packet, go to next channel just in case this one is completely useless
-            _last_rxhop_time = now;
+            _last_rx_time_4hop = now;
+            next_chan(); // this should also restart the listening
+            _statemachine = E32RCRAD_SM_IDLE;
+        }
+        else if (_sync_hop_cnt > 0 && (now - _last_rx_time_4hop) >= _tx_interval)
+        {
+            // we do quick hops in attempts to quickly resynchronize with the transmitter
+            _last_rx_time_4hop = now;
+            _sync_hop_cnt--;
+            next_chan();
+        }
+        else if (_sync_hop_cnt <= 0 && (now - _last_hop_time) >= (_tx_interval <= 0 ? 100 : (_tx_interval * 3)))
+        {
+            // quick hops didn't work, so we've lost sync with transmitter, do slow hops now
+            // this is so that we don't stay in a useless channel forever
             next_chan();
         }
 
@@ -388,17 +436,18 @@ void Esp32RcRadio::task(void)
     }
     else // _is_tx == true
     {
-        #ifdef E32RCRAD_BIDIRECTIONAL
         if (_statemachine == E32RCRAD_SM_LISTENING)
         {
-            if ((now - _last_tx_time) >= (_tx_interval - 2))
+            if ((now - _last_tx_time) >= (_tx_interval / 3))
             {
                 _statemachine = E32RCRAD_SM_IDLE;
+                #ifdef E32RCRAD_BIDIRECTIONAL
                 esp_wifi_set_promiscuous(false);
+                #endif
+                next_chan();
             }
         }
         else
-        #endif
         {
             if ((now - _last_tx_time) >= _tx_interval)
             {
@@ -412,13 +461,21 @@ void Esp32RcRadio::task(void)
     if ((now - _stat_tmr) >= 1000)
     {
         _stat_drate = _is_tx ? _stat_tx_cnt : _stat_rx_cnt;
+        _stat_loss_rate = _stat_rx_lost;
         _stat_tx_cnt = 0;
         _stat_rx_cnt = 0;
+        _stat_rx_lost = 0;
         _stat_tmr = now;
     }
 }
 
 void Esp32RcRadio::start_listener(void)
+{
+    //prep_listener();
+    esp_wifi_set_promiscuous(true);
+}
+
+void Esp32RcRadio::prep_listener(void)
 {
     wifi_promiscuous_filter_t filter1 = {
         .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT
@@ -429,7 +486,6 @@ void Esp32RcRadio::start_listener(void)
     esp_wifi_set_promiscuous_filter(&filter1);
     //esp_wifi_set_promiscuous_ctrl_filter(&filter2);
     esp_wifi_set_promiscuous_rx_cb(&promiscuous_handler);
-    esp_wifi_set_promiscuous(true);
 }
 
 static void promiscuous_handler(void* buf, wifi_promiscuous_pkt_type_t type)
@@ -491,7 +547,7 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     if (parsed->frame_ctrl != E32RCRAD_FRAME_CONTROL) { // frame type must match
         #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
         _stat_rx_errs[1]++;
-        //Serial.printf("\nE 0x%04X\n", parsed->frame_ctrl);
+        //Serial.printf("E HDR 0x%04X\n", parsed->frame_ctrl);
         #endif
         return;
     }
@@ -518,8 +574,12 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     }
     // checksum needs to be valid for the next few security features to work and not be overwhelmed
 
+    bool to_hop = false;
+
     if (_is_tx == false) // only receiver requires additional security
     {
+        to_hop = true; // receiver should hop immediately if no need to reply
+
         if (_session_id == 0) // first packet ever received
         {
             // start the new session
@@ -535,13 +595,20 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
                 if ((rx_flags & (1 << E32RCRAD_FLAG_TEXT)) != 0) {
                     _cur_chan = parsed->chan_hint ^ r; // sync with channel hop
                     next_chan();
-                    _last_rxhop_time = now;
+                    _last_rx_time = now;
                 }
                 #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
                 _stat_rx_errs[5]++;
                 #endif
                 return;
             }
+
+            // calculate how many packets were lost
+            uint32_t diff = rx_seq - _seq_num_prev;
+            diff -= 1;
+            diff = diff > 0xFFFF ? 0xFFFF : diff;
+            _stat_rx_lost += diff;
+
             _seq_num_prev = rx_seq;
         }
         else if (_session_id != rx_sess)
@@ -583,16 +650,23 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
             _seq_num_prev = rx_seq;
         }
 
+        #ifdef E32RCRAD_ADAPTIVE_INTERVAL
         _tx_interval = parsed->interval ^ r;
+        #endif
 
         #ifdef E32RCRAD_BIDIRECTIONAL
         if ((rx_flags & (1 << E32RCRAD_FLAG_REPLYREQUEST)) != 0 || _text_send_timer > 0) {
             _statemachine = E32RCRAD_SM_REPLYING; // signal that the tx function needs to run
+            to_hop = false; // receiver should hop immediately if no need to reply, but wait to hop if need to reply
         }
+        else
         #endif
+        {
+            _statemachine = E32RCRAD_SM_IDLE;
+        }
     }
     #ifdef E32RCRAD_BIDIRECTIONAL
-    else
+    else // _is_tx == true
     {
         // a reply isn't critical, but make sure the session ID is correct
         if (_session_id != rx_sess) {
@@ -605,12 +679,6 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
         if (rx_seq <= _seq_num_prev)
         {
             // ignore duplicate or replay-attack
-            // still do a channel hop if it's a text
-            if ((rx_flags & (1 << E32RCRAD_FLAG_TEXT)) != 0) {
-                _cur_chan = parsed->chan_hint ^ r; // sync with channel hop
-                next_chan();
-                _last_rxhop_time = now;
-            }
             #ifdef E32RCRAD_DEBUG_RX_ERRSTATS
             _stat_rx_errs[8]++;
             #endif
@@ -644,13 +712,41 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
         txt_flag = true;
         _stat_txt_cnt++;
     }
+    _reply_request_latch = false;
+
+    #ifdef E32RCRAD_DEBUG_HOP
+    bool hop_dbg_nl = true;
+    Serial.printf("RX %u %u", now, _seq_num_prev);
+    #endif
 
     if (_is_tx == false)
     {
         _cur_chan = parsed->chan_hint ^ r; // sync with channel hop
-        next_chan();
-        _last_rxhop_time = now;
+        #ifdef E32RCRAD_DEBUG_HOP
+        Serial.printf(" %u", _cur_chan);
+        #endif
+        if (to_hop) {
+            #ifdef E32RCRAD_DEBUG_HOP
+            Serial.printf("\r\nR");
+            hop_dbg_nl = false;
+            #endif
+            next_chan();
+            _last_rx_time_4hop = now - (_tx_interval / 8); // offset the time of the next hop very slightly
+        }
+        else {
+            _last_rx_time_4hop = now - _tx_interval + (_tx_interval / 4); // offset the time of the next hop
+        }
+
+        // do this many quick hops if the transmitter disappears
+        _sync_hop_cnt = _hop_tbl_len * 3;
     }
+
+    #ifdef E32RCRAD_DEBUG_HOP
+    if (hop_dbg_nl) {
+        Serial.printf("\r\n");
+    }
+    #endif
+
     _last_rx_time = now;
     _stat_rx_rssi = ctrl.rssi;
     _stat_rx_good++;
