@@ -4,4 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define ROACH_SCALE_MULTIPLIER 1000
+
 #endif

@@ -65,9 +65,9 @@ roach_nvm_servo_t;
 
 typedef struct
 {
-    int32_t p;
-    int32_t i;
-    int32_t d;
+    int32_t  p;
+    int32_t  i;
+    int32_t  d;
     uint32_t output_limit;
     uint32_t accumulator_limit;
     uint32_t accumulator_decay;

@@ -32,7 +32,10 @@ void roach_drive_mix(int32_t throttle, int32_t steering, int32_t gyro_correction
     }
 
     right = roach_drive_applyServoParams(right, cfg);
-    left = roach_drive_applyServoParams(left, cfg);
+    left  = roach_drive_applyServoParams(left, cfg);
+
+    *output_left  = left;
+    *output_right = right;
 }
 
 int32_t roach_drive_applyServoParams(int32_t spd, roach_nvm_servo_t* cfg)
