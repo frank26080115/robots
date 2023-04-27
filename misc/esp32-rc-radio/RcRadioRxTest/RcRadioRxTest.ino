@@ -6,8 +6,8 @@ char msg_buf[E32RCRAD_PAYLOAD_SIZE];
 
 void setup()
 {
-    Serial.begin(115200);
-    radio.begin(0x1000, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
+    Serial.begin(500000);
+    radio.begin(0x2001, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()
@@ -49,7 +49,7 @@ void loop()
         uint32_t rx_total, rx_good;
         signed rssi;
         radio.get_rx_stats(&rx_total, &rx_good, &rssi);
-        Serial.printf("STAT: %u , %u / %u , %d", radio.get_data_rate(), rx_good, rx_total, rssi);
+        Serial.printf("STAT: %u , %u / %u , %u, %d", radio.get_data_rate(), rx_good, rx_total, radio.get_loss_rate(), rssi);
         #ifdef E32RCRAD_COUNT_RX_SPENT_TIME
         Serial.printf(" , %0.1f / %u", (float)(((float)radio.get_rx_spent_time()) / (((float)1000.0))), now);
         #endif
