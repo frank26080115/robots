@@ -85,7 +85,7 @@ void Esp32RcRadio::var_reset(void)
     _last_rx_time_4hop = 0;
     _sync_hop_cnt = 0;
     _tx_replyreq_tmr = 0;
-    _reply_request_rate = 0;
+    _reply_request_rate = 1000;
     _reply_request_latch = false;
     _cur_chan = 0;
     _last_chan = -1;
@@ -98,6 +98,16 @@ void Esp32RcRadio::var_reset(void)
 void Esp32RcRadio::begin(uint16_t chan_map, uint32_t uid, uint32_t salt)
 {
     instance = (Esp32RcRadio*)this;
+
+    #ifdef E32RCRAD_DEBUG_PINS
+    pinMode     (E32RCRAD_DEBUG_PIN_TX, OUTPUT);
+    digitalWrite(E32RCRAD_DEBUG_PIN_TX, _dbgpin_tx = LOW);
+    pinMode     (E32RCRAD_DEBUG_PIN_RX, OUTPUT);
+    digitalWrite(E32RCRAD_DEBUG_PIN_RX, _dbgpin_rx = LOW);
+    pinMode     (E32RCRAD_DEBUG_PIN_CH, OUTPUT);
+    digitalWrite(E32RCRAD_DEBUG_PIN_CH, _dbgpin_ch = LOW);
+    #endif
+
     var_reset();
     _uid = uid;
     _salt = salt;
@@ -249,6 +259,10 @@ void Esp32RcRadio::tx(void)
 
     ptr->chksum = e32rcrad_getCheckSum(_salt, &(frame_buffer[4]), sizeof(e32rcrad_pkt_t) - 8);
 
+    #ifdef E32RCRAD_DEBUG_PINS
+    digitalWrite(E32RCRAD_DEBUG_PIN_TX, _dbgpin_tx = (_dbgpin_tx == LOW ? HIGH : LOW));
+    #endif
+
     int i;
     for (i = 0; i == 0 || (i < E32RCRAD_TX_RETRANS && _is_tx && is_text == false); i++)
     {
@@ -275,13 +289,7 @@ void Esp32RcRadio::tx(void)
     Serial.printf("TX %u %u\r\n", _last_tx_time, _seq_num);
     #endif
 
-    if (_is_tx)
-    {
-        #ifdef E32RCRAD_BIDIRECTIONAL
-        start_listener(); // start listening for a reply
-        #endif
-    }
-    _statemachine = E32RCRAD_SM_LISTENING;
+    _statemachine = E32RCRAD_SM_SENDING;
 
     if (is_text)
     {
@@ -335,6 +343,10 @@ void Esp32RcRadio::next_chan(void)
                 }
             }
         }
+
+        #ifdef E32RCRAD_DEBUG_PINS
+        digitalWrite(E32RCRAD_DEBUG_PIN_CH, _dbgpin_ch = (_dbgpin_ch == LOW ? HIGH : LOW));
+        #endif
 
         if (_is_tx == false) {
             start_listener();
@@ -400,13 +412,24 @@ void Esp32RcRadio::gen_header(void)
 void Esp32RcRadio::task(void)
 {
     uint32_t now = millis();
+
     if (_is_tx == false)
     {
-        if (_statemachine == E32RCRAD_SM_REPLYING)
+        if (_statemachine == E32RCRAD_SM_SENDING)
+        {
+            if ((now - _last_tx_time) >= E32RCRAD_TX_MIN_TIME)
+            {
+                _statemachine = E32RCRAD_SM_LISTENING;
+            }
+        }
+        else if (_statemachine == E32RCRAD_SM_REPLYING)
         {
             //esp_wifi_set_promiscuous(false);
-            tx();
-            _statemachine = E32RCRAD_SM_LISTENING; // reply only once
+            if ((now - _last_rx_time) >= E32RCRAD_TX_MIN_TIME)
+            {
+                tx();
+                // state will be set to sending
+            }
         }
         else if (_statemachine == E32RCRAD_SM_LISTENING && (now - _last_rx_time_4hop) >= _tx_interval) // reply has been sent, can switch channels
         {
@@ -436,7 +459,19 @@ void Esp32RcRadio::task(void)
     }
     else // _is_tx == true
     {
-        if (_statemachine == E32RCRAD_SM_LISTENING)
+        if (_statemachine == E32RCRAD_SM_SENDING)
+        {
+            #ifdef E32RCRAD_BIDIRECTIONAL
+            if ((now - _last_tx_time) >= E32RCRAD_TX_MIN_TIME)
+            {
+                start_listener(); // start listening for a reply
+                _statemachine = E32RCRAD_SM_LISTENING;
+            }
+            #else
+            _statemachine = E32RCRAD_SM_LISTENING;
+            #endif
+        }
+        else if (_statemachine == E32RCRAD_SM_LISTENING)
         {
             if ((now - _last_tx_time) >= (_tx_interval / 3))
             {
@@ -689,6 +724,10 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
     #endif
 
     // all checks pass
+
+    #ifdef E32RCRAD_DEBUG_PINS
+    digitalWrite(E32RCRAD_DEBUG_PIN_RX, _dbgpin_rx = (_dbgpin_rx == LOW ? HIGH : LOW));
+    #endif
 
     uint8_t* dst_buf = ((rx_flags & (1 << E32RCRAD_FLAG_TEXT)) != 0) ? (uint8_t*)txt_rx_buffer : (uint8_t*)rx_buffer;
 

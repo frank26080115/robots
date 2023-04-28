@@ -8,9 +8,10 @@
 #include <esp_wifi_types.h>
 
 #define E32RCRAD_PAYLOAD_SIZE   32
-#define E32RCRAD_TX_INTERV_DEF  10
+#define E32RCRAD_TX_INTERV_DEF  20
 #define E32RCRAD_TX_INTERV_MAX  100
 #define E32RCRAD_TX_INTERV_MIN  5
+#define E32RCRAD_TX_MIN_TIME    2
 #define E32RCRAD_TX_RETRANS     1
 #define E32RCRAD_TX_RETRANS_TXT 5
 #define E32RCRAD_CHAN_MAP_DEFAULT (0x3FFF & (~((uint32_t)((1 << 0) | (1 << 5) | (1 << 10) | (1 << 13)))))
@@ -20,6 +21,11 @@
 
 #define E32RCRAD_FINGER_QUOTES_RANDOMNESS
 #define E32RCRAD_FINGER_QUOTES_ENCRYPTION
+
+//#define E32RCRAD_DEBUG_PINS
+#define E32RCRAD_DEBUG_PIN_TX 0
+#define E32RCRAD_DEBUG_PIN_RX 0
+#define E32RCRAD_DEBUG_PIN_CH 0
 
 #define E32RCRAD_BIDIRECTIONAL
 #define E32RCRAD_ADAPTIVE_INTERVAL
@@ -37,6 +43,7 @@
 enum
 {
     E32RCRAD_SM_IDLE,
+    E32RCRAD_SM_SENDING,
     E32RCRAD_SM_LISTENING,
     E32RCRAD_SM_REPLYING,
 };
@@ -122,6 +129,10 @@ class Esp32RcRadio
         uint32_t _last_tx_time;
 
         uint32_t _text_send_timer;
+
+        #ifdef E32RCRAD_DEBUG_PINS
+        uint8_t _dbgpin_tx, _dbgpin_rx, _dbgpin_ch;
+        #endif
 
         void tx(void);                 // actually transmit whatever is queued
         void gen_header(void);         // generate the frame header
