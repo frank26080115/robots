@@ -7,7 +7,7 @@ char msg_buf[E32RCRAD_PAYLOAD_SIZE];
 void setup()
 {
     Serial.begin(500000);
-    radio.begin(0x2001, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
+    radio.begin(0x2001 | 0x8000, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()

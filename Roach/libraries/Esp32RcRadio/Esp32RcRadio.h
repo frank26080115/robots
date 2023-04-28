@@ -8,7 +8,7 @@
 #include <esp_wifi_types.h>
 
 #define E32RCRAD_PAYLOAD_SIZE   32
-#define E32RCRAD_TX_INTERV_DEF  20
+#define E32RCRAD_TX_INTERV_DEF  5
 #define E32RCRAD_TX_INTERV_MAX  100
 #define E32RCRAD_TX_INTERV_MIN  5
 #define E32RCRAD_TX_MIN_TIME    2
@@ -36,7 +36,7 @@
 //#define E32RCRAD_DEBUG_HOPTABLE
 //#define E32RCRAD_DEBUG_TX
 //#define E32RCRAD_DEBUG_RX
-//#define E32RCRAD_DEBUG_HOP
+#define E32RCRAD_DEBUG_HOP
 #define E32RCRAD_DEBUG_RX_ERRSTATS
 //#define E32RCRAD_COUNT_RX_SPENT_TIME
 
@@ -100,6 +100,7 @@ class Esp32RcRadio
         uint16_t _chan_map;
         uint8_t  _cur_chan;
         int8_t   _last_chan;
+        bool     _single_chan_rx;
         uint8_t  _hop_table[14];
         uint8_t  _hop_tbl_len;
         uint8_t  _sync_hop_cnt;
