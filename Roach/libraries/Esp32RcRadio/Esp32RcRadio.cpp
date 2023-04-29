@@ -212,7 +212,7 @@ void Esp32RcRadio::gen_hop_table(void)
 
 void Esp32RcRadio::set_chan_map(uint16_t x)
 {
-    _single_chan_rx = (x & 0x8000) != 0;
+    _single_chan_mode = (x & 0x8000) != 0;
     _chan_map = x & 0x3FFF;
     _chan_map = _chan_map == 0 ? E32RCRAD_CHAN_MAP_DEFAULT : _chan_map;
     gen_hop_table();
@@ -435,7 +435,7 @@ void Esp32RcRadio::task(void)
         else if (_statemachine == E32RCRAD_SM_LISTENING && (now - _last_rx_time_4hop) >= _tx_interval) // reply has been sent, can switch channels
         {
             _last_rx_time_4hop = now;
-            if (_single_chan_rx == false) {
+            if (_single_chan_mode == false) {
                 next_chan(); // this should also restart the listening
             }
             _statemachine = E32RCRAD_SM_IDLE;
@@ -445,7 +445,7 @@ void Esp32RcRadio::task(void)
             // we do quick hops in attempts to quickly resynchronize with the transmitter
             _last_rx_time_4hop = now;
             _sync_hop_cnt--;
-            if (_single_chan_rx == false) {
+            if (_single_chan_mode == false) {
                 next_chan();
             }
         }
@@ -453,7 +453,7 @@ void Esp32RcRadio::task(void)
         {
             // quick hops didn't work, so we've lost sync with transmitter, do slow hops now
             // this is so that we don't stay in a useless channel forever
-            if (_single_chan_rx == false) {
+            if (_single_chan_mode == false) {
                 next_chan();
             }
         }
@@ -483,10 +483,13 @@ void Esp32RcRadio::task(void)
             if ((now - _last_tx_time) >= (_tx_interval / 3))
             {
                 _statemachine = E32RCRAD_SM_IDLE;
-                #ifdef E32RCRAD_BIDIRECTIONAL
-                esp_wifi_set_promiscuous(false);
-                #endif
-                next_chan();
+                if (_single_chan_mode == false)
+                {
+                    #ifdef E32RCRAD_BIDIRECTIONAL
+                    esp_wifi_set_promiscuous(false);
+                    #endif
+                    next_chan();
+                }
             }
         }
         else
@@ -510,7 +513,7 @@ void Esp32RcRadio::task(void)
         _stat_tmr = now;
 
         // every second, if in single channel RX mode, assess if the data rate is poor, and switch channel if it is
-        if (_is_tx == false && _single_chan_rx)
+        if (_is_tx == false && _single_chan_mode)
         {
             if (_stat_drate < ((1000 / 20) - 5)) {
                 next_chan();
@@ -644,7 +647,7 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
                 // still do a channel hop if it's a text
                 if ((rx_flags & (1 << E32RCRAD_FLAG_TEXT)) != 0) {
                     _cur_chan = parsed->chan_hint ^ r; // sync with channel hop
-                    if (_single_chan_rx == false) {
+                    if (_single_chan_mode == false) {
                         next_chan();
                     }
                     _last_rx_time = now;
@@ -786,7 +789,7 @@ void Esp32RcRadio::handle_rx(void* buf, wifi_promiscuous_pkt_type_t type)
             Serial.printf("\r\nR");
             hop_dbg_nl = false;
             #endif
-            if (_single_chan_rx == false) {
+            if (_single_chan_mode == false) {
                 next_chan();
             }
             _last_rx_time_4hop = now - (_tx_interval / 8); // offset the time of the next hop very slightly
