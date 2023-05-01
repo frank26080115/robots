@@ -37,7 +37,7 @@ e32rcrad_pkt_t;
 
 static uint8_t tx_buffer[E32RCRAD_PAYLOAD_SIZE];     // application buffer
 static uint8_t rx_buffer[E32RCRAD_PAYLOAD_SIZE];     // application buffer
-static uint8_t frame_buffer[sizeof(e32rcrad_pkt_t)]; // the buffer that's actually sent (and also used for rx comparisons)
+static uint8_t frame_buffer[sizeof(e32rcrad_pkt_t)]; // the buffer that's actually sent
 static bool    rx_flag;                              // indicator of new packet received
 
 static char    txt_rx_buffer[E32RCRAD_PAYLOAD_SIZE]; // application text buffer

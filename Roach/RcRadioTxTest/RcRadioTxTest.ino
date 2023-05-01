@@ -1,13 +1,14 @@
-#include <Esp32RcRadio.h>
+#include <nRF52RcRadio.h>
+#include <Adafruit_TinyUSB.h>
 
-Esp32RcRadio radio(true); // is transmitter
+nRF52RcRadio radio(true); // is transmitter
 
-char msg_buf[E32RCRAD_PAYLOAD_SIZE];
+char msg_buf[NRFRR_PAYLOAD_SIZE];
 
 void setup()
 {
     Serial.begin(500000);
-    radio.begin(0x2001, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
+    radio.begin(0x1000, 0x1234ABCD, 0xDEADBEEF); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()
