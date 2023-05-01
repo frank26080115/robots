@@ -13,6 +13,7 @@ uint32_t nrf5rand_u32(void);
 uint8_t nrf5rand_u8(void);
 void nrf5rand_vector(uint8_t* buf, int len);
 int nrf5rand_avail(void);
+void nrf5rand_flush(void);
 
 #ifdef __cplusplus
 }

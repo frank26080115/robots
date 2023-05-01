@@ -94,6 +94,15 @@ int nrf5rand_avail(void)
     return x;
 }
 
+void nrf5rand_flush(void)
+{
+    __disable_irq();
+    rng_fifo_w = 0;
+    rng_fifo_r = 0;
+    __enable_irq();
+    nrfx_rng_start();
+}
+
 static void rng_handler(uint8_t rng_data)
 {
     uint16_t n = (rng_fifo_w + 1) % rng_fifo_size;
