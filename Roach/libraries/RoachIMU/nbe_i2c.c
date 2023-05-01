@@ -1,8 +1,12 @@
+#if defined(ESP32)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <hal/i2c_hal.h>
+//#include <hal/i2c_hal.h>
+#include "nbe_i2c_funcprotos.h"
+#include "nbe_i2c_ll.h"
 #include <driver/gpio.h>
 #include <hal/gpio_hal.h>
 #include <soc/i2c_periph.h>
@@ -179,7 +183,7 @@ void nbe_i2c_reset(nbe_i2c_t *nbe_i2c) {
 }
 
 void nbe_i2c_start(nbe_i2c_t *nbe_i2c) {
-    nbe_i2c->cmd.op_code = I2C_LL_CMD_RESTART;
+    nbe_i2c->cmd.op_code = I2C_LL_CMD_RESTART; // WARNING: this command might have a different value depending on which ESP32 chip is used
     i2c_hal_write_cmd_reg(&nbe_i2c->hi2c, nbe_i2c->cmd, nbe_i2c->cmd_index);
     nbe_i2c->cmd_index++;
 }
@@ -271,4 +275,6 @@ void nbe_i2c_commit(nbe_i2c_t *nbe_i2c) {
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

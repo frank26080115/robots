@@ -25,57 +25,6 @@
 #include <string.h>
 
 // ------------------------------------------------------------------------
-// Private types
-
-#define SHTP_INSTANCES (1)  // Number of SHTP devices supported
-#define SHTP_MAX_CHANS (8)  // Max channels per SHTP device
-#define SHTP_HDR_LEN (4)
-
-typedef struct shtp_Channel_s {
-    uint8_t nextOutSeq;
-    uint8_t nextInSeq;
-    shtp_Callback_t *callback;
-    void *cookie;
-} shtp_Channel_t;
-
-// Per-instance data for SHTP
-typedef struct shtp_s {
-    // Associated SHTP HAL
-    // If 0, this indicates the SHTP instance is available for new opens
-    sh2_Hal_t *pHal;
-
-    // Asynchronous Event callback and it's cookie
-    shtp_EventCallback_t *eventCallback;
-    void * eventCookie;
-
-    // Transmit support
-    uint8_t outTransfer[SH2_HAL_MAX_TRANSFER_OUT];
-
-    // Receive support
-    uint16_t inRemaining;
-    uint8_t  inChan;
-    uint8_t  inPayload[SH2_HAL_MAX_PAYLOAD_IN];
-    uint16_t inCursor;
-    uint32_t inTimestamp;
-    uint8_t inTransfer[SH2_HAL_MAX_TRANSFER_IN];
-
-    // SHTP Channels
-    shtp_Channel_t      chan[SHTP_MAX_CHANS];
-
-    // Stats
-    uint32_t rxBadChan;
-    uint32_t rxShortFragments;
-    uint32_t rxTooLargePayloads;
-    uint32_t rxInterruptedPayloads;
-    
-    uint32_t badTxChan;
-    uint32_t txDiscards;
-    uint32_t txTooLargePayloads;
-
-} shtp_t;
-
-
-// ------------------------------------------------------------------------
 // Private data
 
 static shtp_t instances[SHTP_INSTANCES];

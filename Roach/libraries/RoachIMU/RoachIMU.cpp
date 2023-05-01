@@ -14,15 +14,48 @@ static void hal_callback(void *cookie, sh2_AsyncEvent_t *pEvent);
 static void sensorHandler(void *cookie, sh2_SensorEvent_t *pEvent);
 static void hal_hardwareReset(void);
 
-static void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees = false);
-static void quaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees = false);
-static void quaternionToEulerGI(sh2_GyroIntegratedRV_t* rotational_vector, euler_t* ypr, bool degrees = false);
+#if defined(NRF52840_XXAA)
+static void twi_handler(nrfx_twim_evt_t const * p_event, void * p_context);
+static nrfx_twim_t m_twi = {.p_twim = NRF_TWIM0, .drv_inst_idx = 0, };//NRFX_TWIM_INSTANCE(TWI_INSTANCE_ID);
+static volatile bool m_xfer_done = false;
+static volatile int  m_xfer_err = 0;
 
-RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int rst, int sda, int scl)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern nrfx_err_t nrfx_twim_init(nrfx_twim_t const *        p_instance,
+                                 nrfx_twim_config_t const * p_config,
+                                 nrfx_twim_evt_handler_t    event_handler,
+                                 void *                     p_context);
+
+extern nrfx_err_t nrfx_twim_tx(nrfx_twim_t const * p_instance,
+                               uint8_t             address,
+                               uint8_t     const * p_data,
+                               size_t              length,
+                               bool                no_stop);
+
+extern nrfx_err_t nrfx_twim_rx(nrfx_twim_t const * p_instance,
+                               uint8_t             address,
+                               uint8_t *           p_data,
+                               size_t              length);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
+static void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees);
+static void quaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees);
+static void quaternionToEulerGI(sh2_GyroIntegratedRV_t* rotational_vector, euler_t* ypr, bool degrees);
+
+RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int dev_addr, int rst, int sda, int scl)
 {
     sample_interval = samp_interval;
     read_interval = rd_interval;
     install_orientation = orientation;
+    i2c_addr = dev_addr;
     pin_rst = rst;
     pin_sda = sda;
     pin_scl = scl;
@@ -31,7 +64,17 @@ RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int rst,
 
 void RoachIMU::begin(void)
 {
-    nbe_i2c_init(&nbe_i2c, 0, pin_sda, pin_scl, 400000);
+    #if defined(ESP32)
+    nbe_i2c_init(&nbe_i2c, 0, (gpio_num_t)pin_sda, (gpio_num_t)pin_scl, 400000);
+    #elif defined(NRF52840_XXAA)
+    nrfx_twim_config_t twi_config = {
+       .scl                = (uint32_t)pin_scl,
+       .sda                = (uint32_t)pin_sda,
+       .frequency          = NRF_TWIM_FREQ_400K,
+       .interrupt_priority = 2,
+    };
+    nrfx_twim_init(&m_twi, &twi_config, twi_handler, NULL);
+    #endif
     hal.open = i2chal_open;
     hal.close = i2chal_close;
     hal.read = i2chal_read;
@@ -50,12 +93,15 @@ void RoachIMU::task(void)
     {
         case ROACHIMU_SM_SETUP:
             {
+                #if defined(ESP32)
                 if (nbe_i2c_is_busy(&nbe_i2c)) {
                     state_machine = ROACHIMU_SM_ERROR_WAIT;
                     error_time = millis();
                     break;
                 }
-                reset_occurred = false;
+                #elif defined(NRF52840_XXAA)
+                #endif
+                reset_occured = false;
                 int err_ret;
                 hal_hardwareReset();
                 err_ret = sh2_open(&hal, hal_callback, NULL);
@@ -88,37 +134,66 @@ void RoachIMU::task(void)
                     error_time = millis();
                     break;
                 }
-                state_machine = ROACHIMU_SM_SVC_GET_HEADER;
+                state_machine = ROACHIMU_SM_SVC_START;
             }
             break;
+        case ROACHIMU_SM_SVC_START:
         case ROACHIMU_SM_SVC_GET_HEADER:
             {
-                nbe_i2c_reset();
                 int len = 4;
+                #if defined(ESP32)
+                nbe_i2c_reset(&nbe_i2c);
                 tx_buff[0] = i2c_first_byte_read(i2c_addr);
                 nbe_i2c_set_tx_buf(&nbe_i2c, tx_buff);
-                nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_nbe);
+                nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_i2c);
                 nbe_i2c_start(&nbe_i2c);
                 if (len > 1) {
                     nbe_i2c_read_ack(&nbe_i2c, len - 1);
                 }
                 nbe_i2c_read_nak(&nbe_i2c, 1);
                 nbe_i2c_commit(&nbe_i2c);
+                #elif defined(NRF52840_XXAA)
+                m_xfer_done = false;
+                m_xfer_err = 0;
+                nrfx_err_t sts = nrfx_twim_rx(&m_twi, i2c_addr, (uint8_t*)&rx_buff_i2c, len);
+                if (sts != NRF_SUCCESS) {
+                    state_machine = ROACHIMU_SM_ERROR;
+                    break;
+                }
+                #endif
                 state_machine = ROACHIMU_SM_SVC_GET_HEADER_WAIT;
                 read_time = millis();
             }
             break;
         case ROACHIMU_SM_SVC_GET_HEADER_WAIT:
             {
-                if (nbe_i2c_is_busy(&nbe_i2c) == false)
+                bool timeout = (millis() - read_time) >= 100;
+                if (
+                    #if defined(ESP32)
+                        nbe_i2c_is_busy(&nbe_i2c) == false
+                    #elif defined(NRF52840_XXAA)
+                        m_xfer_done || timeout
+                    #endif
+                    )
                 {
-                    if (nbe_i2c.error != 0)
+                    if (
+                        #if defined(ESP32)
+                            nbe_i2c.error != 0
+                        #elif defined(NRF52840_XXAA)
+                            m_xfer_err != 0 || timeout
+                        #endif
+                        )
                     {
                         state_machine = ROACHIMU_SM_ERROR;
                         break;
                     }
+                    #if defined(NRF52840_XXAA)
+                    m_xfer_done = false;
+                    m_xfer_err = 0;
+                    #endif
 
-                    uint8_t* header = (uint8_t*)rx_buf;
+                    uint8_t* header = (uint8_t*)rx_buff_i2c;
+                    
                     // Determine amount to read
                     uint16_t packet_size = (uint16_t)header[0] | (uint16_t)header[1] << 8;
                     // Unset the "continue" bit
@@ -152,36 +227,65 @@ void RoachIMU::task(void)
                 } else {
                     svc_reader.read_size = min(ROACHIMU_BUFF_RX_SIZE, svc_reader.cargo_remaining + 4);
                 }
-                nbe_i2c_reset();
                 int len = svc_reader.read_size;
+
+                #if defined(ESP32)
+                nbe_i2c_reset(&nbe_i2c);
                 tx_buff[0] = i2c_first_byte_read(i2c_addr);
                 nbe_i2c_set_tx_buf(&nbe_i2c, tx_buff);
-                nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_nbe);
+                nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_i2c);
                 nbe_i2c_start(&nbe_i2c);
                 if (len > 1) {
                     nbe_i2c_read_ack(&nbe_i2c, len - 1);
                 }
                 nbe_i2c_read_nak(&nbe_i2c, 1);
                 nbe_i2c_commit(&nbe_i2c);
+                #elif defined(NRF52840_XXAA)
+                m_xfer_done = false;
+                m_xfer_err = 0;
+                nrfx_err_t sts = nrfx_twim_rx(&m_twi, i2c_addr, (uint8_t*)&rx_buff_i2c, len);
+                if (sts != NRF_SUCCESS) {
+                    state_machine = ROACHIMU_SM_ERROR;
+                    break;
+                }
+                #endif
+
                 state_machine = ROACHIMU_SM_SVC_READ_CHUNK_WAIT;
             }
             break;
         case ROACHIMU_SM_SVC_READ_CHUNK_WAIT:
             {
-                if (nbe_i2c_is_busy(&nbe_i2c) == false)
+                bool timeout = (millis() - read_time) >= 300;
+                if (
+                    #if defined(ESP32)
+                        nbe_i2c_is_busy(&nbe_i2c) == false
+                    #elif defined(NRF52840_XXAA)
+                        m_xfer_done || timeout
+                    #endif
+                    )
                 {
-                    if (nbe_i2c.error != 0)
+                    if (
+                        #if defined(ESP32)
+                            nbe_i2c.error != 0
+                        #elif defined(NRF52840_XXAA)
+                            m_xfer_err != 0 || timeout
+                        #endif
+                        )
                     {
                         state_machine = ROACHIMU_SM_ERROR;
                         break;
                     }
+                    #if defined(NRF52840_XXAA)
+                    m_xfer_done = false;
+                    m_xfer_err = 0;
+                    #endif
 
                     if (svc_reader.first_read)
                     {
                         rx_buff_wptr = 0;
                         // The first time we're saving the "original" header, so include it in the cargo count
                         svc_reader.cargo_read_amount = svc_reader.read_size;
-                        memcpy(&rx_buff_sh2[rx_buff_wptr], rx_buff_nbe, svc_reader.cargo_read_amount);
+                        memcpy(&rx_buff_sh2[rx_buff_wptr], rx_buff_i2c, svc_reader.cargo_read_amount);
                         svc_reader.first_read = false;
                     } else
                     {
@@ -189,7 +293,7 @@ void RoachIMU::task(void)
                         // the i2c buffer to skip the header included with every new i2c read and
                         // don't include the header in the amount of cargo read
                         svc_reader.cargo_read_amount = svc_reader.read_size - 4;
-                        memcpy(&rx_buff_sh2[rx_buff_wptr], &rx_buff_nbe[4], svc_reader.cargo_read_amount);
+                        memcpy(&rx_buff_sh2[rx_buff_wptr], &rx_buff_i2c[4], svc_reader.cargo_read_amount);
                     }
                     // advance our pointer by the amount of cargo read
                     rx_buff_wptr += svc_reader.cargo_read_amount;
@@ -203,7 +307,7 @@ void RoachIMU::task(void)
             {
                 if (svc_reader.cargo_remaining <= 0 && rx_buff_wptr > 0) // have data
                 {
-                    sh2_rxAssemble(_sh2.pShtp, rx_buff_sh2, rx_buff_wptr, read_time * 1000); // this will call whatever callback was assigned
+                    sh2_rxAssemble(sh2_getShtpInstance(), rx_buff_sh2, rx_buff_wptr, read_time * 1000); // this will call whatever callback was assigned
                     rx_buff_wptr = 0;
                     sample_time = read_time;
                 }
@@ -213,7 +317,7 @@ void RoachIMU::task(void)
         case ROACHIMU_SM_SVC_READ_DONE_LOOP:
             state_machine = ROACHIMU_SM_SVC_READ_DONE_WAIT;
             break;
-        case ROACHIMU_SM_SVC_READ_DONE_LOOP:
+        case ROACHIMU_SM_SVC_READ_DONE_WAIT:
             if ((millis() - read_time) >= read_interval) { // read_interval can be zero for no-waiting
                 state_machine = ROACHIMU_SM_SVC_GET_HEADER;
             }
@@ -245,7 +349,7 @@ void RoachIMU::pause_service(void)
 void RoachIMU::tare(void)
 {
     pause_service();
-    sh2_setTareNow(0x07, 0x05); // tare all three axis, for gyro-integrated-RV
+    sh2_setTareNow(0x07, (sh2_TareBasis_t)0x05); // tare all three axis, for gyro-integrated-RV
 }
 
 void RoachIMU::do_math(void)
@@ -305,11 +409,28 @@ void RoachIMU::do_math(void)
     }
 }
 
+#if defined(NRF52840_XXAA)
+static void twi_handler(nrfx_twim_evt_t const * p_event, void * p_context)
+{
+    switch (p_event->type)
+    {
+        case NRFX_TWIM_EVT_DONE:
+            m_xfer_done = true;
+            break;
+        default:
+            m_xfer_done = true;
+            m_xfer_err = (int)p_event->type;
+            break;
+    }
+}
+#endif
+
 bool RoachIMU::i2c_write(uint8_t* buf, int len)
 {
     pause_service();
 
-    nbe_i2c_reset();
+    #if defined(ESP32)
+    nbe_i2c_reset(&nbe_i2c);
     int i;
     tx_buff[0] = i2c_first_byte_write(i2c_addr);
     for (i = 0; i < len; i++)
@@ -317,7 +438,7 @@ bool RoachIMU::i2c_write(uint8_t* buf, int len)
         tx_buff[i + 1] = buf[i];
     }
     nbe_i2c_set_tx_buf(&nbe_i2c, tx_buff);
-    nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_nbe);
+    nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_i2c);
     nbe_i2c_start(&nbe_i2c);
     nbe_i2c_write(&nbe_i2c, 1 + len);
     nbe_i2c_stop(&nbe_i2c);
@@ -326,17 +447,33 @@ bool RoachIMU::i2c_write(uint8_t* buf, int len)
         yield(); // or whatever you want to do
     }
     return nbe_i2c.error == 0;
+    #elif defined(NRF52840_XXAA)
+    uint32_t t = millis();
+    nrfx_err_t sts = nrfx_twim_tx(&m_twi, i2c_addr, buf, len, false);
+    if (sts != NRF_SUCCESS) {
+        return false;
+    }
+    while (m_xfer_done == false && m_xfer_err == 0) {
+        yield();
+        if ((millis() - t) >= 100) {
+            break;
+        }
+    }
+    return m_xfer_done && m_xfer_err == 0;
+    #endif
 }
 
 bool RoachIMU::i2c_read(uint8_t* buf, int len)
 {
     pause_service();
 
-    nbe_i2c_reset();
     int i;
+
+    #if defined(ESP32)
+    nbe_i2c_reset(&nbe_i2c);
     tx_buff[0] = i2c_first_byte_read(i2c_addr);
     nbe_i2c_set_tx_buf(&nbe_i2c, tx_buff);
-    nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_nbe);
+    nbe_i2c_set_rx_buf(&nbe_i2c, rx_buff_i2c);
     nbe_i2c_start(&nbe_i2c);
     if (len > 1) {
         nbe_i2c_read_ack(&nbe_i2c, len - 1);
@@ -349,9 +486,25 @@ bool RoachIMU::i2c_read(uint8_t* buf, int len)
     if (nbe_i2c.error != 0) {
         return false;
     }
+    #elif defined(NRF52840_XXAA)
+    uint32_t t = millis();
+    nrfx_err_t sts = nrfx_twim_rx(&m_twi, i2c_addr, rx_buff_i2c, len);
+    if (sts != NRF_SUCCESS) {
+        return false;
+    }
+    while (m_xfer_done == false && m_xfer_err == 0) {
+        yield();
+        if ((millis() - t) >= 100) {
+            break;
+        }
+    }
+    if (m_xfer_done == false || m_xfer_err != 0) {
+        return false;
+    }
+    #endif
     for (i = 0; i < len; i++)
     {
-        buf[i] = rx_buff_nbe[i];
+        buf[i] = rx_buff_i2c[i];
     }
     return true;
 }
@@ -370,7 +523,6 @@ static int i2chal_open(sh2_Hal_t *self)
     if (!success)
         return -1;
     delay(300);
-    instance->state_machine = ROACH_SM_OPEN;
     return 0;
 }
 
@@ -412,7 +564,7 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t
             read_size = min(i2c_buffer_max, (size_t)cargo_remaining + 4);
         }
 
-        // Serial.print("Reading from I2C: "); Serial.println(read_size);
+        // Serial.print("Reading from I2C: ");  Serial.println(read_size);
         // Serial.print("Remaining to read: "); Serial.println(cargo_remaining);
 
         if (!instance->i2c_read(i2c_buffer, read_size)) {

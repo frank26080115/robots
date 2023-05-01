@@ -23,6 +23,10 @@
 #ifndef SH2_HAL_H
 #define SH2_HAL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 // Maximum SHTP Transfer and Payload sizes
@@ -95,6 +99,10 @@ struct sh2_Hal_s {
     // microseconds.  
     uint32_t (*getTimeUs)(sh2_Hal_t *self);
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 // End of include guard
 #endif

@@ -2470,3 +2470,7 @@ int sh2_saveDeadReckoningCalNow(void){
 
     return opProcess(pSh2, &sendCmdOp);
 }
+
+shtp_t* sh2_getShtpInstance(void) {
+    return (shtp_t*)(_sh2.pShtp);
+}

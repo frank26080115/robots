@@ -35,12 +35,11 @@ extern "C" {
 #include <stdbool.h>
 
 #include "sh2_hal.h"
+#include "shtp.h"
 
 /***************************************************************************************
  * Public type definitions
  ***************************************************************************************/
-
-extern sh2_t _sh2;
 
 /**
  * @brief Sensor Event
@@ -741,7 +740,13 @@ int sh2_saveDeadReckoningCalNow(void);
  * This used to be a private function in shtp.c
  * It is now exposed so that a non-blocking I2C implementation can be used
  */
-void sh2_rxAssemble(shtp_t *pShtp, uint8_t *in, uint16_t len, uint32_t t_us)
+void sh2_rxAssemble(shtp_t *pShtp, uint8_t *in, uint16_t len, uint32_t t_us);
+
+/**
+ * @brief Get a pointer to shtp
+ *
+ */
+shtp_t* sh2_getShtpInstance(void);
 
 #ifdef __cplusplus
 }

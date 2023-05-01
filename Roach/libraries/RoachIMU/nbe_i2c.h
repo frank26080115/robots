@@ -1,10 +1,13 @@
 #pragma once
 
+#if defined(ESP32)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <hal/i2c_hal.h>
+//#include <hal/i2c_hal.h>
+#include "nbe_i2c_types.h"
 #include <driver/gpio.h>
 #include <hal/gpio_hal.h>
 #include <stdint.h>
@@ -61,4 +64,6 @@ void nbe_i2c_commit(nbe_i2c_t *nbe_i2c);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
