@@ -7,7 +7,7 @@
 #include <stdbool.h>
 
 #define RH_NRF51_MAX_PAYLOAD_LEN 254
-#define NRFRR_PAYLOAD_SIZE   64
+#define NRFRR_PAYLOAD_SIZE   (64 * 3)
 // we want this to be long enough for strings, but short enough to fit, also shorter sends faster
 // doc: Independent of the configuration of MAXLEN, the combined length of S0, LENGTH, S1 and PAYLOAD cannot exceed 258 bytes.
 
@@ -17,7 +17,7 @@
 #define NRFRR_TX_INTERV_MAX  100
 #define NRFRR_TX_INTERV_MIN  5
 #define NRFRR_TX_MIN_TIME    2
-#define NRFRR_TX_RETRANS_TXT 5
+#define NRFRR_TX_RETRANS_TXT 2
 #define NRFRR_CHAN_MAP_DEFAULT        0x0FFFFFFF
 #define NRFRR_CHAN_MAP_DEFAULT_SINGLE 0x02
 
@@ -32,14 +32,14 @@
 
 #define NRFRR_BIDIRECTIONAL
 #define NRFRR_ADAPTIVE_INTERVAL
-#define NRFRR_USE_INTERRUPTS
+//#define NRFRR_USE_INTERRUPTS
 
 #define NRFRR_USE_FREQ_LOWER
 #define NRFRR_USE_FREQ_NORTHAMERICAN
 //#define NRFRR_USE_FREQ_EUROPEAN
 #define NRFRR_USE_FREQ_UPPER
 
-//#define NRFRR_DEBUG_HOPTABLE
+#define NRFRR_DEBUG_HOPTABLE
 //#define NRFRR_DEBUG_TX
 //#define NRFRR_DEBUG_RX
 //#define NRFRR_DEBUG_HOP
@@ -155,7 +155,7 @@ class nRF52RcRadio
         uint32_t _last_tx_time;
         uint32_t _rx_time_cache;
 
-        uint32_t _text_send_timer;
+        int32_t  _text_send_timer;
 
         #ifdef NRFRR_DEBUG_PINS
         uint8_t _dbgpin_tx, _dbgpin_rx, _dbgpin_ch;

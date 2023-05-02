@@ -224,14 +224,15 @@ void nRF52RcRadio::init_hw(void)
     // These shorts will make the radio transition from Ready to Start to Disable automatically
     // for both TX and RX, which makes for much shorter on-air times
     NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos)
-                      | (RADIO_SHORTS_END_DISABLE_Enabled << RADIO_SHORTS_END_DISABLE_Pos);
+                      | (RADIO_SHORTS_END_DISABLE_Enabled << RADIO_SHORTS_END_DISABLE_Pos)
+                      ;
 
     NRF_RADIO->PCNF0 =   (8 << RADIO_PCNF0_LFLEN_Pos)  // Payload size length in bits
                        | (1 << RADIO_PCNF0_S0LEN_Pos)  // S0 is 1 octet
                        | (8 << RADIO_PCNF0_S1LEN_Pos); // S1 is 1 octet
 
     NRF_RADIO->MODE    = ((
-        #ifdef RADIO_MODE_MODE_Nrf_250Kbit
+        #if defined(RADIO_MODE_MODE_Nrf_250Kbit) && false
             RADIO_MODE_MODE_Nrf_250Kbit
         #else
             RADIO_MODE_MODE_Nrf_1Mbit
@@ -451,6 +452,7 @@ void nRF52RcRadio::prep_tx(void)
         _text_send_timer--;
         if (_text_send_timer <= 0) {
             _seq_num++;
+            _text_send_timer = 0;
         }
     }
     else
@@ -473,11 +475,13 @@ void nRF52RcRadio::next_chan(void)
     uint8_t nchan = _hop_table[_cur_chan] - 1;
     //if (nchan != _last_chan) // prevent wasting time changing to the same channel
     {
+        uint16_t freq = freq_lookup[nchan];
+
         #ifdef NRFRR_DEBUG_HOP
-        Serial.printf("HOP %u %u %u\r\n", millis(), _cur_chan, nchan);
+        Serial.printf("HOP %u %u %u %u\r\n", millis(), _cur_chan, nchan, ((freq & 0x100) != 0) ? (2360 + (freq & 0xFF)) : (2400 + freq));
         #endif
 
-        NRF_RADIO->FREQUENCY = freq_lookup[nchan];
+        NRF_RADIO->FREQUENCY = freq;
 
         #ifdef NRFRR_DEBUG_PINS
         digitalWrite(NRFRR_DEBUG_PIN_CH, _dbgpin_ch = (_dbgpin_ch == LOW ? HIGH : LOW));
@@ -674,29 +678,34 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             // Radio will transition automatically to Disable state at the end of transmission
             NRF_RADIO->PACKETPTR = (uint32_t)frame_buffer;
             NRF_RADIO->EVENTS_READY = 0;
-            NRF_RADIO->TASKS_TXEN = 1;
             NRF_RADIO->EVENTS_END = 0; // So we can detect end of transmission
+            NRF_RADIO->TASKS_TXEN = 1;
 
             #ifdef NRFRR_DEBUG_PINS
-            digitalWrite(NRFRR_DEBUG_PIN_TX, _dbgpin_tx = (_dbgpin_tx == LOW ? HIGH : LOW));
+            digitalWrite(NRFRR_DEBUG_PIN_TX, HIGH);
             #endif
 
             _statemachine = NRFRR_SM_TX_WAIT;
             _sm_time = now;
             break;
         case NRFRR_SM_TX_WAIT:
-            if (NRF_RADIO->EVENTS_END)
+            if (NRF_RADIO->EVENTS_END || NRF_RADIO->EVENTS_DISABLED)
             {
                 NRF_RADIO->EVENTS_END = 0;
                 NRF_RADIO->EVENTS_DISABLED = 0;
                 NRF_RADIO->TASKS_DISABLE = 1;
+
+                #ifdef NRFRR_DEBUG_PINS
+                digitalWrite(NRFRR_DEBUG_PIN_TX, LOW);
+                #endif
+
                 if (_is_tx)
                 {
                     #ifdef NRFRR_BIDIRECTIONAL
                     _statemachine = NRFRR_SM_RX_START;
                     #else
                     _statemachine = NRFRR_SM_HOP_START;
-                    _statemachine_next = NRFRR_SM_RX_START;
+                    _statemachine_next = NRFRR_SM_IDLE_WAIT;
                     #endif
                 }
                 else
