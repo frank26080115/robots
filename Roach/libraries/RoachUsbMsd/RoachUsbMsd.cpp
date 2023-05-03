@@ -62,6 +62,11 @@ bool RoachUsbMsd_hasChange(bool clr)
     return x;
 }
 
+bool RoachUsbMsd_hasVbus(void)
+{
+    return (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) != 0;
+}
+
 static int32_t msc_read_cb(uint32_t lba, void* buffer, uint32_t bufsize)
 {
   // Note: SPIFLash Block API: readBlocks/writeBlocks/syncBlocks
