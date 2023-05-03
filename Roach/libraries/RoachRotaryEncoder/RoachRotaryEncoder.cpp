@@ -26,10 +26,12 @@ void RoachEnc_begin(int pin_a, int pin_b)
     attachInterrupt(enc_pin_a, RoachEnc_isr, CHANGE);
     attachInterrupt(enc_pin_b, RoachEnc_isr, CHANGE);
 #elif defined(ROACHENC_USE_QDEC)
+    uint32_t pin_a_nrf = g_ADigitalPinMap[enc_pin_a];
+    uint32_t pin_b_nrf = g_ADigitalPinMap[enc_pin_b];
     nrf_qdec_sampleper_set(NRF_QDEC_SAMPLEPER_128us);
-    nrf_gpio_cfg_input((uint32_t)enc_pin_a, NRF_GPIO_PIN_PULLUP);
-    nrf_gpio_cfg_input((uint32_t)enc_pin_b, NRF_GPIO_PIN_PULLUP);
-    nrf_qdec_pio_assign((uint32_t)enc_pin_a, (uint32_t)enc_pin_b, NRF_QDEC_LED_NOT_CONNECTED);
+    nrf_gpio_cfg_input(pin_a_nrf, NRF_GPIO_PIN_PULLUP);
+    nrf_gpio_cfg_input(pin_b_nrf, NRF_GPIO_PIN_PULLUP);
+    nrf_qdec_pio_assign(pin_a_nrf, pin_b_nrf, NRF_QDEC_LED_NOT_CONNECTED);
     nrf_qdec_dbfen_enable();
     nrf_qdec_enable();
     nrf_qdec_task_trigger(NRF_QDEC_TASK_START);
