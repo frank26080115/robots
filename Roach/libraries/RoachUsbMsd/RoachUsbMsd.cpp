@@ -21,6 +21,7 @@ static bool fs_formatted = false;
 
 // Set to true when PC write to flash
 static bool fs_changed = true;
+static uint32_t fs_change_time = 0;
 
 static int32_t msc_read_cb(uint32_t lba, void* buffer, uint32_t bufsize);
 static int32_t msc_write_cb(uint32_t lba, uint8_t* buffer, uint32_t bufsize);
@@ -53,9 +54,10 @@ bool RoachUsbMsd_isReady(void)
 
 bool RoachUsbMsd_hasChange(bool clr)
 {
-    bool x = fs_changed;
-    if (clr) {
+    bool x = fs_changed && (millis() - fs_change_time) >= 1000;
+    if (x && clr) {
         fs_changed = false;
+        fs_change_time = 0;
     }
     return x;
 }
@@ -87,5 +89,7 @@ static void msc_flush_cb(void)
   // clear file system's cache to force refresh
   fatfs.cacheClear();
 
+  // indicate change
   fs_changed = true;
+  fs_change_time = millis();
 }
