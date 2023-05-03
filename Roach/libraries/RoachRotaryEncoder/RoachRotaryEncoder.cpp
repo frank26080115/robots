@@ -1,7 +1,14 @@
 #include "RoachRotaryEncoder.h"
 
+#if defined(ROACHENC_USE_GPIO)
 void IRAM_ATTR RoachEnc_isr(void);
 void IRAM_ATTR RoachEnc_task(void);
+#elif defined(ROACHENC_USE_QDEC)
+#include "nrf_qdec.h"
+#include "nrfx_qdec.h"
+void RoachEnc_task(void);
+void RoachEnc_isr(nrf_drv_qdec_event_t event);
+#endif
 
 static volatile int32_t enc_cnt;
 static volatile uint8_t enc_prev, enc_flags;
@@ -14,22 +21,45 @@ void RoachEnc_begin(int pin_a, int pin_b)
 {
     pinMode(enc_pin_a = pin_a, INPUT_PULLUP);
     pinMode(enc_pin_b = pin_b, INPUT_PULLUP);
+
+#if defined(ROACHENC_USE_GPIO)
     enc_flags = 0;
     attachInterrupt(enc_pin_a, RoachEnc_isr, CHANGE);
     attachInterrupt(enc_pin_b, RoachEnc_isr, CHANGE);
+#elif defined(ROACHENC_USE_QDEC)
+    nrfx_qdec_config_t config = {
+        .reportper          = NRF_QDEC_REPORTPER_DISABLED,
+        .sampleper          = NRF_QDEC_SAMPLEPER_128us,
+        .psela              = enc_pin_a,
+        .pselb              = enc_pin_b,
+        .pselled            = 0xFFFFFFFF,
+        .ledpre             = 0,
+        .ledpol             = (nrf_qdec_ledpol_t)0,
+        .dbfen              = true,
+        .sample_inten       = false,
+        .interrupt_priority = 0,
+    };
+    nrfx_qdec_init(&config, RoachEnc_isr);
+    nrfx_qdec_enable();
+#endif
     RoachEnc_task();
     enc_cnt = 0;
     enc_prev_action = 0;
     enc_time = millis();
 }
 
+#if defined(ROACHENC_USE_GPIO)
 void IRAM_ATTR RoachEnc_isr(void)
+#elif defined(ROACHENC_USE_QDEC)
+void RoachEnc_isr(nrfx_qdec_event_t event)
+#endif
 {
     RoachEnc_task();
 }
 
 void IRAM_ATTR RoachEnc_task(void)
 {
+    #if defined(ROACHENC_USE_GPIO)
     int8_t action = 0; // 1 or -1 if moved, sign is direction
     uint8_t cur_pos = 0;
     if (digitalRead(enc_pin_a) == LOW) {
@@ -138,6 +168,21 @@ void IRAM_ATTR RoachEnc_task(void)
             enc_prev_action = 0;
         }
     }
+    #elif defined(ROACHENC_USE_QDEC)
+    uint32_t now = millis();
+    NRF_QDEC->TASKS_READCLRACC = 1;
+    int32_t x = NRF_QDEC->ACCREAD;
+    if (x != 0) {
+        enc_moved |= true;
+        enc_time = now;
+        //enc_prev_action = x > 0 ? 1 : -1
+    }
+    //else if ((now - enc_time) >= 1000)
+    //{
+    //    enc_prev_action = 0;
+    //}
+    enc_cnt += x;
+    #endif
 }
 
 int32_t RoachEnc_get(bool clr)
@@ -156,4 +201,9 @@ bool RoachEnc_hasMoved(bool clr)
         enc_moved = false;
     }
     return x;
+}
+
+uint32_t RoachEnc_getLastTime(void)
+{
+    return enc_time;
 }
