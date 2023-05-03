@@ -5,9 +5,8 @@ void IRAM_ATTR RoachEnc_isr(void);
 void IRAM_ATTR RoachEnc_task(void);
 #elif defined(ROACHENC_USE_QDEC)
 #include "nrf_qdec.h"
-#include "nrfx_qdec.h"
 void RoachEnc_task(void);
-void RoachEnc_isr(nrf_drv_qdec_event_t event);
+void RoachEnc_isr(nrf_qdec_event_t event);
 #endif
 
 static volatile int32_t enc_cnt;
@@ -27,20 +26,13 @@ void RoachEnc_begin(int pin_a, int pin_b)
     attachInterrupt(enc_pin_a, RoachEnc_isr, CHANGE);
     attachInterrupt(enc_pin_b, RoachEnc_isr, CHANGE);
 #elif defined(ROACHENC_USE_QDEC)
-    nrfx_qdec_config_t config = {
-        .reportper          = NRF_QDEC_REPORTPER_DISABLED,
-        .sampleper          = NRF_QDEC_SAMPLEPER_128us,
-        .psela              = enc_pin_a,
-        .pselb              = enc_pin_b,
-        .pselled            = 0xFFFFFFFF,
-        .ledpre             = 0,
-        .ledpol             = (nrf_qdec_ledpol_t)0,
-        .dbfen              = true,
-        .sample_inten       = false,
-        .interrupt_priority = 0,
-    };
-    nrfx_qdec_init(&config, RoachEnc_isr);
-    nrfx_qdec_enable();
+    nrf_qdec_sampleper_set(NRF_QDEC_SAMPLEPER_128us);
+    nrf_gpio_cfg_input((uint32_t)enc_pin_a, NRF_GPIO_PIN_PULLUP);
+    nrf_gpio_cfg_input((uint32_t)enc_pin_b, NRF_GPIO_PIN_PULLUP);
+    nrf_qdec_pio_assign((uint32_t)enc_pin_a, (uint32_t)enc_pin_b, NRF_QDEC_LED_NOT_CONNECTED);
+    nrf_qdec_dbfen_enable();
+    nrf_qdec_enable();
+    nrf_qdec_task_trigger(NRF_QDEC_TASK_START);
 #endif
     RoachEnc_task();
     enc_cnt = 0;
@@ -51,13 +43,17 @@ void RoachEnc_begin(int pin_a, int pin_b)
 #if defined(ROACHENC_USE_GPIO)
 void IRAM_ATTR RoachEnc_isr(void)
 #elif defined(ROACHENC_USE_QDEC)
-void RoachEnc_isr(nrfx_qdec_event_t event)
+void RoachEnc_isr(nrf_qdec_event_t event)
 #endif
 {
     RoachEnc_task();
 }
 
-void IRAM_ATTR RoachEnc_task(void)
+void
+#if defined(ROACHENC_USE_GPIO) && defined(ESP32)
+IRAM_ATTR
+#endif
+RoachEnc_task(void)
 {
     #if defined(ROACHENC_USE_GPIO)
     int8_t action = 0; // 1 or -1 if moved, sign is direction
@@ -107,13 +103,13 @@ void IRAM_ATTR RoachEnc_task(void)
             if ((enc_flags & (1 << 0)) != 0 && ((enc_flags & (1 << 2)) != 0 || (enc_flags & (1 << 4)) != 0)) {
                 action = 1;
             }
-            else if ((enc_flags & (1 << 2)) != 0) && ((enc_flags & (1 << 0)) != 0) || (enc_flags & (1 << 4)) != 0))) {
+            else if ((enc_flags & (1 << 2)) != 0 && ((enc_flags & (1 << 0)) != 0 || (enc_flags & (1 << 4)) != 0)) {
                 action = 1;
             }
-            else if ((enc_flags & (1 << 1)) != 0) && ((enc_flags & (1 << 3)) != 0) || (enc_flags & (1 << 4)) != 0))) {
+            else if ((enc_flags & (1 << 1)) != 0 && ((enc_flags & (1 << 3)) != 0 || (enc_flags & (1 << 4)) != 0)) {
                 action = -1;
             }
-            else if ((enc_flags & (1 << 3)) != 0) && ((enc_flags & (1 << 1)) != 0) || (enc_flags & (1 << 4)) != 0))) {
+            else if ((enc_flags & (1 << 3)) != 0 && ((enc_flags & (1 << 1)) != 0 || (enc_flags & (1 << 4)) != 0)) {
                 action = -1;
             }
         }
@@ -175,13 +171,13 @@ void IRAM_ATTR RoachEnc_task(void)
     if (x != 0) {
         enc_moved |= true;
         enc_time = now;
+        enc_cnt += x;
         //enc_prev_action = x > 0 ? 1 : -1
     }
     //else if ((now - enc_time) >= 1000)
     //{
     //    enc_prev_action = 0;
     //}
-    enc_cnt += x;
     #endif
 }
 
