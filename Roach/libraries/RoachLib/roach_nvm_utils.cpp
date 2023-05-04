@@ -15,7 +15,7 @@ bool roach_nvm_write_item(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, c
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];
-        if (desc_itm->name[0] == 0) {
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
             // end of table, item not found;
             return false;
         }
@@ -85,7 +85,7 @@ void roach_nvm_read_from_file(File* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t
     while (f->available())
     {
         String s = f->readStringUntil('\n');
-        int spci = s.indexOf(' ');
+        int spci = s.indexOf('=');
         String left = s.substring(0, spci);
         String right = s.substring(spci + 1, s.length());
         roach_nvm_write_item(struct_ptr, desc_tbl, left.c_str(), right.c_str());
@@ -150,8 +150,11 @@ void roach_nvm_write_to_file(File* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t*
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+            break;
+        }
         f->print(desc_itm->name);
-        f->print(' ');
+        f->print('=');
         char str[32];
         roach_nvm_format_item(str, struct_ptr, desc_itm);
         f->print(str);
@@ -166,6 +169,9 @@ void roach_nvm_write_desc_file(File* f, roach_nvm_gui_desc_t* desc_tbl)
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+            break;
+        }
         f->print(desc_itm->name);
         f->print(',');
         f->print(desc_itm->type_code);
@@ -188,6 +194,9 @@ void roach_nvm_set_defaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+            break;
+        }
         int32_t x = desc_itm->def_val;
         if (strcmp("hex", desc_itm->type_code) == 0)
         {

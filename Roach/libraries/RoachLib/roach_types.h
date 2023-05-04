@@ -9,20 +9,6 @@
 
 #define PACK_STRUCT __attribute__ ((packed))
 
-enum
-{
-    ROACHCTRLFLAG_USE_GYRO,
-    // ROACHCTRLFLAG_WEAPON_ON, // not required, managed by weapon speed = 0
-    // ROACHCTRLFLAG_REVERSE,   // not required, managed by negating throttle value
-    ROACHCTRLFLAG_AUTO_CALIB,   // allows for the IMU to recalibrate while the robot is motionless
-};
-
-enum
-{
-    ROACHRXNVMFLAG_FLIP_DRIVE_LEFT,
-    ROACHRXNVMFLAG_FLIP_DRIVE_RIGHT,
-};
-
 // try to keep this under 32 bytes
 typedef struct
 {
@@ -50,6 +36,15 @@ typedef struct
 }
 PACK_STRUCT
 roach_telem_pkt_t;
+
+typedef struct
+{
+    uint32_t uid;
+    uint32_t salt;
+    uint32_t chan_map;
+}
+PACK_STRUCT
+roach_rf_nvm_t;
 
 typedef struct
 {
@@ -91,46 +86,27 @@ roach_nvm_pot_t;
 
 typedef struct
 {
-    //uint32_t magic;
-    //uint8_t  version;
-
-    uint32_t rf_uid;
-    uint32_t rf_seed;
-    uint16_t rf_chanmap;
-
-    uint32_t flags;
     uint8_t  imu_orientation; // there are 6 x 8 combinations, see RoachImu's implementation
 
     roach_nvm_servo_t drive_left;
+    bool              drive_left_flip;
     roach_nvm_servo_t drive_right;
+    bool              drive_right_flip;
     roach_nvm_servo_t weapon;
 
     roach_nvm_pid_t pid_heading;
     uint16_t heading_timeout;
-
-    //uint32_t chksum;
 }
 PACK_STRUCT
 roach_rx_nvm_t;
 
 typedef struct
 {
-    //uint32_t magic;
-    //uint8_t  version;
-
-    uint32_t rf_uid;
-    uint32_t rf_seed;
-    uint16_t rf_chanmap;
-
-    uint32_t flags;
-
     roach_nvm_pot_t pot_throttle;
     roach_nvm_pot_t pot_steering;
     int32_t heading_multiplier;
-
     int32_t cross_mix;
-
-    //uint32_t chksum;
+    roach_nvm_pot_t pot_weapon;
 }
 PACK_STRUCT
 roach_tx_nvm_t;
