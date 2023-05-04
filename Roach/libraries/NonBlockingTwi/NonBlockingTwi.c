@@ -26,6 +26,8 @@ extern nrfx_err_t nrfx_twim_tx(nrfx_twim_t const * p_instance,
                                size_t              length,
                                bool                no_stop);
 
+// implement a FIFO with a linked list
+
 typedef struct
 {
     void* next;
@@ -76,6 +78,17 @@ void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len)
     nbtwi_task();
 }
 
+void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len)
+{
+    uint8_t* tmp = malloc(len + 1);
+    if (tmp) {
+        tmp[0] = c;
+        memcpy(&tmp[1], data, len);
+        nbtwi_write(i2c_addr, tmp, len + 1);
+        free(tmp);
+    }
+}
+
 static void twi_handler(nrfx_twim_evt_t const * p_event, void * p_context)
 {
     switch (p_event->type)
@@ -121,4 +134,11 @@ void nbtwi_task(void)
 bool nbtwi_isBusy(void)
 {
     return m_xfer_done && head == NULL;
+}
+
+void nbtwi_wait(void)
+{
+    while (nbtwi_isBusy()) {
+        yield();
+    }
 }
