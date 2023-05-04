@@ -7,7 +7,82 @@
 #include <InternalFileSystem.h>
 #endif
 
-bool roach_nvm_write_item(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
+int32_t roach_nvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
+{
+    if (strcmp("hex", desc_itm->type_code) == 0)
+    {
+        uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset];
+        return (int32_t)*wptr;
+    }
+    if (desc_itm->type_code[0] == 'u' || desc_itm->type_code[0] == 's')
+    {
+        int32_t x;
+
+        int sz = atoi(&(desc_itm->type_code[1]));
+        if (desc_itm->type_code[0] == 's') {
+            sz *= -1;
+        }
+
+        switch (sz)
+        {
+            case  8 : { uint8_t*  wptr = (uint8_t* )&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            case  16: { uint16_t* wptr = (uint16_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            case  32: { uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            case -8 : {  int8_t*  wptr = ( int8_t* )&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            case -16: {  int16_t* wptr = ( int16_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            case -32: {  int32_t* wptr = ( int32_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            default:
+                return;
+        }
+        return x;
+    }
+    return 0;
+}
+
+void roach_nvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
+{
+    if (strcmp("hex", desc_itm->type_code) == 0)
+    {
+        uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset];
+        *wptr = (uint32_t)val;
+        return;
+    }
+    if (desc_itm->type_code[0] == 'u' || desc_itm->type_code[0] == 's')
+    {
+        int32_t x = val;
+
+        int sz = atoi(&(desc_itm->type_code[1]));
+        if (desc_itm->type_code[0] == 's') {
+            sz *= -1;
+        }
+
+        x = (x > desc_itm->limit_max) ? desc_itm->limit_max : x;
+        x = (x < desc_itm->limit_min) ? desc_itm->limit_min : x;
+
+        switch (sz)
+        {
+            case  8 : { uint8_t*  wptr = (uint8_t* )&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            case  16: { uint16_t* wptr = (uint16_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            case  32: { uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            case -8 : {  int8_t*  wptr = ( int8_t* )&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            case -16: {  int16_t* wptr = ( int16_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            case -32: {  int32_t* wptr = ( int32_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            default:
+                break;
+        }
+        return;
+    }
+}
+
+int32_t roach_nvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
+{
+    int32_t x = roach_nvm_getval(struct_ptr, desc_itm);
+    x += val;
+    roach_nvm_setval(struct_ptr, desc_itm, x);
+    return roach_nvm_getval(struct_ptr, desc_itm);
+}
+
+bool roach_nvm_write_itemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
 {
     roach_nvm_gui_desc_t* desc_itm = NULL;
     int i;
@@ -62,6 +137,9 @@ bool roach_nvm_write_item(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, c
         if (desc_itm->type_code[0] == 's') {
             sz *= -1;
         }
+
+        x = (x > desc_itm->limit_max) ? desc_itm->limit_max : x;
+        x = (x < desc_itm->limit_min) ? desc_itm->limit_min : x;
 
         ret = true;
         switch (sz)
