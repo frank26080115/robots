@@ -68,8 +68,8 @@ void RoachIMU::begin(void)
     nbe_i2c_init(&nbe_i2c, 0, (gpio_num_t)pin_sda, (gpio_num_t)pin_scl, 400000);
     #elif defined(NRF52840_XXAA)
     nrfx_twim_config_t twi_config = {
-       .scl                = (uint32_t)pin_scl,
-       .sda                = (uint32_t)pin_sda,
+       .scl                = g_ADigitalPinMap[pin_scl],
+       .sda                = g_ADigitalPinMap[pin_sda],
        .frequency          = NRF_TWIM_FREQ_400K,
        .interrupt_priority = 2,
     };
