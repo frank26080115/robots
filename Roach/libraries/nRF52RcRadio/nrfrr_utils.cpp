@@ -6,6 +6,7 @@
 #include "nrf_ppi.h"
 #include "nrf_egu.h"
 
+// extern uint32_t crc32_calc(uint8_t const * p_data, uint32_t size, uint32_t const * p_crc);
 // copied from nRF5 SDK
 static uint32_t crc32_compute(uint8_t const * p_data, uint32_t size, uint32_t const * p_crc)
 {
@@ -31,10 +32,13 @@ uint32_t nrfrr_getCheckSum(uint32_t salt, uint8_t* data, uint8_t len)
 
 uint32_t nrfrr_rand(void)
 {
+    #ifdef NRFRR_USE_NRF_RNG
     if (nrf5rand_avail() >= 4) {
         return nrf5rand_u32();
     }
-    else {
+    else
+    #endif
+    {
         return rand();
     }
 }

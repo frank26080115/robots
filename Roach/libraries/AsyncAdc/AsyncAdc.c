@@ -22,9 +22,9 @@
 
 #define IRAM_ATTR
 
-static uint32_t saadcReference = SAADC_CH_CONFIG_REFSEL_Internal;
-static uint32_t saadcGain      = SAADC_CH_CONFIG_GAIN_Gain1_6;
-static uint32_t saadcSampleTime = SAADC_CH_CONFIG_TACQ_3us;
+static uint32_t saadcReference  = SAADC_CH_CONFIG_REFSEL_Internal;
+static uint32_t saadcGain       = SAADC_CH_CONFIG_GAIN_Gain1_6;
+static uint32_t saadcSampleTime = SAADC_CH_CONFIG_TACQ_5us;
 
 static bool saadcBurst = SAADC_CH_CONFIG_BURST_Disabled;
 

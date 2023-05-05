@@ -99,3 +99,20 @@ int32_t roach_expo_curve32(int32_t x, int32_t curve)
     double yd = roach_expo_curve(xd, cd);
     return (int32_t)lround(yd);
 }
+
+// copied from nRF5 SDK
+uint32_t crc32_calc(uint8_t const * p_data, uint32_t size, uint32_t const * p_crc)
+{
+    uint32_t crc;
+
+    crc = (p_crc == NULL) ? 0xFFFFFFFF : ~(*p_crc);
+    for (uint32_t i = 0; i < size; i++)
+    {
+        crc = crc ^ p_data[i];
+        for (uint32_t j = 8; j > 0; j--)
+        {
+            crc = (crc >> 1) ^ (0xEDB88320U & ((crc & 1) ? 0xFFFFFFFF : 0));
+        }
+    }
+    return ~crc;
+}

@@ -7,7 +7,7 @@
 #include <stdbool.h>
 
 #define RH_NRF51_MAX_PAYLOAD_LEN 254
-#define NRFRR_PAYLOAD_SIZE   (64 * 3)
+#define NRFRR_PAYLOAD_SIZE   (64 * 1)
 // we want this to be long enough for strings, but short enough to fit, also shorter sends faster
 // doc: Independent of the configuration of MAXLEN, the combined length of S0, LENGTH, S1 and PAYLOAD cannot exceed 258 bytes.
 
@@ -24,6 +24,7 @@
 #define NRFRR_REM_USED_SESSIONS 32
 
 #define NRFRR_FINGER_QUOTES_RANDOMNESS
+#define NRFRR_USE_NRF_RNG
 
 //#define NRFRR_DEBUG_PINS
 #define NRFRR_DEBUG_PIN_TX 27
@@ -93,6 +94,7 @@ class nRF52RcRadio
         void pause(void);
         void resume(void);
         bool is_paused(void);
+        bool is_busy(void);
 
         inline void set_reply_req_rate(uint16_t x) { _reply_request_rate = x; };
         void set_chan_map(uint32_t x);

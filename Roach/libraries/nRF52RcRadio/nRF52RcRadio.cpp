@@ -927,6 +927,19 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
     return ret;
 }
 
+bool nRF52RcRadio::is_busy(void)
+{
+    if (_statemachine == NRFRR_SM_TX_WAIT) {
+        return true;
+    }
+    if (_statemachine == NRFRR_SM_RX) {
+        if ((millis() - _last_tx_time) < (_tx_interval - 4)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void nRF52RcRadio::task(void)
 {
     uint32_t now;

@@ -4,11 +4,9 @@ enum
     MENU_STATS,                 // display extra live data
     MENU_INFO,                  // display stuff like profile, UID, version
     MENU_RAW,                   // display raw input data
-    MENU_CONFIG_CONN,           // allows user to select between profiles of RF parameters
-    MENU_CONFIG_PROFILE_ROBOT,  // allows user to select between profiles of robot parameters
-    MENU_CONFIG_PROFILE_CTRLER, // allows user to select between profiles of controller parameters
+    MENU_CONFIG_CALIBSYNC,      // options for calibration and synchronization
+    MENU_CONFIG_FILELOAD,       // choose to load a file
     MENU_CONFIG_DRIVE,          // edit parameters about drive train
-    MENU_CONFIG_CALIB,          // options for calibrating controller
     MENU_CONFIG_WEAP,           // edit parameters about the weapon
     MENU_CONFIG_CTRLER,         // edit parameters about the controller
     MENU_CONFIG_IMU,            // edit parameters for the IMU (orientation, PID, timeout, etc)
@@ -131,20 +129,32 @@ class RoachMenu
             oled.display();
         };
 
-        virtual void task(void)
+        virtual void taskHP(void)
+        {
+            ctrler_tasks();
+            nbtwi_task();
+        };
+
+        virtual void taskLP(void)
+        {
+        };
+
+        virtual void run(void)
         {
             onEnter();
 
-            while (_exit == false)
+            while (_exit == 0)
             {
                 yield();
-                ctrler_tasks();
+
+                taskHP();
 
                 if (canDisplay() == false) {
                     continue;
                 }
 
                 checkButtons();
+                taskLP();
                 draw();
 
                 if (_dirty) {
@@ -160,18 +170,18 @@ class RoachMenu
         uint8_t _id;
         uint32_t _last_time = 0;
         bool _dirty = false;
-        bool _exit = false;
+        int _exit = 0;
 
         virtual void onEnter(void)
         {
-            _exit = false;
+            _exit = 0;
             _dirty = true;
             clear();
         };
 
         virtual void onExit(void)
         {
-            _exit = false;
+            _exit = 0;
         }
 
         virtual void onButton(uint8_t btn)
@@ -223,6 +233,8 @@ class RoachMenuListItem
         {
             return _txt;
         };
+
+        void* next_node;
 
     protected:
         char* _txt = NULL;
@@ -354,6 +366,21 @@ class RoachMenuLister : RoachMenu
         {
         };
 
+        ~RoachMenuFileOpenList(void)
+        {
+            if (_head_node == NULL) {
+                return;
+            }
+            while (_head_node != NULL) {
+                if (_head_node->text != NULL) {
+                    free(_head_node->text);
+                }
+                roach_txtnode_t* n = _head_node->next;
+                free(_head_node);
+                _head_node = n;
+            }
+        };
+
         virtual void draw(void)
         {
             draw_title();
@@ -407,11 +434,87 @@ class RoachMenuLister : RoachMenu
         inline RoachMenuListItem* getCurItem(void) { return getItem(_list_idx); };
         uint8_t _list_cnt, _list_idx;
         int8_t _draw_start_idx, _draw_end_idx;
+        RoachMenuListItem* _head_node = NULL, _tail_node = NULL;
 
         virtual void onEnter(void)
         {
             RoachMenu::onEnter();
             _list_idx = 0;
+        };
+
+        virtual void draw_sidebar(void)
+        {
+            
+        };
+
+        virtual void draw_title(void)
+        {
+            
+        };
+
+        void buildFileList(char* filter)
+        {
+            if (!root.open("/"))
+            {
+                Serial.println("open root failed");
+                return;
+            }
+            while (file.openNext(&root, O_RDONLY))
+            {
+                if (file.isDir() == false)
+                {
+                    char sfname[64];
+                    file.getName7(sfname, 62);
+                    bool matches = false;
+                    if (filter != NULL) {
+                        matches = memcmp(filter, sfname, strlen(filter)) == 0;
+                    }
+                    else {
+                        matches = (   memcmp("rf"    , sfname, 2) == 0
+                                   || memcmp("robot" , sfname, 5) == 0
+                                   || memcmp("ctrler", sfname, 6) == 0
+                                  );
+                    }
+                    if (matches)
+                    {
+                        RoachMenuFileItem* n = new RoachMenuFileItem(sfname);
+                        if (_head_node == NULL) {
+                            _head_node = (RoachMenuListItem*)n;
+                            _tail_node = (RoachMenuListItem*)n;
+                        }
+                        else if (_tail_node != NULL) {
+                            _tail_node->next_node = (void*)n;
+                            _tail_node = (RoachMenuListItem*)n;
+                        }
+                        _list_cnt += 1;
+                    }
+                }
+                file.close();
+            }
+            RoachMenuFileItem* nc = new RoachMenuFileItem("CANCEL");
+            if (_head_node == NULL) {
+                _head_node = (RoachMenuListItem*)nc;
+                _tail_node = (RoachMenuListItem*)nc;
+            }
+            else if (_tail_node != NULL) {
+                _tail_node->next_node = (void*)nc;
+                _tail_node = (RoachMenuListItem*)nc;
+            }
+            _list_cnt++;
+        };
+
+        RoachMenuListItem* getNodeAt(int idx)
+        {
+            int i = 0;
+            if (_head_node == NULL) {
+                return NULL;
+            }
+            RoachMenuListItem* n = _head_node;
+            while (i != idx) {
+                n = (RoachMenuListItem*)(n->next_node);
+                i += 1;
+            }
+            return n;
         };
 
         virtual void onButton(uint8_t btn)
@@ -435,9 +538,162 @@ class RoachMenuLister : RoachMenu
                 case BTNID_EXIT:
                     _exit = EXITCODE_HOME;
                     break;
-                case BTNID_SAVE:
-                    // TODO: save
-                    break;
+            }
+        };
+
+};
+
+class RoachMenuFileOpenList : RoachMenuLister
+{
+    public:
+        RoachMenuFileOpenList(uint8_t id) : RoachMenuLister(id)
+        {
+        };
+
+    protected:
+
+        virtual RoachMenuListItem* getItem(int idx)
+        {
+            return getNodeAt(idx);
+        }
+
+        virtual void onEnter(void)
+        {
+            RoachMenuLister::onEnter();
+            buildFileList(NULL);
+        };
+
+        virtual void onButton(uint8_t btn)
+        {
+            RoachMenuLister::onButton(btn);
+            if (_exit == 0)
+            {
+                switch (btn)
+                {
+                    case BTNID_ACTION:
+                        RoachMenuListItem* x = getCurItem();
+                        if (x != NULL)
+                        {
+                            if (x->getName() != NULL)
+                            {
+                                if (strcmp(x->getName(), "CANCEL") == 0) {
+                                    _exit = EXITCODE_HOME;
+                                    return;
+                                }
+
+                                if (memcmp(x->getName(), "rf", 2) == 0) {
+                                    // TODO: load RF parameters from file and restart the radio engine
+                                }
+                                else if (memcmp(x->getName(), "ctrler", 2) == 0) {
+                                    // TODO: load controller parameters from file
+                                }
+                                else if (memcmp(x->getName(), "robot", 2) == 0) {
+                                    // TODO: load robot parameters from file, and then sync it to the robot
+                                }
+                                else {
+                                    showError("invalid file name");
+                                }
+                            }
+                            else {
+                                showError("file name is null");
+                            }
+                        }
+                        else {
+                            showError("file selection is null");
+                        }
+                        _exit = EXITCODE_HOME;
+                        break;
+                }
+            }
+        };
+};
+
+class RoachMenuFileSaveList : RoachMenuLister
+{
+    public:
+        RoachMenuFileSaveList(char* filter) : RoachMenuLister(0)
+        {
+            strncpy(_filter, filter, 14);
+        };
+
+    protected:
+
+        char _filter[16];
+        char _newfilename[32];
+
+        virtual RoachMenuListItem* getItem(int idx)
+        {
+            return getNodeAt(idx);
+        }
+
+        virtual void onEnter(void)
+        {
+            RoachMenuLister::onEnter();
+            RoachMenuFileItem* n = new RoachMenuFileItem("NEW FILE");
+            _head_node = (RoachMenuListItem*)n;
+            _tail_node = (RoachMenuListItem*)n;
+            _list_cnt++;
+            buildFileList(_filter[0] != 0 ? _filter : NULL);
+        };
+
+        virtual void onButton(uint8_t btn)
+        {
+            RoachMenuLister::onButton(btn);
+            if (_exit == 0)
+            {
+                switch (btn)
+                {
+                    case BTNID_ACTION:
+                        RoachMenuListItem* x = getCurItem();
+                        if (x != NULL)
+                        {
+                            if (x->getName() != NULL)
+                            {
+                                if (strcmp(x->getName(), "CANCEL") == 0) {
+                                    _exit = EXITCODE_HOME;
+                                    return;
+                                }
+
+                                if (strcmp(x->getName(), "NEW FILE") == 0 && _filter[0] != 0)
+                                {
+                                    _newfilename[0] = '/'; // optional space with the root slash
+                                    bool can_save = false;
+                                    int i;
+                                    for (i = 1; i <= 9999; i++)
+                                    {
+                                        sprintf(&(_newfilename[1]), "%s_%u.txt", _filter, i);
+                                        if (root.exists(&(_newfilename[1])) == false)
+                                        {
+                                            can_save = true;
+                                            break;
+                                        }
+                                    }
+                                    if (can_save)
+                                    {
+                                        saveToFile(_newfilename);
+                                    }
+                                    else
+                                    {
+                                        showError("cannot save new file");
+                                    }
+                                }
+                                else if (memcmp(x->getName(), "ctrler", 6) == 0 || memcmp(x->getName(), "robot", 5) == 0) {
+                                    saveToFile(x->getName());
+                                }
+                                else {
+                                    showError("invalid file name");
+                                }
+                            }
+                            else {
+                                showError("file name is null");
+                            }
+                        }
+                        else {
+                            showError("file selection is null");
+                        }
+                        _exit = EXITCODE_HOME;
+                        break;
+                }
             }
         };
 };

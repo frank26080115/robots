@@ -86,6 +86,8 @@ roach_nvm_pot_t;
 
 typedef struct
 {
+    uint32_t magic;
+
     uint8_t  imu_orientation; // there are 6 x 8 combinations, see RoachImu's implementation
 
     roach_nvm_servo_t drive_left;
@@ -96,17 +98,23 @@ typedef struct
 
     roach_nvm_pid_t pid_heading;
     uint16_t heading_timeout;
+
+    uint32_t checksum;
 }
 PACK_STRUCT
 roach_rx_nvm_t;
 
 typedef struct
 {
+    uint32_t magic;
+
     roach_nvm_pot_t pot_throttle;
     roach_nvm_pot_t pot_steering;
     int32_t heading_multiplier;
     int32_t cross_mix;
     roach_nvm_pot_t pot_weapon;
+
+    uint32_t checksum;
 }
 PACK_STRUCT
 roach_tx_nvm_t;
