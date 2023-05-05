@@ -310,9 +310,15 @@ uint16_t IRAM_ATTR adcEnd(uint8_t pin)
     }
     return value;
     #elif defined(NRF52840_XXAA) || defined(NRF52) || defined(NRF52_SERIES)
-    if (adc_state_machine == 4) {
-        return mapResolution(value_cache, lastResolution, readResolution);
+    if (adc_state_machine != 4) {
+        if (adc_state_machine == 0) {
+            adcStart(pin);
+        }
+        while (adcBusy(pin)) {
+            yield();
+        }
     }
-    return 0;
+    adc_state_machine = 0;
+    return mapResolution(value_cache, lastResolution, readResolution);
     #endif
 }
