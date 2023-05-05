@@ -1,6 +1,8 @@
 #ifndef _ASYNCADC_H_
 #define _ASYNCADC_H_
 
+#include <Arduino.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -14,6 +16,11 @@ extern bool adcAttachPin(uint8_t pin);// __attribute__ ((weak, alias("__adcAttac
 extern bool adcStart(uint8_t pin);// __attribute__ ((weak, alias("__adcStart")));
 extern bool adcBusy(uint8_t pin);// __attribute__ ((weak, alias("__adcBusy")));
 extern uint16_t adcEnd(uint8_t pin);// __attribute__ ((weak, alias("__adcEnd")));
+
+#if defined(NRF52840_XXAA) || defined(NRF52) || defined(NRF52_SERIES)
+void adcSetReference(eAnalogReference ulMode);
+void adcSetReadResolution(int res);
+#endif
 
 #ifdef __cplusplus
 }
