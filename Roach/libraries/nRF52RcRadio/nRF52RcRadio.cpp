@@ -1020,12 +1020,8 @@ bool nRF52RcRadio::validate_rx(void)
     }
     // checksum needs to be valid for the next few security features to work and not be overwhelmed
 
-    bool to_hop = false;
-
     if (_is_tx == false) // only receiver requires additional security
     {
-        to_hop = true; // receiver should hop immediately if no need to reply
-
         if (_session_id == 0) // first packet ever received
         {
             // start the new session
@@ -1105,7 +1101,6 @@ bool nRF52RcRadio::validate_rx(void)
         #ifdef NRFRR_BIDIRECTIONAL
         if ((rx_flags & (1 << NRFRR_FLAG_REPLYREQUEST)) != 0 || _text_send_timer > 0) {
             _reply_requested = true;
-            to_hop = false; // receiver should hop immediately if no need to reply, but wait to hop if need to reply
         }
         else
         {
@@ -1166,15 +1161,6 @@ bool nRF52RcRadio::validate_rx(void)
         #ifdef NRFRR_DEBUG_HOP
         Serial.printf(" %u", _cur_chan);
         #endif
-        if (to_hop) {
-            #ifdef NRFRR_DEBUG_HOP
-            Serial.printf("\r\nR");
-            hop_dbg_nl = false;
-            #endif
-            if (_single_chan_mode == false) {
-                next_chan();
-            }
-        }
     }
 
     #ifdef NRFRR_DEBUG_HOP
