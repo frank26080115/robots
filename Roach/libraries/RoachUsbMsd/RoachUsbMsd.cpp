@@ -67,6 +67,14 @@ bool RoachUsbMsd_hasVbus(void)
     return (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) != 0;
 }
 
+uint64_t RoachUsbMsd_getFreeSpace(void)
+{
+    uint64_t x;
+    x = fatfs.freeClusterCount();
+    x *= fatfs.blocksPerCluster()/2;
+    return x;
+}
+
 static int32_t msc_read_cb(uint32_t lba, void* buffer, uint32_t bufsize)
 {
   // Note: SPIFLash Block API: readBlocks/writeBlocks/syncBlocks

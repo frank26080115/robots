@@ -1,4 +1,39 @@
 
+static uint32_t gui_last_draw_time = 0;
+
+bool gui_canDisplay(void)
+{
+    if (nbtwi_isBusy() != false) {
+        return false;
+    }
+    if (radio.is_busy())
+    {
+        uint32_t now = millis();
+        if ((now - gui_last_draw_time) >= 80) {
+            gui_last_draw_time = now;
+            return true;
+        }
+    }
+    return false;
+}
+
+void gui_drawWait(void)
+{
+    while (nbtwi_isBusy()) {
+        yield();
+        ctrler_tasks();
+    }
+}
+
+void gui_drawNow(void)
+{
+    oled.display();
+    while (nbtwi_isBusy()) {
+        yield();
+        ctrler_tasks();
+    }
+}
+
 void showError(const char* s)
 {
     nbtwi_wait();

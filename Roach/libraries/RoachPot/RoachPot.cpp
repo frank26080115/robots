@@ -7,9 +7,10 @@ static int pot_pin[POT_CNT_MAX];
 static int pot_task_idx = 0;
 static uint8_t adc_state_machine = ROACHPOT_SM_IDLE;
 
-RoachPot::RoachPot(int pin)
+RoachPot::RoachPot(int pin, roach_nvm_pot_t* c)
 {
     _pin = pin;
+    _cfg = c;
 }
 
 void RoachPot::begin(void)
@@ -56,9 +57,9 @@ void RoachPot::task(void)
     }
     has_new = true;
     int32_t x32 = x;
-    if (cfg.filter != 0)
+    if (cfg->filter != 0)
     {
-        int32_t filtered = roach_lpf(x32, last_val_filter, cfg.filter);
+        int32_t filtered = roach_lpf(x32, last_val_filter, cfg->filter);
         last_adc_filter = filtered;
         last_adc = roach_reduce_to_scale(filtered);
     }
@@ -76,7 +77,7 @@ void RoachPot::task(void)
         {
             int32_t avg = calib_sum + (calib_cnt / 2);
             avg /= calib_cnt;
-            cfg.center = avg;
+            cfg->center = avg;
             state_machine = ROACHPOT_SM_NORMAL;
             calib_done = true;
         }
@@ -86,37 +87,37 @@ void RoachPot::task(void)
     {
         if (state_machine == ROACHPOT_SM_CALIB_LIMITS)
         {
-            cfg.limit_max = (x32 > cfg.limit_max) ? x32 : cfg.limit_max; 
-            cfg.limit_min = (x32 < cfg.limit_min) ? x32 : cfg.limit_min;
-            if ((millis() - calib_start_time) >= 5000)
-            {
-                state_machine = ROACHPOT_SM_NORMAL;
-                calib_done = true;
-            }
+            cfg->limit_max = (x32 > cfg->limit_max) ? x32 : cfg->limit_max; 
+            cfg->limit_min = (x32 < cfg->limit_min) ? x32 : cfg->limit_min;
+            //if ((millis() - calib_start_time) >= 5000)
+            //{
+            //    state_machine = ROACHPOT_SM_NORMAL;
+            //    calib_done = true;
+            //}
         }
 
-        x32 -= cfg.center;
+        x32 -= cfg->center;
         if (x32 > 0)
         {
-            if (x32 < cfg.deadzone)
+            if (x32 < cfg->deadzone)
             {
                 last_val = 0;
             }
             else
             {
-                last_val = roach_value_map(x32 - cfg.deadzone, 0, cfg.limit_max - cfg.center - cfg.deadzone - cfg.boundary, 0, ROACH_SCALE_MULTIPLIER, true);
+                last_val = roach_value_map(x32 - cfg->deadzone, 0, cfg->limit_max - cfg->center - cfg->deadzone - cfg->boundary, 0, ROACH_SCALE_MULTIPLIER, true);
             }
         }
         else if (x32 < 0)
         {
-            if (x32 > -cfg.deadzone)
+            if (x32 > -cfg->deadzone)
             {
                 last_val = 0;
             }
             else
             {
                 x32 *= -1;
-                last_val = -roach_value_map(x32 - cfg.deadzone, 0, cfg.center - cfg.limit_min - cfg.deadzone - cfg.boundary, 0, ROACH_SCALE_MULTIPLIER, true);
+                last_val = -roach_value_map(x32 - cfg->deadzone, 0, cfg->center - cfg->limit_min - cfg->deadzone - cfg->boundary, 0, ROACH_SCALE_MULTIPLIER, true);
             }
         }
         else
@@ -124,9 +125,9 @@ void RoachPot::task(void)
             last_val = 0;
         }
 
-        if (cfg.curve != 0)
+        if (cfg->curve != 0)
         {
-            last_val = roach_expo_curve32(last_val, cfg.curve);
+            last_val = roach_expo_curve32(last_val, cfg->curve);
         }
     }
 }
@@ -146,8 +147,14 @@ void RoachPot::calib_center(void)
 
 void RoachPot::calib_limits(void)
 {
-    cfg.limit_max -= cfg.boundary;
-    cfg.limit_min += cfg.boundary;
+    cfg->limit_max -= cfg->boundary;
+    cfg->limit_min += cfg->boundary;
     state_machine = ROACHPOT_SM_CALIB_LIMITS;
     calib_start_time = millis();
+}
+
+void RoachPot::calib_stop(void)
+{
+    state_machine = ROACHPOT_SM_NORMAL;
+    calib_done = true;
 }

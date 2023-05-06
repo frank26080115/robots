@@ -8,6 +8,7 @@ void RoachUsbMsd_task(void);
 bool RoachUsbMsd_isReady(void);
 bool RoachUsbMsd_hasChange(bool clr);
 bool RoachUsbMsd_hasVbus(void);
+uint64_t RoachUsbMsd_getFreeSpace(void);
 
 #ifdef __cplusplus
 extern "C" {

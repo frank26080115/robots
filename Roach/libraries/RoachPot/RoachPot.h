@@ -16,15 +16,16 @@ enum
 class RoachPot
 {
     public:
-        RoachPot(int pin);
+        RoachPot(int pin, roach_nvm_pot_t* c);
         void begin(void);
         int16_t get(void);
         bool task(void);
         void calib_center(void);
         void calib_limits(void);
-        roach_nvm_pot_t cfg;
+        void calib_stop(void);
         bool has_new;
         bool calib_done;
+        roach_nvm_pot_t* cfg;
 
     private:
         uint8_t state_machine;

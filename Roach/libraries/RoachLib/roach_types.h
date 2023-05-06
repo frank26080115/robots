@@ -27,6 +27,7 @@ roach_ctrl_pkt_t;
 typedef struct
 {
     uint16_t timestamp;
+    uint32_t checksum;
     uint16_t battery;
     uint8_t  temperature;
     int16_t  rssi;
@@ -123,7 +124,7 @@ typedef struct
 {
     uint32_t byte_offset;
     char     name[32];
-    char     type_code[32]; // "u8", "s8", "u16", "s16", "u32", "s32", "s32x100", "hex"
+    char     type_code[16]; // "u8", "s8", "u16", "s16", "u32", "s32", "s32x100", "hex"
     int32_t  def_val;
     int32_t  limit_min;     // always populate
     int32_t  limit_max;     // always populate

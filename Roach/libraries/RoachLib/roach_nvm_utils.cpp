@@ -7,7 +7,7 @@
 #include <InternalFileSystem.h>
 #endif
 
-int32_t roach_nvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
+int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
 {
     if (strcmp("hex", desc_itm->type_code) == 0)
     {
@@ -39,7 +39,7 @@ int32_t roach_nvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
     return 0;
 }
 
-void roach_nvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
+void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
 {
     if (strcmp("hex", desc_itm->type_code) == 0)
     {
@@ -74,7 +74,7 @@ void roach_nvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32
     }
 }
 
-int32_t roach_nvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
+int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
 {
     int32_t x = roach_nvm_getval(struct_ptr, desc_itm);
     x += val;
@@ -82,7 +82,7 @@ int32_t roach_nvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, in
     return roach_nvm_getval(struct_ptr, desc_itm);
 }
 
-bool roach_nvm_write_itemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
+bool roachnvm_write_itemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
 {
     roach_nvm_gui_desc_t* desc_itm = NULL;
     int i;
@@ -158,7 +158,7 @@ bool roach_nvm_write_itemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl
     return ret;
 }
 
-void roach_nvm_read_from_file(File* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_read_from_file(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     while (f->available())
     {
@@ -170,7 +170,7 @@ void roach_nvm_read_from_file(File* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t
     }
 }
 
-void roach_nvm_format_item(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
+void roachnvm_format_item(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
 {
     if (strcmp("hex", desc_itm->type_code) == 0)
     {
@@ -221,7 +221,7 @@ void roach_nvm_format_item(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t*
     }
 }
 
-void roach_nvm_write_to_file(File* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_write_to_file(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
     roach_nvm_write_item* desc_itm;
@@ -240,7 +240,7 @@ void roach_nvm_write_to_file(File* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t*
     }
 }
 
-void roach_nvm_write_desc_file(File* f, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_write_desc_file(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
     roach_nvm_write_item* desc_itm;
@@ -265,7 +265,7 @@ void roach_nvm_write_desc_file(File* f, roach_nvm_gui_desc_t* desc_tbl)
     }
 }
 
-void roach_nvm_set_defaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_set_defaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
     roach_nvm_write_item* desc_itm;

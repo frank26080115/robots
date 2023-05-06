@@ -91,6 +91,8 @@ class nRF52RcRadio
         int  textRead (char* buf);                             // read available text message
         void textSend (char* buf);                             // send text message
 
+        bool connected(void);
+
         void pause(void);
         void resume(void);
         bool is_paused(void);
