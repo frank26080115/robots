@@ -9,6 +9,15 @@
 
 #define PACK_STRUCT __attribute__ ((packed))
 
+enum
+{
+    ROACHPKTFLAG_BTN1 = 0x01,
+    ROACHPKTFLAG_BTN2 = 0x02,
+    ROACHPKTFLAG_BTN3 = 0x04,
+    ROACHPKTFLAG_BTN4 = 0x08,
+    ROACHPKTFLAG_GYROACTIVE = 0x10,
+};
+
 // try to keep this under 32 bytes
 typedef struct
 {
@@ -17,9 +26,10 @@ typedef struct
     int16_t  throttle;
     int16_t  steering;
     int16_t  heading;  // absolute encoder data to set absolute heading
-    int8_t   weap_speed;
+    int16_t  pot_weap;
+    int16_t  pot_aux;
     uint32_t flags;
-    uint16_t chan_map; // the transmitter channel map might not be the same as the receiver, the receiver might be running in single channel mode
+    //uint32_t chan_map; // the transmitter channel map might not be the same as the receiver, the receiver might be running in single channel mode
 }
 PACK_STRUCT
 roach_ctrl_pkt_t;
@@ -114,6 +124,8 @@ typedef struct
     int32_t heading_multiplier;
     int32_t cross_mix;
     roach_nvm_pot_t pot_weapon;
+    roach_nvm_pot_t pot_aux;
+    roach_nvm_pot_t pot_battery;
 
     uint32_t checksum;
 }

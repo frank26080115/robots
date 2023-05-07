@@ -41,14 +41,14 @@ RoachButton::RoachButton(int pin, int rep, int db)
     _pin = pin;
     _rep = rep;
     _db = db;
+    roachbtn_insttbl[roachbtn_cnt] = this;
+    roachbtn_cnt += 1;
 }
 
 void RoachButton::begin(void)
 {
-    roachbtn_insttbl[roachbtn_cnt] = this;
     pinMode(_pin, INPUT_PULLUP);
     attachInterrupt(_pin, _pin_irq_ptr[roachbtn_cnt], CHANGE);
-    roachbtn_cnt += 1;
     _pressed = false;
     _last_down_time = 0;
     _last_up_time = 0;
@@ -110,4 +110,20 @@ uint32_t RoachButton::isHeld(void)
     d = d <= 0 ? 1 : d;
     __enable_irq();
     return d;
+}
+
+void RoachButton_clearAll(void)
+{
+    int i;
+    for (i = 0; i < roachbtn_cnt; i++) {
+        roachbtn_insttbl[i]->hasPressed(true);
+    }
+}
+
+void RoachButton_allBegin(void)
+{
+    int i;
+    for (i = 0; i < roachbtn_cnt; i++) {
+        roachbtn_insttbl[i]->begin();
+    }
 }

@@ -26,7 +26,7 @@ uint8_t rosync_rxitems_cnt;
 uint8_t rosync_upload_cache[NRFRR_PAYLOAD_SIZE];
 uint32_t rosync_upload_lasttime = 0;
 
-void RoSync_task()
+void RoSync_task(void)
 {
     uint32_t now = millis();
 

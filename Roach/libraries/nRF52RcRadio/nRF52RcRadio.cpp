@@ -552,9 +552,11 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
 {
     bool ret = false; // return true for "run again"
 
+    #ifdef NRFRR_USE_INTERRUPTS
     if (is_isr == false) {
         __disable_irq();
     }
+    #endif
 
     #ifdef NRFRR_USE_INTERRUPTS
     if (is_isr)
@@ -918,11 +920,15 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             _statemachine = NRFRR_SM_HALT_WAIT;
             _sm_time = now;
             break;
+         case NRFRR_SM_CONT_TX:
+            break;
     }
 
+    #ifdef NRFRR_USE_INTERRUPTS
     if (is_isr == false) {
         __enable_irq();
     }
+    #endif
 
     return ret;
 }
@@ -1278,6 +1284,12 @@ bool nRF52RcRadio::is_paused(void)
 
 void nRF52RcRadio::resume(void)
 {
+    if (_statemachine == NRFRR_SM_CONT_TX) {
+        NRF_RADIO->EVENTS_DISABLED = 0;
+        NRF_RADIO->TEST            = 0;
+        NRF_RADIO->TASKS_DISABLE   = 1;
+        _statemachine = NRFRR_SM_HALT_START;
+    }
     if (_statemachine >= NRFRR_SM_HALT_START)
     {
         while (is_paused() == false) {
@@ -1287,4 +1299,14 @@ void nRF52RcRadio::resume(void)
     }
     _statemachine = NRFRR_SM_IDLE_WAIT;
     _statemachine_next = _statemachine;
+}
+
+void nRF52RcRadio::cont_tx(uint16_t freq)
+{
+    pause();
+    set_freq(freq);
+    _statemachine = NRFRR_SM_CONT_TX;
+    NRF_RADIO->FREQUENCY  = freq;
+    NRF_RADIO->TEST       = (RADIO_TEST_CONST_CARRIER_Enabled << RADIO_TEST_CONST_CARRIER_Pos) | (RADIO_TEST_PLL_LOCK_Enabled << RADIO_TEST_PLL_LOCK_Pos);
+    NRF_RADIO->TASKS_TXEN = 1;
 }

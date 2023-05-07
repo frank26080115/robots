@@ -1,8 +1,8 @@
 #include "RoachLib.h"
 
-#ifdef ESP32 // TODO: proper detection
+#if defined(ESP32)
 #include <SPIFFS.h>
-#else
+#elif defined(NRF52840_XXAA)
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
 #endif
@@ -74,7 +74,7 @@ void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_
     }
 }
 
-int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
+int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t x)
 {
     int32_t x = roach_nvm_getval(struct_ptr, desc_itm);
     x += val;
@@ -82,10 +82,18 @@ int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int
     return roach_nvm_getval(struct_ptr, desc_itm);
 }
 
-bool roachnvm_write_itemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
+bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
 {
     roach_nvm_gui_desc_t* desc_itm = NULL;
+
     int i;
+    int slen = strlen(name);
+    for (i = slen - 1; i > 0; i--) {
+        if (name[i] == ' ' || name[i] == '\t') {
+            name[i] = 0;
+        }
+    }
+
     // iterate through all items to look for a name match
     for (i = 0; i < 0xFFFF; i++)
     {
@@ -103,6 +111,10 @@ bool roachnvm_write_itemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl,
     }
 
     bool ret = false;
+
+    while (value[0] == ' ' || value[0] == '\t') {
+        value = &value[1];
+    }
 
     if (strcmp("hex", desc_itm->type_code) == 0)
     {
@@ -158,19 +170,54 @@ bool roachnvm_write_itemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl,
     return ret;
 }
 
-void roachnvm_read_from_file(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
+    #if defined(NRF52840_XXAA)
+    char temp_buff[64];
+    #endif
     while (f->available())
     {
+        #if defined(ESP32)
         String s = f->readStringUntil('\n');
         int spci = s.indexOf('=');
         String left = s.substring(0, spci);
         String right = s.substring(spci + 1, s.length());
-        roach_nvm_write_item(struct_ptr, desc_tbl, left.c_str(), right.c_str());
+        roachnvm_parseitem(struct_ptr, desc_tbl, left.c_str(), right.c_str());
+        #elif defined(NRF52840_XXAA)
+        int i = 0;
+        while (true)
+        {
+            int c = f->read();
+            bool is_end = (c == 0 || c == '\n' || c == '\r' || c < 0);
+            if (is_end && i > 0)
+            {
+                temp_buff[i] = 0;
+                int j;
+                for (j = 1; j < i; j++)
+                {
+                    char fc = temp_buff[j];
+                    if (fc == '=' || fc == ':' || fc == ',') {
+                        temp_buff[j] = 0;
+                        j += 1;
+                        roachnvm_parseitem(struct_ptr, desc_tbl, temp_buff, &(temp_buff[j]));
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                temp_buff[i] = c;
+                temp_buff[i + 1] = 0;
+            }
+            if (c < 0) {
+                break;
+            }
+        }
+        #endif
     }
 }
 
-void roachnvm_format_item(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
+void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
 {
     if (strcmp("hex", desc_itm->type_code) == 0)
     {
@@ -221,7 +268,7 @@ void roachnvm_format_item(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* 
     }
 }
 
-void roachnvm_write_to_file(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
     roach_nvm_write_item* desc_itm;
@@ -240,7 +287,7 @@ void roachnvm_write_to_file(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_des
     }
 }
 
-void roachnvm_write_desc_file(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_writedescfile(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
     roach_nvm_write_item* desc_itm;
@@ -265,7 +312,7 @@ void roachnvm_write_desc_file(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl)
     }
 }
 
-void roachnvm_set_defaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
+void roachnvm_setdefaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
     roach_nvm_write_item* desc_itm;

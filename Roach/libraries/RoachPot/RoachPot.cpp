@@ -11,15 +11,15 @@ RoachPot::RoachPot(int pin, roach_nvm_pot_t* c)
 {
     _pin = pin;
     _cfg = c;
+    pot_inst[pot_cnt] = this;
+    pot_pin[pot_cnt] = _pin;
+    pot_cnt++;
 }
 
 void RoachPot::begin(void)
 {
     adcAttachPin(_pin);
     state_machine = ROACHPOT_SM_NORMAL;
-    pot_inst[pot_cnt] = this;
-    pot_pin[pot_cnt] = _pin;
-    pot_cnt++;
     has_new = false;
     calib_done = false;
 }
@@ -129,6 +129,24 @@ void RoachPot::task(void)
         {
             last_val = roach_expo_curve32(last_val, cfg->curve);
         }
+    }
+}
+
+void RoachPot_allTask(void)
+{
+    int i;
+    for (i = 0; i < pot_cnt; i++)
+    {
+        pot_inst[i]->task();
+    }
+}
+
+void RoachPot_allBegin(void)
+{
+    int i;
+    for (i = 0; i < pot_cnt; i++)
+    {
+        pot_inst[i]->begin();
     }
 }
 

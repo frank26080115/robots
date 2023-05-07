@@ -36,4 +36,7 @@ class RoachPot
         int32_t calib_sum, calib_cnt;
 };
 
+void RoachPot_allTask(void);
+void RoachPot_allBegin(void);
+
 #endif

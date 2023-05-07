@@ -18,4 +18,6 @@ class RoachButton
         volatile bool _pressed;
 };
 
+void RoachButton_clearAll(void);
+
 #endif

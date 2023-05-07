@@ -3,6 +3,21 @@
 
 #include <Arduino.h>
 
+enum
+{
+    MENUID_NONE,
+    MENUID_HOME,                  // display input visualizations
+    //MENUID_STATS,                 // display extra live data
+    MENUID_INFO,                  // display stuff like profile, UID, version
+    //MENUID_RAW,                   // display raw input data
+    MENUID_CONFIG_CALIBSYNC,      // options for calibration and synchronization
+    MENUID_CONFIG_FILELOAD,       // choose to load a file
+    MENUID_CONFIG_DRIVE,          // edit parameters about drive train
+    MENUID_CONFIG_WEAP,           // edit parameters about the weapon
+    MENUID_CONFIG_CTRLER,         // edit parameters about the controller
+    MENUID_CONFIG_IMU,            // edit parameters for the IMU (orientation, PID, timeout, etc)
+};
+
 class RoachMenu
 {
     public:

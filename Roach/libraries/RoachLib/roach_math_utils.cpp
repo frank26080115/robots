@@ -100,8 +100,7 @@ int32_t roach_expo_curve32(int32_t x, int32_t curve)
     return (int32_t)lround(yd);
 }
 
-// copied from nRF5 SDK
-uint32_t crc32_calc(uint8_t const * p_data, uint32_t size, uint32_t const * p_crc)
+uint32_t roach_crcCalc(uint8_t const * p_data, uint32_t size, uint32_t const * p_crc)
 {
     uint32_t crc;
 

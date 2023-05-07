@@ -8,4 +8,10 @@
 
 #define PACK_STRUCT __attribute__ ((packed))
 
+#if defined(ESP32)
+#define RoachFile File
+#elif defined(NRF52840_XXAA)
+#define RoachFile FatFile
+#endif
+
 #endif

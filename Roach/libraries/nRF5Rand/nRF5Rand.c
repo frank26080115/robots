@@ -18,12 +18,21 @@ static bool has_srand = false;
 
 static void rng_handler(uint8_t rng_data);
 
-void nrf5rand_init(int sz)
+void nrf5rand_init(int sz, bool use_irq)
 {
     rng_fifo = (uint8_t*)malloc(rng_fifo_size = sz);
     static nrfx_rng_config_t cfg = NRFX_RNG_DEFAULT_CONFIG;
     nrfx_rng_init(&cfg, rng_handler);
-    nrfx_rng_start();
+    if (use_irq) {
+        nrfx_rng_start();
+    }
+    else {
+        #ifdef NRF_RNG_USE_NEW_VERSION
+        nrf_rng_task_trigger(NRF_RNG_TASK_START);
+        #else
+        nrf_rng_task_trigger(NRF_RNG, NRF_RNG_TASK_START);
+        #endif
+    }
 }
 
 void nrf5rand_vector(uint8_t* buf, int len)
@@ -101,6 +110,27 @@ void nrf5rand_flush(void)
     rng_fifo_r = 0;
     __enable_irq();
     nrfx_rng_start();
+}
+
+void nrf5rand_stopIrq(void)
+{
+    #ifdef NRF_RNG_USE_NEW_VERSION
+    nrf_rng_int_disable(NRF_RNG_INT_VALRDY_MASK);
+    #else
+    nrf_rng_int_disable(NRF_RNG, NRF_RNG_INT_VALRDY_MASK);
+    #endif
+}
+
+void nrf5rand_task(void)
+{
+    if (NRF_RNG->EVENT_VALRDY) {
+        rng_handler(nrf_rng_random_value_get(NRF_RNG));
+        #ifdef NRF_RNG_USE_NEW_VERSION
+        nrf_rng_event_clear(NRF_RNG_EVENT_VALRDY);
+        #else
+        nrf_rng_event_clear(NRF_RNG, NRF_RNG_EVENT_VALRDY);
+        #endif
+    }
 }
 
 static void rng_handler(uint8_t rng_data)

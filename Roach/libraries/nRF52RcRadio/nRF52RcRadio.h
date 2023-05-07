@@ -67,6 +67,7 @@ enum
     NRFRR_SM_HALT_START,
     NRFRR_SM_HALT_WAIT,
     NRFRR_SM_HALTED,
+    NRFRR_SM_CONT_TX,
 };
 
 enum
@@ -114,6 +115,8 @@ class nRF52RcRadio
         #ifdef NRFRR_DEBUG_RX_ERRSTATS
         inline uint32_t* get_rx_err_stat(void) { return _stat_rx_errs; };
         #endif
+
+        void cont_tx(uint16_t f);
 
     private:
         bool     _is_tx;
