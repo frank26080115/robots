@@ -1,4 +1,4 @@
-class RoachMenuFuncCalibGyro : RoachMenuFunctionItem
+class RoachMenuFuncCalibGyro : public RoachMenuFunctionItem
 {
     public:
         RoachMenuFuncCalibGyro(void) : RoachMenuFunctionItem("calib gyro")
@@ -42,7 +42,7 @@ class RoachMenuFuncCalibGyro : RoachMenuFunctionItem
         };
 };
 
-class RoachMenuFuncCalibAdcCenter : RoachMenuFunctionItem
+class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
 {
     public:
         RoachMenuFuncCalibAdcCenter(void) : RoachMenuFunctionItem("cal centers")
@@ -53,37 +53,37 @@ class RoachMenuFuncCalibAdcCenter : RoachMenuFunctionItem
         {
             int y = 11;
             oled.setCursor(0, y);
-            oled.printf("T: %d", pot_trigger.cfg->center);
-            y += 8;
+            oled.printf("T: %d", pot_throttle.cfg->center);
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             oled.printf("S: %d", pot_steering.cfg->center);
-            y += 8;
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("W: %d", pot_weap.cfg->center);
-            y += 8;
+            oled.printf("W: %d", pot_weapon.cfg->center);
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             oled.printf("A: %d", pot_aux.cfg->center);
-            y += 8;
+            y += ROACHGUI_LINE_HEIGHT;
         };
 
     protected:
         virtual void onEnter(void)
         {
-            roach_lockPots(true);
+            pots_locked = true;
             RoachMenu::onEnter();
-            pot_trigger.calib_center();
+            pot_throttle.calib_center();
             pot_steering.calib_center();
-            pot_weap.calib_center();
+            pot_weapon.calib_center();
             pot_aux.calib_center();
         };
 
         virtual void onExit(void)
         {
-            pot_trigger.calib_stop();
+            pot_throttle.calib_stop();
             pot_steering.calib_stop();
-            pot_weap.calib_stop();
+            pot_weapon.calib_stop();
             pot_aux.calib_stop();
-            roach_lockPots(false);
+            pots_locked = false;
         };
 
         virtual void draw_sidebar(void)
@@ -104,9 +104,9 @@ class RoachMenuFuncCalibAdcCenter : RoachMenuFunctionItem
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
-                    pot_trigger.calib_center();
+                    pot_throttle.calib_center();
                     pot_steering.calib_center();
-                    pot_weap.calib_center();
+                    pot_weapon.calib_center();
                     pot_aux.calib_center();
                     break;
             }
@@ -114,7 +114,7 @@ class RoachMenuFuncCalibAdcCenter : RoachMenuFunctionItem
 };
 
 
-class RoachMenuFuncCalibAdcLimits : RoachMenuFunctionItem
+class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
 {
     public:
         RoachMenuFuncCalibAdcLimits(void) : RoachMenuFunctionItem("cal limits")
@@ -125,37 +125,37 @@ class RoachMenuFuncCalibAdcLimits : RoachMenuFunctionItem
         {
             int y = 11;
             oled.setCursor(0, y);
-            oled.printf("T: %d <> %d", pot_trigger.cfg->limit_min, pot_trigger.cfg->limit_max);
-            y += 8;
+            oled.printf("T: %d <> %d", pot_throttle.cfg->limit_min, pot_throttle.cfg->limit_max);
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             oled.printf("S: %d <> %d", pot_steering.cfg->limit_min, pot_steering.cfg->limit_max);
-            y += 8;
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("W: %d <> %d", pot_weap.cfg->limit_min, pot_weap.cfg->limit_max);
-            y += 8;
+            oled.printf("W: %d <> %d", pot_weapon.cfg->limit_min, pot_weapon.cfg->limit_max);
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             oled.printf("A: %d <> %d", pot_aux.cfg->limit_min, pot_aux.cfg->limit_max);
-            y += 8;
+            y += ROACHGUI_LINE_HEIGHT;
         };
 
     protected:
         virtual void onEnter(void)
         {
-            roach_lockPots(true);
+            pots_locked = true;
             RoachMenu::onEnter();
-            pot_trigger.calib_limits();
+            pot_throttle.calib_limits();
             pot_steering.calib_limits();
-            pot_weap.calib_limits();
+            pot_weapon.calib_limits();
             pot_aux.calib_limits();
         };
 
         virtual void onExit(void)
         {
-            pot_trigger.calib_stop();
+            pot_throttle.calib_stop();
             pot_steering.calib_stop();
-            pot_weap.calib_stop();
+            pot_weapon.calib_stop();
             pot_aux.calib_stop();
-            roach_lockPots(false);
+            pots_locked = false;
         };
 
         virtual void draw_sidebar(void)
@@ -176,16 +176,16 @@ class RoachMenuFuncCalibAdcLimits : RoachMenuFunctionItem
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
-                    pot_trigger.calib_limits();
+                    pot_throttle.calib_limits();
                     pot_steering.calib_limits();
-                    pot_weap.calib_limits();
+                    pot_weapon.calib_limits();
                     pot_aux.calib_limits();
                     break;
             }
         };
 };
 
-class RoachMenuFuncSyncDownload : RoachMenuFunctionItem
+class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
 {
     public:
         RoachMenuFuncSyncDownload(void) : RoachMenuFunctionItem("sync download")
@@ -228,7 +228,7 @@ class RoachMenuFuncSyncDownload : RoachMenuFunctionItem
         };
 };
 
-class RoachMenuFuncSyncUpload : RoachMenuFunctionItem
+class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
 {
     public:
         RoachMenuFuncSyncUpload(void) : RoachMenuFunctionItem("sync upload")
@@ -271,10 +271,10 @@ class RoachMenuFuncSyncUpload : RoachMenuFunctionItem
         };
 };
 
-class RoachMenuCalibSync : RoachMenuLister
+class RoachMenuCalibSync : public RoachMenuLister
 {
     public:
-        RoachMenuActionLister(void) : RoachMenuLister(MENUID_CONFIG_CALIBSYNC)
+        RoachMenuCalibSync(void) : RoachMenuLister(MENUID_CONFIG_CALIBSYNC)
         {
             addNode((RoachMenuListItem*)(new RoachMenuFuncCalibGyro()));
             addNode((RoachMenuListItem*)(new RoachMenuFuncCalibAdcCenter()));

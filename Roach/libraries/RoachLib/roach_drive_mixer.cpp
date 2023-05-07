@@ -15,7 +15,7 @@ void roach_drive_mix(int32_t throttle, int32_t steering, int32_t gyro_correction
     int32_t w = input_limit - abs(throttle);
     w *= input_limit;
     w *= inv_steering;
-    w += inv_steering * input_limit
+    w += inv_steering * input_limit;
     int32_t right = roach_reduce_to_scale((v + w) / 2);
     int32_t left  = roach_reduce_to_scale((v - w) / 2);
 

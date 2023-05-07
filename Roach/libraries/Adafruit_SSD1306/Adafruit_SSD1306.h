@@ -35,7 +35,7 @@
 // AND HEIGHT ARGUMENTS).
 
 // Uncomment to disable Adafruit splash logo
-//#define SSD1306_NO_SPLASH
+#define SSD1306_NO_SPLASH
 
 #include <Adafruit_GFX.h>
 

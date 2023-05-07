@@ -19,6 +19,8 @@ class RoachPot
         RoachPot(int pin, roach_nvm_pot_t* c);
         void begin(void);
         int16_t get(void);
+        int16_t getAdcFiltered(void);
+        int16_t getAdcRaw(void);
         bool task(void);
         void calib_center(void);
         void calib_limits(void);
@@ -31,7 +33,7 @@ class RoachPot
         uint8_t state_machine;
         uint32_t calib_start_time;
         int _pin;
-        int32_t last_adc, last_val;
+        int32_t last_adc, last_val, last_adc_raw;
         int32_t last_adc_filter;
         int32_t calib_sum, calib_cnt;
 };

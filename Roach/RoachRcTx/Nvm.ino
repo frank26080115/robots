@@ -1,6 +1,9 @@
-roach_rf_nvm_t nvm_rf;
-roach_rx_nvm_t nvm_rx;
-roach_tx_nvm_t nvm_tx;
+#if defined(ESP32)
+#include <SPIFFS.h>
+#elif defined(NRF52840_XXAA)
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
+#endif
 
 roach_nvm_gui_desc_t cfggroup_ctrler[] = {
     { ((uint32_t)(&(nvm_tx.heading_multiplier      )) - (uint32_t)(&nvm_tx)), "H scale"     , "s32x10" ,                     90,                 INT_MIN, INT_MAX               , 1, },
@@ -37,46 +40,89 @@ roach_nvm_gui_desc_t cfggroup_ctrler[] = {
     { ((uint32_t)(&(nvm_tx.pot_aux     .limit_max  )) - (uint32_t)(&nvm_tx)), "POT lim max" , "s16"    ,          ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .expo       )) - (uint32_t)(&nvm_tx)), "POT expo"    , "s16x10" ,                      0, -ROACH_SCALE_MULTIPLIER, ROACH_SCALE_MULTIPLIER, 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .filter     )) - (uint32_t)(&nvm_tx)), "POT filter"  , "s16x10" ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
-    { ((uint32_t)(&(nvm_tx.pot_battery .center     )) - (uint32_t)(&nvm_tx)), "BAT center"  , "s16"    ,                      0,                       0, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_battery .limit_max  )) - (uint32_t)(&nvm_tx)), "BAT lim max" , "s16"    ,          ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_battery .filter     )) - (uint32_t)(&nvm_tx)), "BAT filter"  , "s16x10" ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
     ROACH_NVM_GUI_DESC_END,
 };
 
-#define ROACH_STARTUP_FILE_NAME "startup.txt"
-
 void settings_init(void)
 {
+    settings_factoryReset();
+    settings_loadFile(ROACH_STARTUP_FILE_NAME);
+}
+
+void settings_factoryReset(void)
+{
     memset(&nvm_tx, 0, sizeof(roach_tx_nvm_t));
-    roachnvm_setdefaults(&nvm_rf, cfggroup_rf);
-    roachnvm_setdefaults(&nvm_tx, cfggroup_ctrler);
-    roachnvm_setdefaults(&nvm_rx, cfggroup_drive);
-    roachnvm_setdefaults(&nvm_rx, cfggroup_weap);
-    roachnvm_setdefaults(&nvm_rx, cfggroup_imu);
-    FatFile f;
-    bool suc = f.open(ROACH_STARTUP_FILE_NAME);
-    if (suc)
-    {
-        roachnvm_readfromfile(&f, &nvm_rf, cfggroup_rf);
-        roachnvm_readfromfile(&f, &nvm_tx, cfggroup_ctrler);
-        roachnvm_readfromfile(&f, &nvm_rx, cfggroup_drive);
-        roachnvm_readfromfile(&f, &nvm_rx, cfggroup_weap);
-        roachnvm_readfromfile(&f, &nvm_rx, cfggroup_imu);
-        f.close();
-    }
+    roachnvm_setdefaults((uint8_t*)&nvm_rf, cfggroup_rf);
+    roachnvm_setdefaults((uint8_t*)&nvm_tx, cfggroup_ctrler);
+    roachnvm_setdefaults((uint8_t*)&nvm_rx, cfggroup_drive);
+    roachnvm_setdefaults((uint8_t*)&nvm_rx, cfggroup_weap);
+    roachnvm_setdefaults((uint8_t*)&nvm_rx, cfggroup_imu);
 }
 
 void settings_save(void)
 {
-    FatFile f;
-    bool suc = f.open(ROACH_STARTUP_FILE_NAME, O_RDWR | O_CREAT);
+    settings_saveToFile(ROACH_STARTUP_FILE_NAME);
+}
+
+void settings_loadFile(const char* fname)
+{
+    RoachFile f;
+    bool suc = f.open(fname);
+    uint8_t flags = 0;
+    if (memcmp(fname, "rf", 2) == 0) {
+        flags |= (1 << 0);
+    }
+    if (memcmp(fname, "ctrler", 6) == 0) {
+        flags |= (1 << 1);
+    }
+    if (memcmp(fname, "robot", 5) == 0) {
+        flags |= (1 << 2);
+    }
     if (suc)
     {
-        roachnvm_writetofile(&f, &nvm_rf, cfggroup_rf);
-        roachnvm_writetofile(&f, &nvm_tx, cfggroup_ctrler);
-        roachnvm_writetofile(&f, &nvm_rx, cfggroup_drive);
-        roachnvm_writetofile(&f, &nvm_rx, cfggroup_weap);
-        roachnvm_writetofile(&f, &nvm_rx, cfggroup_imu);
+        if ((flags & (1 << 0)) != 0 || flags == 0) {
+            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rf, cfggroup_rf);
+        }
+        if ((flags & (1 << 1)) != 0 || flags == 0) {
+            roachnvm_readfromfile(&f, (uint8_t*)&nvm_tx, cfggroup_ctrler);
+        }
+        if ((flags & (1 << 2)) != 0 || flags == 0) {
+            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_drive);
+            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_weap);
+            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
+        }
+        f.close();
+    }
+}
+
+void settings_saveToFile(const char* fname)
+{
+    RoachFile f;
+    bool suc = f.open(fname, O_RDWR | O_CREAT);
+    uint8_t flags = 0;
+    if (memcmp(fname, "rf", 2) == 0) {
+        flags |= (1 << 0);
+    }
+    if (memcmp(fname, "ctrler", 6) == 0) {
+        flags |= (1 << 1);
+    }
+    if (memcmp(fname, "robot", 5) == 0) {
+        flags |= (1 << 2);
+    }
+    if (suc)
+    {
+        if ((flags & (1 << 0)) != 0 || flags == 0) {
+            roachnvm_writetofile(&f, (uint8_t*)&nvm_rf, cfggroup_rf);
+        }
+        if ((flags & (1 << 1)) != 0 || flags == 0) {
+            roachnvm_writetofile(&f, (uint8_t*)&nvm_tx, cfggroup_ctrler);
+        }
+        if ((flags & (1 << 2)) != 0 || flags == 0) {
+            roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_drive);
+            roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_weap);
+            roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
+        }
         f.close();
     }
 }

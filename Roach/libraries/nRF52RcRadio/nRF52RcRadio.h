@@ -82,17 +82,18 @@ class nRF52RcRadio
     public:
         nRF52RcRadio  (bool is_tx); // constructor, selects if the role is transmitter or receiver
         void var_reset(void);       // sets all variables to initial state
-        void begin    (uint32_t chan_map, uint32_t uid, uint32_t salt); // init, provide channel map as a bitmask, unique identifier for pairing, and security salt
+        void begin    (uint32_t chan_map, uint32_t uid, uint32_t salt, int fem_tx = -1, int fem_rx = -1); // init, provide channel map as a bitmask, unique identifier for pairing, and security salt
         void send     (uint8_t* data);                         // queue data to be sent, and optionally: send immediately
         int  available(void);                                  // check if new packet has been received
         int  read     (uint8_t* data);                         // copy the new packet to a buffer
         void task     (void);                                  // periodic task, call from loop()
         bool state_machine_run(uint32_t t, bool is_isr);       // innards of task(), but can be called from ISR
         int  textAvail(void);                                  // check if text message is available
-        int  textRead (char* buf);                             // read available text message
-        void textSend (char* buf);                             // send text message
+        int  textRead (const char* buf);                             // read available text message
+        void textSend (const char* buf);                             // send text message
 
-        bool connected(void);
+        inline bool connected(void) { return _connected; };
+        inline int  get_rssi(void)  { return _stat_rx_rssi; };
 
         void pause(void);
         void resume(void);
@@ -123,10 +124,11 @@ class nRF52RcRadio
         uint32_t _session_id;
         uint32_t _seq_num;
         uint32_t _seq_num_prev;
-        uint8_t  _statemachine;
+        uint8_t  _statemachine = NRFRR_SM_IDLE_WAIT;
         uint8_t  _statemachine_next;
         uint32_t _sm_time;
         uint32_t _sm_evt_time;
+        bool     _connected;
         uint32_t _salt;
         uint32_t _uid;
         uint32_t _chan_map;

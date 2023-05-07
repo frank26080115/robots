@@ -18,6 +18,9 @@ class RoachButton
         volatile bool _pressed;
 };
 
+void RoachButton_allBegin(void);
 void RoachButton_clearAll(void);
+void RoachButton_hasAnyPressed(void);
+void RoachButton_isAnyHeld(void);
 
 #endif

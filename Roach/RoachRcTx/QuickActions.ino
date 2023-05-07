@@ -1,10 +1,9 @@
-
-#define QUICKACTION_HOLD_TIME 2000
+#include "MenuClass.h"
 
 class QuickAction
 {
     public:
-        QuickAction(const char* txt, RoachBtn* btn)
+        QuickAction(const char* txt, RoachButton* btn)
         {
             strncpy(_txt, txt, 30);
             _btn = btn;
@@ -21,17 +20,17 @@ class QuickAction
 
     protected:
         char _txt[32];
-        RoachBtn* _btn;
+        RoachButton* _btn;
         uint32_t t = 0;
         uint32_t last_time = 0;
 
         virtual void draw_start(void)
         {
             gui_drawWait();
-            oled.clear();
+            oled.clearDisplay();
             oled.setCursor(0, 0);
             oled.print("QIKACT");
-            oled.setCursor(0, 8);
+            oled.setCursor(0, ROACHGUI_LINE_HEIGHT);
             oled.print(_txt);
             draw_barOutline();
             gui_drawNow();
@@ -68,7 +67,7 @@ class QuickAction
         virtual void draw_barFill(void);
 };
 
-class QuickActionDownload : QuickAction
+class QuickActionDownload : public QuickAction
 {
     public:
         QuickActionDownload(void) : QuickAction("sync download", &btn_down)
@@ -86,8 +85,8 @@ class QuickActionDownload : QuickAction
 
         virtual void draw_barOutline(void)
         {
-            x = oled.width() - 9;
-            h = oled.height() - 1;
+            x = SCREEN_WIDTH - 9;
+            h = SCREEN_HEIGHT - 1;
             oled.drawRect(x, 0, 8, h, 1);
         };
 
@@ -98,7 +97,7 @@ class QuickActionDownload : QuickAction
         };
 };
 
-class QuickActionUpload : QuickAction
+class QuickActionUpload : public QuickAction
 {
     public:
         QuickActionUpload(void) : QuickAction("sync upload", &btn_up)
@@ -116,19 +115,19 @@ class QuickActionUpload : QuickAction
 
         virtual void draw_barOutline(void)
         {
-            x = oled.width() - 9;
-            h = oled.height() - 1;
+            x = SCREEN_WIDTH - 9;
+            h = SCREEN_HEIGHT - 1;
             oled.drawRect(x, 0, 8, h, 1);
         };
 
         virtual void draw_barFill(void)
         {
             int h2 = map(t, 0, QUICKACTION_HOLD_TIME, 0, h);
-            oled.fillRect(x, oled.height() - h2, 8, h2, 1);
+            oled.fillRect(x, SCREEN_HEIGHT - h2, 8, h2, 1);
         };
 };
 
-class QuickActionCalibGyro : QuickAction
+class QuickActionCalibGyro : public QuickAction
 {
     public:
         QuickActionCalibGyro(void) : QuickAction("cal. gyro", &btn_left)
@@ -146,8 +145,8 @@ class QuickActionCalibGyro : QuickAction
 
         virtual void draw_barOutline(void)
         {
-            y = (oled.height() / 2) - 4;
-            w = oled.width();
+            y = (SCREEN_HEIGHT / 2) - 4;
+            w = SCREEN_WIDTH;
             oled.drawRect(0, y, w, 8, 1);
         };
 
@@ -158,7 +157,7 @@ class QuickActionCalibGyro : QuickAction
         };
 };
 
-class QuickActionCalibCenters : QuickAction
+class QuickActionCalibCenters : public QuickAction
 {
     public:
         QuickActionCalibCenters(void) : QuickAction("cal. centers", &btn_center)
@@ -176,20 +175,20 @@ class QuickActionCalibCenters : QuickAction
 
         virtual void draw_barOutline(void)
         {
-            x = oled.width() - 32;
-            y = oled.height() / 2;
+            x = SCREEN_WIDTH - 32;
+            y = SCREEN_HEIGHT / 2;
             r = 30;
-            oled.drawCircle(x, y, r, 0xFF, 1);
+            oled.drawCircle(x, y, r, 1);
         };
 
         virtual void draw_barFill(void)
         {
             int r2 = map(t, 0, QUICKACTION_HOLD_TIME, 0, r);
-            oled.fillCircle(x, y, r2, 0xFF, 1);
+            oled.fillCircle(x, y, r2, 1);
         };
 };
 
-class QuickActionCalibLimits : QuickAction
+class QuickActionCalibLimits : public QuickAction
 {
     public:
         QuickActionCalibLimits(void) : QuickAction("cal. limits", &btn_right)
@@ -207,8 +206,42 @@ class QuickActionCalibLimits : QuickAction
 
         virtual void draw_barOutline(void)
         {
-            y = (oled.height() / 2) - 4;
-            w = oled.width();
+            y = (SCREEN_HEIGHT / 2) - 4;
+            w = SCREEN_WIDTH;
+            oled.drawRect(0, y, w, 8, 1);
+        };
+
+        virtual void draw_barFill(void)
+        {
+            int x = map(t, 0, QUICKACTION_HOLD_TIME, 0, w);
+            oled.fillRect(0, y, x, 8, 1);
+        };
+};
+
+class QuickActionSaveStartup : public QuickAction
+{
+    public:
+        QuickActionSaveStartup(void) : QuickAction("save startup", &btn_right)
+        {
+        };
+
+    protected:
+        int y, w;
+        virtual void action(void)
+        {
+            settings_save();
+            oled.setCursor(0, ROACHGUI_LINE_HEIGHT);
+            oled.print("done");
+            gui_drawNow();
+            while (btns_isAnyHeld()) {
+                ctrler_tasks();
+            }
+        };
+
+        virtual void draw_barOutline(void)
+        {
+            y = (SCREEN_HEIGHT / 2) - 4;
+            w = SCREEN_WIDTH;
             oled.drawRect(0, y, w, 8, 1);
         };
 
@@ -246,7 +279,8 @@ void QuickAction_check(uint8_t btn)
         }
         case BTNID_RIGHT:
         {
-            QuickActionCalibLimits* q = new QuickActionCalibLimits();
+            //QuickActionCalibLimits* q = new QuickActionCalibLimits();
+            QuickActionSaveStartup* q = new QuickActionSaveStartup();
             q->run();
             delete q;
             break;

@@ -18,6 +18,20 @@ enum
     ROACHPKTFLAG_GYROACTIVE = 0x10,
 };
 
+enum
+{
+    ENCODERMODE_NORMAL,
+    ENCODERMODE_USEPOT,
+};
+
+enum
+{
+    ROACH_FLIP_NONE,
+    ROACH_FLIP_LR,
+    ROACH_FLIP_REV_RIGHT,
+    ROACH_FLIP_REV_LEFT,
+};
+
 // try to keep this under 32 bytes
 typedef struct
 {
@@ -41,8 +55,6 @@ typedef struct
     uint16_t battery;
     uint8_t  temperature;
     int16_t  rssi;
-    int16_t  data_rate;
-    int16_t  rxall_rate;
     int16_t  loss_rate;
 }
 PACK_STRUCT
@@ -143,5 +155,7 @@ typedef struct
     int32_t  step;          // 0 for disable
 }
 roach_nvm_gui_desc_t;
+
+#define ROACH_NVM_GUI_DESC_END    { 0, "\0", "\0", 0, 0, 0, 0, }
 
 #endif

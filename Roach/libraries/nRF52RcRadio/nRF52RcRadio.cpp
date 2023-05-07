@@ -105,6 +105,7 @@ nRF52RcRadio::nRF52RcRadio(bool is_tx)
 
 void nRF52RcRadio::var_reset(void)
 {
+    _connected = false;
     _tx_interval = NRFRR_TX_INTERV_DEF;
     _session_id = 0;
     _seq_num = 0;
@@ -137,7 +138,7 @@ void nRF52RcRadio::var_reset(void)
     txt_flag = false;
 }
 
-void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt)
+void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt, int fem_tx, int fem_rx)
 {
     instance = (nRF52RcRadio*)this;
 
@@ -150,9 +151,16 @@ void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt)
     digitalWrite(NRFRR_DEBUG_PIN_CH, _dbgpin_ch = LOW);
     #endif
 
+    if (_statemachine != NRFRR_SM_IDLE_WAIT) {
+        pause();
+    }
+
     var_reset();
     _uid = uid;
     _salt = salt;
+
+    _fem_tx = fem_tx;
+    _fem_rx = fem_rx;
 
     set_chan_map(chan_map);
 
@@ -673,6 +681,11 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             }
             break;
         case NRFRR_SM_TX_START:
+            // do this check for connectivity here, since it's not a frequent calculation
+            if ((now - _last_rx_time) >= (_is_tx ? 3000 : 1000)) {
+                _connected = false;
+            }
+
             // Maybe set the AES CCA module for the correct encryption mode
             if (_encrypting) {
                 NRF_CCM->MODE = (CCM_MODE_MODE_Encryption << CCM_MODE_MODE_Pos); // Encrypt
@@ -842,6 +855,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
         case NRFRR_SM_RX_END:
             if (validate_rx())
             {
+                _connected = true;
                 if (_is_tx)
                 {
                     if (_single_chan_mode == false) {
@@ -1237,7 +1251,7 @@ int nRF52RcRadio::textAvail(void)
     return txt_flag ? NRFRR_PAYLOAD_SIZE : 0;
 }
 
-int nRF52RcRadio::textRead(char* buf)
+int nRF52RcRadio::textRead(const char* buf)
 {
     task();
     if (txt_flag) // has data
@@ -1252,7 +1266,7 @@ int nRF52RcRadio::textRead(char* buf)
     return -1; // report no data
 }
 
-void nRF52RcRadio::textSend(char* buf)
+void nRF52RcRadio::textSend(const char* buf)
 {
     strncpy((char*)txt_tx_buffer, (const char*)buf, NRFRR_PAYLOAD_SIZE - 2);
     _text_send_timer = _hop_tbl_len * NRFRR_TX_RETRANS_TXT; // makes sure the text is sent over all the channels a few times

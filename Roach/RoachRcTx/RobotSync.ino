@@ -1,4 +1,3 @@
-
 enum
 {
     ROSYNC_DISCONNECTED,
@@ -8,8 +7,12 @@ enum
     ROSYNC_DONE_SYNCED,
     ROSYNC_DOWNLOAD_START,
     ROSYNC_DOWNLOAD_WAIT,
+    ROSYNC_DOWNLOAD_FAILED,
+    ROSYNC_DOWNLOAD_DONE,
+    ROSYNC_UPLOAD,
     ROSYNC_UPLOAD_START,
     ROSYNC_UPLOAD_WAIT,
+    ROSYNC_UPLOAD_DONE,
 };
 
 uint8_t rosync_statemachine = 0;
@@ -25,6 +28,7 @@ bool rosync_matched = false;
 uint8_t rosync_rxitems_cnt;
 uint8_t rosync_upload_cache[NRFRR_PAYLOAD_SIZE];
 uint32_t rosync_upload_lasttime = 0;
+uint32_t rosync_upload_idx = 0;
 
 void RoSync_task(void)
 {
@@ -49,8 +53,8 @@ void RoSync_task(void)
             break;
         case ROSYNC_QUERY:
             {
-                nvm_rx.magic = nvm_rf.seed;
-                nvm_rx.checksum = crc32_calc((uint8_t*)nvm_rx, sizeof(roach_rx_nvm_t) - 4);
+                nvm_rx.magic = nvm_rf.salt;
+                nvm_rx.checksum = roach_crcCalc((uint8_t*)&nvm_rx, sizeof(roach_rx_nvm_t) - 4, NULL);
                 rosync_matched = (telem_pkt.checksum == nvm_rx.checksum);
                 rosync_statemachine = ROSYNC_DONE;
                 break;
@@ -58,7 +62,7 @@ void RoSync_task(void)
             break;
         case ROSYNC_DOWNLOAD_START:
             {
-                robot.textSend("syncdownload");
+                radio.textSend("syncdownload");
                 rosync_statemachine = ROSYNC_DOWNLOAD_WAIT;
                 rosync_state_timer = now;
                 rosync_sync_complete = false;
@@ -70,7 +74,7 @@ void RoSync_task(void)
                 if (rosync_sync_complete || (now - rosync_state_timer) >= 3000)
                 {
                     uint32_t old_checksum = rosync_nvm_cache.checksum;
-                    uint32_t new_checksum = crc32_calc((uint8_t*)rosync_nvm_cache, sizeof(roach_rx_nvm_t) - 4);
+                    uint32_t new_checksum = roach_crcCalc((uint8_t*)&rosync_nvm_cache, sizeof(roach_rx_nvm_t) - 4, NULL);
                     if (old_checksum == new_checksum)
                     {
                         memcpy(&nvm_rx, &rosync_nvm_cache, sizeof(roach_rx_nvm_t));
@@ -91,6 +95,7 @@ void RoSync_task(void)
                 }
             }
             break;
+        case ROSYNC_UPLOAD_START:
         case ROSYNC_UPLOAD:
             {
                 if (rosync_upload_lasttime == 0 || (now - rosync_upload_lasttime) >= 200)
@@ -110,7 +115,7 @@ void RoSync_task(void)
                         rosync_sync_complete = true;
                         break;
                     }
-                    roach_nvm_gui_desc_t* desc = roach_nvm_rx_getAt(rosync_upload_idx);
+                    roach_nvm_gui_desc_t* desc = roachnvm_rx_getAt(rosync_upload_idx);
                     RoSync_uploadChunk(desc);
                 }
             }
@@ -159,11 +164,11 @@ void RoSync_downloadPrint()
     {
         int percent = map(rosync_download_progress, 0, sizeof(roach_rx_nvm_t), 0, 100);
         oled.printf("progress %d %%", percent);
-        y += 8
-        int w = oled.width() - 12;
+        y += ROACHGUI_LINE_HEIGHT;
+        int w = SCREEN_WIDTH - 12;
         int s = map(rosync_download_progress, 0, sizeof(roach_rx_nvm_t), 0, w);
-        oled.drawRect(0, y, w, y + 8, 1);
-        oled.fillRect(0, y, s, y + 8, 1);
+        oled.drawRect(0, y, w, y + ROACHGUI_LINE_HEIGHT, 1);
+        oled.fillRect(0, y, s, y + ROACHGUI_LINE_HEIGHT, 1);
     }
     else if (rosync_statemachine == ROSYNC_DOWNLOAD_FAILED)
     {
@@ -172,14 +177,14 @@ void RoSync_downloadPrint()
     else if (rosync_statemachine == ROSYNC_DISCONNECTED)
     {
         oled.print("error:");
-        y += 8
+        y += ROACHGUI_LINE_HEIGHT;
         oled.setCursor(0, y);
         oled.print("disconnected");
     }
     else
     {
         oled.print("error:");
-        y += 8
+        y += ROACHGUI_LINE_HEIGHT;
         oled.setCursor(0, y);
         oled.print("unknown state");
     }
@@ -189,7 +194,7 @@ void RoSync_decodeDownload(const char* s)
 {
     int slen = strlen(s);
     int nbytes = (slen - 4) / 2;
-    uint8_t* data = malloc(nbytes);
+    uint8_t* data = (uint8_t*)malloc(nbytes);
     if (data == NULL) {
         return;
     }
@@ -209,11 +214,18 @@ void RoSync_decodeDownload(const char* s)
     free(data);
 }
 
+void RoSync_uploadStart(void)
+{
+    rosync_statemachine = ROSYNC_UPLOAD;
+    rosync_upload_idx = 0;
+    rosync_upload_lasttime = 0;
+}
+
 void RoSync_uploadChunk(roach_nvm_gui_desc_t* desc)
 {
-    sprintf(rosync_upload_cache, "ul %s=%d\n", desc->name, roach_nvm_getval(&nvm_rx, desc));
-    radio.textSend(rosync_upload_cache);
-    rosync_upload_lasttime = now;
+    sprintf((char*)rosync_upload_cache, "ul %s=%d\n", desc->name, roachnvm_getval((uint8_t*)&nvm_rx, desc));
+    radio.textSend((const char*)rosync_upload_cache);
+    rosync_upload_lasttime = millis();
 }
 
 void RoSync_uploadPrint()
@@ -227,9 +239,9 @@ void RoSync_uploadPrint()
     else if (rosync_statemachine == ROSYNC_UPLOAD)
     {
         int percent = map(rosync_upload_idx, 0, rosync_rxitems_cnt, 0, 100);
-        oled.print("progress %d %%", percent);
-        y += 8
-        int w = oled.width() - 12;
+        oled.printf("progress %d %%", percent);
+        y += ROACHGUI_LINE_HEIGHT;
+        int w = SCREEN_WIDTH - 12;
         int s = map(rosync_upload_idx, 0, rosync_rxitems_cnt, 0, w);
         oled.drawRect(0, y, w, y + 8, 1);
         oled.fillRect(0, y, s, y + 8, 1);
@@ -237,14 +249,14 @@ void RoSync_uploadPrint()
     else if (rosync_statemachine == ROSYNC_DISCONNECTED)
     {
         oled.print("error:");
-        y += 8
+        y += ROACHGUI_LINE_HEIGHT;
         oled.setCursor(0, y);
         oled.print("disconnected");
     }
     else
     {
         oled.print("error:");
-        y += 8
+        y += ROACHGUI_LINE_HEIGHT;
         oled.setCursor(0, y);
         oled.print("unknown state");
     }

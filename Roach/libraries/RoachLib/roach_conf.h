@@ -11,4 +11,9 @@
 #define ROACH_ADC_MID   2048
 #define ROACH_ADC_NOISE 32
 
+#define ROACH_SERVO_MIN 1000
+#define ROACH_SERVO_MID 1500
+#define ROACH_SERVO_MAX 2000
+#define ROACH_SERVO_OVR 250
+
 #endif

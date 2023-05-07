@@ -57,6 +57,7 @@ void RoachPot::task(void)
     }
     has_new = true;
     int32_t x32 = x;
+    last_adc_raw = x32;
     if (cfg->filter != 0)
     {
         int32_t filtered = roach_lpf(x32, last_val_filter, cfg->filter);
@@ -153,6 +154,16 @@ void RoachPot_allBegin(void)
 int16_t RoachPot::get(void)
 {
     return last_val;
+}
+
+int16_t RoachPot::getAdcFiltered(void)
+{
+    return last_adc;
+}
+
+int16_t RoachPot::getAdcRaw(void)
+{
+    return last_adc_raw;
 }
 
 void RoachPot::calib_center(void)

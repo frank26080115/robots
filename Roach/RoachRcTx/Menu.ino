@@ -1,5 +1,35 @@
+#include "MenuClass.h"
 
-class RoachMenuHome : RoachMenu
+extern bool rosync_matched;
+
+int printRfStats(int y)
+{
+    oled.setCursor(0, y);
+    if (radio.connected() == false)
+    {
+        oled.print("DISCONNECTED");
+    }
+    else
+    {
+        if (rosync_matched)
+        {
+            oled.print("CONN'ed, SYNC'ed");
+        }
+        else
+        {
+            oled.print("CONN'ed, MISMATCH");
+        }
+        y += ROACHGUI_LINE_HEIGHT;
+        oled.setCursor(0, y);
+        oled.printf("sig %d ; %d", radio.get_rssi(), telem_pkt.rssi);
+        y += ROACHGUI_LINE_HEIGHT;
+        oled.setCursor(0, y);
+        oled.printf("pkt loss %0.3f", ((float)telem_pkt.loss_rate) / 100.0);
+    }
+    return y;
+}
+
+class RoachMenuHome : public RoachMenu
 {
     public:
         RoachMenuHome() : RoachMenu(MENUID_HOME)
@@ -8,40 +38,31 @@ class RoachMenuHome : RoachMenu
 
         virtual void draw(void)
         {
-            int y = 0;
+            int y = printRfStats(0);
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            if (radio.connected() == false)
-            {
-                oled.print("DISCONNECTED");
+            oled.printf("T:%4d S:%d", tx_pkt.throttle, tx_pkt.steering);
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("H:%4d W:%d", tx_pkt.heading, tx_pkt.pot_weap);
+            if (weap_sw_warning) {
+                oled.print("!");
             }
-            else
-            {
-                if (rosync_matched)
-                {
-                    oled.print("CONN'ed, SYNC'ed");
-                }
-                else
-                {
-                    oled.print("CONN'ed, MISMATCH");
-                }
-                y += 8;
-                oled.setCursor(0, y);
-                oled.print("sig %d ; %d");
-                y += 8;
-                oled.setCursor(0, y);
-                oled.print("pkt loss %0.3f");
-            }
-            y += 8;
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.print("T:%4d S:%d");
-            y += 8;
-            oled.setCursor(0, y);
-            oled.print("H:%4d W:%d");
-            // TODO: if weapon switch is on at start, give warning here
-            y += 8;
-            oled.setCursor(0, y);
-            // TODO: switches
-            y += 8;
+            oled.printf("A:%d SW:%d%d%d"
+                #ifdef ROACHHW_PIN_BTN_SW4
+                "%d"
+                #endif
+                , tx_pkt.pot_aux
+                , ((tx_pkt.flags & ROACHPKTFLAG_BTN1) != 0 ? 1 : 0)
+                , ((tx_pkt.flags & ROACHPKTFLAG_BTN2) != 0 ? 1 : 0)
+                , ((tx_pkt.flags & ROACHPKTFLAG_BTN3) != 0 ? 1 : 0)
+                #ifdef ROACHHW_PIN_BTN_SW4
+                , ((tx_pkt.flags & ROACHPKTFLAG_BTN4) != 0 ? 1 : 0)
+                #endif
+                );
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             // TODO: battery
         };
@@ -52,7 +73,7 @@ class RoachMenuHome : RoachMenu
             drawSideBar("CONF", "PAGE", true);
         };
 
-        virtual void draw_titlevoid)
+        virtual void draw_title(void)
         {
         };
 
@@ -71,7 +92,7 @@ class RoachMenuHome : RoachMenu
         };
 };
 
-class RoachMenuInfo : RoachMenu
+class RoachMenuInfo : public RoachMenu
 {
     public:
         RoachMenuInfo() : RoachMenu(MENUID_INFO)
@@ -83,38 +104,20 @@ class RoachMenuInfo : RoachMenu
             int y = 0;
             oled.setCursor(0, y);
             oled.printf("UID  %08X");
-            //y += 8;
+            //y += ROACHGUI_LINE_HEIGHT;
             //oled.setCursor(0, y);
-            //oled.printf("seed %08X");
-            y += 8;
+            //oled.printf("salt %08X");
+            //y += ROACHGUI_LINE_HEIGHT;
+            //oled.setCursor(0, y);
+            //oled.printf("map  %08X");
+            y += ROACHGUI_LINE_HEIGHT;
+            y = printRfStats(y);
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("map  %08X");
-            y += 8;
+            oled.printf("dsk free %d kb", _freeSpace);
+            y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            if (radio.connected() == false)
-            {
-                oled.print("DISCONNECTED");
-            }
-            else
-            {
-                if (rosync_matched)
-                {
-                    oled.print("CONN'ed, SYNC'ed");
-                }
-                else
-                {
-                    oled.print("CONN'ed, MISMATCH");
-                }
-                y += 8;
-                oled.setCursor(0, y);
-                oled.print("sig %d ; %d");
-                y += 8;
-                oled.setCursor(0, y);
-                oled.print("pkt loss %0.3f");
-            }
-            y += 8;
-            oled.setCursor(0, y);
-            oled.print("dsk free %d kb", _freeSpace);
+            oled.printf("RAM free %d b", minimum_ram);
         };
 
     protected:
@@ -180,10 +183,10 @@ void menu_run(void)
         current_menu = (RoachMenu*)menuListCur;
     }
     else if (ec == EXITCODE_LEFT) {
-        current_menu = (RoachMenu*)menuListCur->prev_node;
+        current_menu = (RoachMenu*)menuListCur->prev_menu;
     }
     else if (ec == EXITCODE_RIGHT) {
-        current_menu = (RoachMenu*)menuListCur->next_node;
+        current_menu = (RoachMenu*)menuListCur->next_menu;
     }
 }
 
@@ -194,20 +197,20 @@ void menu_setup(void)
     menu_install(new RoachMenuCfgLister(MENUID_CONFIG_WEAP  , "WEAPON"    , "robot" , &nvm_rx, cfggroup_weap));
     menu_install_calibSync();
     menu_install(new RoachMenuCfgLister(MENUID_CONFIG_CTRLER, "CONTROLLER", "ctrler", &nvm_tx, cfggroup_ctrler));
-    menu_install(new RoachMenuFileOpenList());
+    menu_install_fileOpener();
 }
 
 void menu_install(RoachMenu* m)
 {
     if (menuListHead == NULL) {
-        menuListHead = n;
-        menuListTail = n;
-        menuListCur  = n;
+        menuListHead = m;
+        menuListTail = m;
+        menuListCur  = m;
     }
     else
     {
-        menuListTail->next_node = n;
-        menuListTail            = n;
-        menuListHead->prev_node = n;
+        menuListTail->next_menu = m;
+        menuListTail            = m;
+        menuListHead->prev_menu = m;
     }
 }

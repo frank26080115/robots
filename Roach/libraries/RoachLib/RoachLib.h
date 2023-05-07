@@ -7,6 +7,18 @@
 #include "roach_defs.h"
 #include "roach_types.h"
 
+#if defined(ESP32)
+#include <SPIFFS.h>
+#define RoachFile File
+#elif defined(NRF52840_XXAA)
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
+#include "SPI.h"
+#include "SdFat.h"
+#include "Adafruit_SPIFlash.h"
+#define RoachFile FatFile
+#endif
+
 extern roach_nvm_gui_desc_t cfggroup_rf[];
 extern roach_nvm_gui_desc_t cfggroup_drive[];
 extern roach_nvm_gui_desc_t cfggroup_weap[];

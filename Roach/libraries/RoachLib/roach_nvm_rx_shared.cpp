@@ -1,7 +1,7 @@
 #include "RoachLib.h"
 
 extern roach_rx_nvm_t nvm_rx;
-extern roach_rx_nvm_t nvm_rf;
+extern roach_rf_nvm_t nvm_rf;
 
 roach_nvm_gui_desc_t cfggroup_rf[] = {
     { ((uint32_t)(&(nvm_rf.uid     )) - (uint32_t)(&nvm_rf)), "UID"     , "hex", 0x1234ABCD, 0, 0xFFFFFFFF, 1, },
@@ -70,13 +70,13 @@ int roachnvm_cntgroup(roach_nvm_gui_desc_t* g)
 void roachnvm_buildrxcfggroup(void)
 {
     int cnt = 0;
-    int c1 = roach_nvm_cnt_group(cfggroup_drive);
-    int c2 = roach_nvm_cnt_group(cfggroup_weap);
-    int c3 = roach_nvm_cnt_group(cfggroup_imu);
+    int c1 = roachnvm_cntgroup(cfggroup_drive);
+    int c2 = roachnvm_cntgroup(cfggroup_weap);
+    int c3 = roachnvm_cntgroup(cfggroup_imu);
     cnt += c1;
     cnt += c2;
     cnt += c3;
-    cfggroup_rxall = malloc((cnt + 1) * sizeof(void*));
+    cfggroup_rxall = (roach_nvm_gui_desc_t**)malloc((cnt + 1) * sizeof(void*));
     if (cfggroup_rxall == NULL) {
         return;
     }

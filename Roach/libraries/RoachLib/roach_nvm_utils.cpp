@@ -2,9 +2,14 @@
 
 #if defined(ESP32)
 #include <SPIFFS.h>
+#define RoachFile File
 #elif defined(NRF52840_XXAA)
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
+#include "SPI.h"
+#include "SdFat.h"
+#include "Adafruit_SPIFlash.h"
+#define RoachFile FatFile
 #endif
 
 int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
@@ -32,7 +37,7 @@ int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
             case -16: {  int16_t* wptr = ( int16_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
             case -32: {  int32_t* wptr = ( int32_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
             default:
-                return;
+                return 0;
         }
         return x;
     }
@@ -76,10 +81,10 @@ void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_
 
 int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t x)
 {
-    int32_t x = roach_nvm_getval(struct_ptr, desc_itm);
-    x += val;
-    roach_nvm_setval(struct_ptr, desc_itm, x);
-    return roach_nvm_getval(struct_ptr, desc_itm);
+    int32_t y = roachnvm_getval(struct_ptr, desc_itm);
+    y += x;
+    roachnvm_setval(struct_ptr, desc_itm, y);
+    return roachnvm_getval(struct_ptr, desc_itm);
 }
 
 bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
@@ -118,7 +123,7 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
 
     if (strcmp("hex", desc_itm->type_code) == 0)
     {
-        uint32_t x = strtoul(value, 16);
+        uint32_t x = strtoul(value, NULL, 16);
         uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset];
         *wptr = x;
         ret = true;
@@ -137,11 +142,11 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
         int32_t x;
         if (m <= 1)
         {
-            x = strtol(value, 10);
+            x = strtol(value, NULL, 10);
         }
         else
         {
-            double flt = strtod(value);
+            double flt = strtod(value, NULL);
             flt *= m;
             x = (int32_t)lround(flt);
         }
@@ -262,7 +267,7 @@ void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* d
         else
         {
             volatile double xd = x;
-            dx /= m;
+            xd /= m;
             sprintf(str, "%0.8f", x);
         }
     }
@@ -271,7 +276,7 @@ void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* d
 void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
-    roach_nvm_write_item* desc_itm;
+    roach_nvm_gui_desc_t* desc_itm;
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];
@@ -290,7 +295,7 @@ void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_
 void roachnvm_writedescfile(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
-    roach_nvm_write_item* desc_itm;
+    roach_nvm_gui_desc_t* desc_itm;
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];
@@ -315,7 +320,7 @@ void roachnvm_writedescfile(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl)
 void roachnvm_setdefaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
-    roach_nvm_write_item* desc_itm;
+    roach_nvm_gui_desc_t* desc_itm;
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];

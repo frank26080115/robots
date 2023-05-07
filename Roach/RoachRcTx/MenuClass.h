@@ -3,6 +3,11 @@
 
 #include <Arduino.h>
 
+#include <RoachLib.h>
+#include <RoachPot.h>
+#include <RoachButton.h>
+#include <RoachRotaryEncoder.h>
+
 enum
 {
     MENUID_NONE,
@@ -16,6 +21,29 @@ enum
     MENUID_CONFIG_WEAP,           // edit parameters about the weapon
     MENUID_CONFIG_CTRLER,         // edit parameters about the controller
     MENUID_CONFIG_IMU,            // edit parameters for the IMU (orientation, PID, timeout, etc)
+};
+
+enum
+{
+    EXITCODE_NONE,
+    EXITCODE_LEFT,
+    EXITCODE_RIGHT,
+    EXITCODE_UP,
+    EXITCODE_DOWN,
+    EXITCODE_BACK,
+    EXITCODE_HOME,
+};
+
+enum
+{
+    BTNID_NONE,
+    BTNID_LEFT,
+    BTNID_RIGHT,
+    BTNID_UP,
+    BTNID_DOWN,
+    BTNID_CENTER,
+    BTNID_G5,
+    BTNID_G6,
 };
 
 class RoachMenu
@@ -55,13 +83,13 @@ class RoachMenuListItem
 };
 
 
-class RoachMenuFunctionItem : RoachMenuListItem, RoachMenu
+class RoachMenuFunctionItem : public RoachMenuListItem, public RoachMenu
 {
     public:
         RoachMenuFunctionItem(const char* fname);
 };
 
-class RoachMenuFileItem : RoachMenuListItem
+class RoachMenuFileItem : public RoachMenuListItem
 {
     public:
         RoachMenuFileItem(const char* fname);
@@ -72,7 +100,7 @@ class RoachMenuFileItem : RoachMenuListItem
         char* _fname = NULL;
 };
 
-class RoachMenuCfgItem : RoachMenuListItem
+class RoachMenuCfgItem : public RoachMenuListItem
 {
     public:
         RoachMenuCfgItem(void* struct_ptr, roach_nvm_gui_desc_t* desc);
@@ -83,20 +111,21 @@ class RoachMenuCfgItem : RoachMenuListItem
         void* _struct = NULL;
 };
 
-class RoachMenuCfgItemEditor : RoachMenu
+class RoachMenuCfgItemEditor : public RoachMenu
 {
     public:
         RoachMenuCfgItemEditor(void* struct_ptr, roach_nvm_gui_desc_t* desc);
     protected:
         roach_nvm_gui_desc_t* _desc = NULL;
         void* _struct = NULL;
+        virtual void taskLP(void);
         virtual void onEnter(void);
         virtual void onExit(void);
         virtual void onButton(uint8_t btn);
         virtual void checkButtons(void);
 };
 
-class RoachMenuLister : RoachMenu
+class RoachMenuLister : public RoachMenu
 {
     public:
         RoachMenuLister(uint8_t id);
@@ -108,7 +137,8 @@ class RoachMenuLister : RoachMenu
         virtual char* getItemText(int idx);
         inline  char* getCurItemText(void) { return getItemText(_list_idx); };
         uint8_t _list_cnt, _list_idx;
-        RoachMenuListItem* _head_node = NULL, _tail_node = NULL;
+        RoachMenuListItem* _head_node = NULL;
+        RoachMenuListItem* _tail_node = NULL;
         virtual void onEnter(void);
         void buildFileList(const char* filter);
         RoachMenuListItem* getNodeAt(int idx);
@@ -117,10 +147,10 @@ class RoachMenuLister : RoachMenu
 
 };
 
-class RoachMenuFileOpenList : RoachMenuLister
+class RoachMenuFileOpenList : public RoachMenuLister
 {
     public:
-        RoachMenuFileOpenList(uint8_t id);
+        RoachMenuFileOpenList(void);
     protected:
         virtual void draw_sidebar(void);
         virtual void draw_title(void);
@@ -130,7 +160,7 @@ class RoachMenuFileOpenList : RoachMenuLister
 };
 
 
-class RoachMenuFileSaveList : RoachMenuLister
+class RoachMenuFileSaveList : public RoachMenuLister
 {
     public:
         RoachMenuFileSaveList(const char* filter);
@@ -144,7 +174,7 @@ class RoachMenuFileSaveList : RoachMenuLister
         virtual void onButton(uint8_t btn);;
 };
 
-class RoachMenuCfgLister : RoachMenuLister
+class RoachMenuCfgLister : public RoachMenuLister
 {
     public:
         RoachMenuCfgLister(uint8_t id, const char* name, const char* filter, void* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);

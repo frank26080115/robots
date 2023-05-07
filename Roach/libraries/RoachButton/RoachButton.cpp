@@ -127,3 +127,23 @@ void RoachButton_allBegin(void)
         roachbtn_insttbl[i]->begin();
     }
 }
+
+bool RoachButton_hasAnyPressed(void)
+{
+    bool x = false;
+    int i;
+    for (i = 0; i < roachbtn_cnt; i++) {
+        x |= roachbtn_insttbl[i]->hasPressed(false);
+    }
+    return x;
+}
+
+bool RoachButton_isAnyHeld(void)
+{
+    bool x = false;
+    int i;
+    for (i = 0; i < roachbtn_cnt; i++) {
+        x |= roachbtn_insttbl[i]->isHeld() > 0;
+    }
+    return x;
+}

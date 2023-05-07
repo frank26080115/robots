@@ -1,16 +1,17 @@
+#include "MenuClass.h"
+
 RoachMenu::RoachMenu(uint8_t id)
 {
     _id = id;
 };
 
-virtual void RoachMenu::draw(void)
+void RoachMenu::draw(void)
 {
 };
 
-virtual void RoachMenu::clear(void)
+void RoachMenu::clear(void)
 {
-    oled.clear();
-    gui_dirty = true;
+    oled.clearDisplay();
 };
 
 void RoachMenu::display(void)
@@ -18,17 +19,17 @@ void RoachMenu::display(void)
     oled.display();
 };
 
-virtual void RoachMenu::taskHP(void)
+void RoachMenu::taskHP(void)
 {
     ctrler_tasks();
     nbtwi_task();
 };
 
-virtual void RoachMenu::taskLP(void)
+void RoachMenu::taskLP(void)
 {
 };
 
-virtual void RoachMenu::run(void)
+void RoachMenu::run(void)
 {
     onEnter();
 
@@ -48,42 +49,38 @@ virtual void RoachMenu::run(void)
             taskLP();
             draw();
 
-            if (gui_dirty) {
-                display();
-                gui_dirty = false;
-            }
+            display();
         }
     }
 
     onExit();
 }
 
-virtual void RoachMenu::draw_sidebar(void)
+void RoachMenu::draw_sidebar(void)
 {
     
 };
 
-virtual void RoachMenu::draw_title(void)
+void RoachMenu::draw_title(void)
 {
     
 };
 
-virtual void RoachMenu::onEnter(void)
+void RoachMenu::onEnter(void)
 {
     _exit = 0;
-    gui_dirty = true;
     clear();
 }
 
-virtual void RoachMenu::onExit(void)
+void RoachMenu::onExit(void)
 {
 }
 
-virtual void RoachMenu::onButton(uint8_t btn)
+void RoachMenu::onButton(uint8_t btn)
 {
 }
 
-virtual void RoachMenu::checkButtons(void)
+void RoachMenu::checkButtons(void)
 {
     if (btn_up.hasPressed(true)) {
         this->onButton(BTNID_UP);
@@ -115,30 +112,23 @@ RoachMenuListItem::~RoachMenuListItem(void)
     }
 }
 
-virtual void RoachMenuListItem::sprintName(char* s)
+void RoachMenuListItem::sprintName(char* s)
 {
     strncpy(s, _txt, (128 / 4));
 }
 
-virtual char* RoachMenuListItem::getName(void)
+char* RoachMenuListItem::getName(void)
 {
     return _txt;
-}
-
-RoachMenuFileItem::RoachMenuFileItem(const char* fname) : RoachMenu(0)
-{
-    int slen = strlen(fname);
-    _txt = malloc(slen + 1);
-    strcpy(_txt, fname, slen);
 }
 
 RoachMenuFileItem::RoachMenuFileItem(const char* fname)
 {
     int slen = strlen(fname);
-    _txt = malloc(slen + 1);
-    _fname = malloc(slen + 1);
-    strcpy(_txt, fname, slen);
-    strcpy(_fname, fname, slen);
+    _txt   = (char*)malloc(slen + 1);
+    _fname = (char*)malloc(slen + 1);
+    strncpy(_txt, fname, slen);
+    strncpy(_fname, fname, slen);
     int i;
     for (i = 2; i < slen - 4; i++)
     {
@@ -176,15 +166,17 @@ RoachMenuCfgItem::RoachMenuCfgItem(void* struct_ptr, roach_nvm_gui_desc_t* desc)
     _desc = desc;
 }
 
-virtual void RoachMenuCfgItem::sprintName(char* s)
+void RoachMenuCfgItem::sprintName(char* s)
 {
     strncpy(s, _desc->name, (128 / 4));
 }
 
-virtual char* RoachMenuCfgItem::getName(void)
+char* RoachMenuCfgItem::getName(void)
 {
     return _desc->name;
 }
+
+uint32_t cfg_last_change_time = 0;
 
 RoachMenuCfgItemEditor::RoachMenuCfgItemEditor(void* struct_ptr, roach_nvm_gui_desc_t* desc) : RoachMenu(0)
 {
@@ -192,34 +184,45 @@ RoachMenuCfgItemEditor::RoachMenuCfgItemEditor(void* struct_ptr, roach_nvm_gui_d
     _desc = desc;
 }
 
-virtual void RoachMenuCfgItemEditor::onEnter(void)
+void RoachMenuCfgItemEditor::onEnter(void)
 {
     RoachMenu::onEnter();
-    encoder.get(true); // clear the counter
-    roach_lockHeading(true);
+    RoachEnc_get(true); // clear the counter
+    encoder_mode = ENCODERMODE_USEPOT;
 }
 
-virtual void RoachMenuCfgItemEditor::onExit(void)
+void RoachMenuCfgItemEditor::taskLP(void)
 {
-    if ((uint32_t)_struct == (uint32_t)&nvm_rx)
+    if (cfg_last_change_time != 0 && (uint32_t)_struct == (uint32_t)&nvm_rx)
+    {
+        if ((millis() - cfg_last_change_time) >= 1000) {
+            RoSync_uploadChunk(_desc);
+            cfg_last_change_time = 0;
+        }
+    }
+}
+
+void RoachMenuCfgItemEditor::onExit(void)
+{
+    if ((uint32_t)_struct == (uint32_t)&nvm_rx && cfg_last_change_time != 0)
     {
         RoSync_uploadChunk(_desc);
     }
     RoachMenu::onExit();
-    roach_lockHeading(false);
+    encoder_mode = 0;
 }
 
-virtual void RoachMenuCfgItemEditor::onButton(uint8_t btn)
+void RoachMenuCfgItemEditor::onButton(uint8_t btn)
 {
     switch (btn)
     {
         case BTNID_UP:
-            roach_nvm_incval((uint8_t*)_struct, _desc, _desc->step);
-            gui_dirty |= true;
+            roachnvm_incval((uint8_t*)_struct, _desc, _desc->step);
+            cfg_last_change_time = millis();
             break;
         case BTNID_DOWN:
-            roach_nvm_incval((uint8_t*)_struct, _desc, -_desc->step);
-            gui_dirty |= true;
+            roachnvm_incval((uint8_t*)_struct, _desc, -_desc->step);
+            cfg_last_change_time = millis();
             break;
         case BTNID_G5:
         case BTNID_G6:
@@ -228,13 +231,13 @@ virtual void RoachMenuCfgItemEditor::onButton(uint8_t btn)
     }
 }
 
-virtual void RoachMenuCfgItemEditor::checkButtons(void)
+void RoachMenuCfgItemEditor::checkButtons(void)
 {
     RoachMenu::checkButtons();
-    int x = encoder.get(true);
+    int x = RoachEnc_get(true);
     if (x != 0) {
-        roach_nvm_incval((uint8_t*)_struct, _desc, -x * _desc->step);
-        gui_dirty |= true;
+        roachnvm_incval((uint8_t*)_struct, _desc, -x * _desc->step);
+        cfg_last_change_time = millis();
     }
 }
 
@@ -242,7 +245,7 @@ RoachMenuLister::RoachMenuLister(uint8_t id) : RoachMenu(id)
 {
 }
 
-virtual void RoachMenuLister::draw(void)
+void RoachMenuLister::draw(void)
 {
     draw_title();
     draw_sidebar();
@@ -271,7 +274,7 @@ virtual void RoachMenuLister::draw(void)
     for (i = 0; i < ROACHMENU_LIST_MAX; i++)
     {
         j = _draw_start_idx + i;
-        oled.setCursor(0, ROACHMENU_LINE_HEIGHT * (i + 2));
+        oled.setCursor(0, ROACHGUI_LINE_HEIGHT * (i + 2));
         if (j == _list_idx)
         {
             oled.printf(">");
@@ -291,7 +294,7 @@ virtual void RoachMenuLister::draw(void)
     }
 }
 
-virtual void RoachMenuLister::onEnter(void)
+void RoachMenuLister::onEnter(void)
 {
     RoachMenu::onEnter();
     _list_idx = 0;
@@ -299,17 +302,17 @@ virtual void RoachMenuLister::onEnter(void)
 
 void RoachMenuLister::buildFileList(const char* filter)
 {
-    if (!root.open("/"))
+    if (!fatroot.open("/"))
     {
         Serial.println("open root failed");
         return;
     }
-    while (file.openNext(&root, O_RDONLY))
+    while (fatfile.openNext(&fatroot, O_RDONLY))
     {
-        if (file.isDir() == false)
+        if (fatfile.isDir() == false)
         {
             char sfname[64];
-            file.getName7(sfname, 62);
+            fatfile.getName7(sfname, 62);
             bool matches = false;
             if (filter != NULL) {
                 matches = memcmp(filter, sfname, strlen(filter)) == 0;
@@ -334,7 +337,7 @@ void RoachMenuLister::buildFileList(const char* filter)
                 _list_cnt += 1;
             }
         }
-        file.close();
+        fatfile.close();
     }
     RoachMenuFileItem* nc = new RoachMenuFileItem("CANCEL");
     if (_head_node == NULL) {
@@ -348,14 +351,14 @@ void RoachMenuLister::buildFileList(const char* filter)
     _list_cnt++;
 }
 
-virtual void RoachMenuLister::onExit(void)
+void RoachMenuLister::onExit(void)
 {
     RoachMenu::onExit();
     if (_head_node == NULL) {
         return;
     }
     while (_head_node != NULL) {
-        RoachMenuListItem* n = (RoachMenuListItem*)_head_node->next;
+        RoachMenuListItem* n = (RoachMenuListItem*)_head_node->next_node;
         delete _head_node;
         _head_node = n;
     }
@@ -397,17 +400,15 @@ char* RoachMenuLister::getItemText(int idx)
     return n->getName();
 }
 
-virtual void RoachMenuLister::onButton(uint8_t btn)
+void RoachMenuLister::onButton(uint8_t btn)
 {
     switch (btn)
     {
         case BTNID_UP:
             _list_idx = (_list_idx > 0) ? (_list_idx - 1) : _list_idx;
-            gui_dirty |= true;
             break;
         case BTNID_DOWN:
             _list_idx = (_list_idx < (_list_cnt - 1)) ? (_list_idx + 1) : _list_idx;
-            gui_dirty |= true;
             break;
     }
 }
@@ -416,26 +417,26 @@ RoachMenuCfgLister::RoachMenuCfgLister(uint8_t id, const char* name, const char*
 {
     _struct = struct_ptr;
     _desc_tbl = desc_tbl;
-    _list_cnt = roachnvm_cnt_group(desc_tbl);
+    _list_cnt = roachnvm_cntgroup(desc_tbl);
     strncpy(_title, name, 30);
 }
 
-virtual char* RoachMenuCfgLister::getItemText(int idx)
+char* RoachMenuCfgLister::getItemText(int idx)
 {
-    return desc_tbl[idx].name;
+    return _desc_tbl[idx].name;
 }
 
-virtual void RoachMenuCfgLister::draw_sidebar(void)
+void RoachMenuCfgLister::draw_sidebar(void)
 {
     drawSideBar("EXIT", "SAVE", true);
 }
 
-virtual void RoachMenuCfgLister::draw_title(void)
+void RoachMenuCfgLister::draw_title(void)
 {
     drawTitleBar((const char*)_title, true, true, true);
 }
 
-virtual void RoachMenuCfgLister::onButton(uint8_t btn)
+void RoachMenuCfgLister::onButton(uint8_t btn)
 {
     RoachMenuLister::onButton(btn);
     if (_exit == 0)
@@ -447,7 +448,6 @@ virtual void RoachMenuCfgLister::onButton(uint8_t btn)
                     RoachMenuCfgItemEditor* n = new RoachMenuCfgItemEditor(_struct, &(_desc_tbl[_list_idx]));
                     n->run();
                     delete n;
-                    gui_dirty = true;
                 }
                 break;
             case BTNID_G5:
@@ -455,7 +455,6 @@ virtual void RoachMenuCfgLister::onButton(uint8_t btn)
                     RoachMenuFileSaveList* n = new RoachMenuFileSaveList(_filter);
                     n->run();
                     delete n;
-                    gui_dirty = true;
                 }
                 break;
         }
