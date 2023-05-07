@@ -159,7 +159,7 @@ RoachMenu* menuListHead = NULL;
 RoachMenu* menuListTail = NULL;
 RoachMenu* menuListCur  = NULL;
 
-void menu_task(void)
+void menu_run(void)
 {
     if (current_menu == NULL)
     {

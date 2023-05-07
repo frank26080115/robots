@@ -26,17 +26,24 @@ int headingx = 0, heading = 0;
 
 void setup(void)
 {
-    nrf5rand_init(1024, true);
+    nrf5rand_init(512, true, false);
     Serial.begin(115200);
     RoachButton_allBegin();
     RoachPot_allBegin();
     RoachEnc_begin(ROACHHW_PIN_ENC_A, ROACHHW_PIN_ENC_B);
     nbtwi_init();
+    oled.begin();
+    gui_drawSplash();
+    menu_setup();
+    Serial.println("\r\nRoach RC Transmitter - Hello World!");
+    cmdline.begin();
+    RoachUsbMsd_begin();
+    menu_run(); // the menu's run loop will execute other tasks, such as ctrler_task
 }
 
-void ctrler_setup(void)
+void loop(void)
 {
-    
+    // this will never actually run
 }
 
 void ctrler_tasks(void)

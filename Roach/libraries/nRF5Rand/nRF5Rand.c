@@ -15,11 +15,13 @@ static volatile int      rng_fifo_w;
 static volatile int      rng_fifo_r;
 
 static bool has_srand = false;
+static bool need_autorestart;
 
 static void rng_handler(uint8_t rng_data);
 
-void nrf5rand_init(int sz, bool use_irq)
+void nrf5rand_init(int sz, bool use_irq, bool auto_restart)
 {
+    need_autorestart = auto_restart;
     rng_fifo = (uint8_t*)malloc(rng_fifo_size = sz);
     static nrfx_rng_config_t cfg = NRFX_RNG_DEFAULT_CONFIG;
     nrfx_rng_init(&cfg, rng_handler);
@@ -54,8 +56,11 @@ void nrf5rand_vector(uint8_t* buf, int len)
     rng_fifo_r = r;
     __enable_irq();
 
-    if (nrf5rand_avail() < rng_fifo_size / 2) {
-        nrfx_rng_start();
+    if (need_autorestart)
+    {
+        if (nrf5rand_avail() < rng_fifo_size / 2) {
+            nrfx_rng_start();
+        }
     }
 
     if (has_srand == false && len >= 4)
@@ -97,8 +102,11 @@ int nrf5rand_avail(void)
     __disable_irq();
     x = (rng_fifo_w + rng_fifo_size - rng_fifo_r) % rng_fifo_size;
     __enable_irq();
-    if (x < rng_fifo_size / 2) {
-        nrfx_rng_start();
+    if (need_autorestart)
+    {
+        if (x < rng_fifo_size / 2) {
+            nrfx_rng_start();
+        }
     }
     return x;
 }
