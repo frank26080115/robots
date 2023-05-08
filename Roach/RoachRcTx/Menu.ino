@@ -3,24 +3,29 @@
 extern bool rosync_matched;
 extern bool switches_alarm;
 
+extern const uint8_t icon_disconnected[];
+extern const uint8_t icon_connected[];
+extern const uint8_t icon_mismatched[];
+
 int printRfStats(int y)
 {
     oled.setCursor(0, y);
     if (radio.connected() == false)
     {
-        oled.print("DISCONNECTED");
+        oled.drawBitmap(0, 0, icon_disconnected, 16, 8, 1);
     }
     else
     {
         if (rosync_matched)
         {
-            oled.printf("%c", 0x01);
+            oled.drawBitmap(0, 0, icon_connected, 16, 8, 1);
         }
         else
         {
-            oled.printf("?");
+            oled.drawBitmap(0, 0, icon_mismatched, 16, 8, 1);
         }
-        oled.printf(" %d ; %d", radio.get_rssi(), telem_pkt.rssi);
+        oled.setCursor(16, y);
+        oled.printf("%d ; %d", radio.get_rssi(), telem_pkt.rssi);
         if (telem_pkt.loss_rate >= 1000) {
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
@@ -37,6 +42,17 @@ class RoachMenuHome : public RoachMenu
         {
         };
 
+        virtual void taskLP(void)
+        {
+            RoachMenu::taskLP();
+            #ifdef ROACHTX_AUTOSAVE
+            settings_saveIfNeeded(2 * 1000);
+            #endif
+            #ifdef ROACHTX_AUTOEXIT
+            gui_last_activity_time = 0;
+            #endif
+        };
+
         virtual void draw(void)
         {
             oled.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
@@ -46,17 +62,17 @@ class RoachMenuHome : public RoachMenu
             int y = printRfStats(0);
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("T:%4d S:%d", tx_pkt.throttle, tx_pkt.steering);
+            oled.printf("%c%4d %c%d", 0x18, tx_pkt.throttle, 0x1D, tx_pkt.steering);
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             if (radio.connected() && telem_pkt.heading == 0x7FFF) {
                 oled.printf("IMUFAIL");
             }
             else if (radio.connected()) {
-                oled.printf("H:%4d  %d", tx_pkt.heading, telem_pkt.heading);
+                oled.printf("H:%4d  %d", roach_div_rounded(tx_pkt.heading, 100), telem_pkt.heading);
             }
             else {
-                oled.printf("H:%4d", tx_pkt.heading);
+                oled.printf("H:%4d", roach_div_rounded(tx_pkt.heading, 100));
             }
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
@@ -93,6 +109,7 @@ class RoachMenuHome : public RoachMenu
 
         virtual void onButton(uint8_t btn)
         {
+            RoachMenu::onButton(btn);
             QuickAction_check(btn);
             switch (btn)
             {
@@ -112,6 +129,14 @@ class RoachMenuInfo : public RoachMenu
         RoachMenuInfo() : RoachMenu(MENUID_INFO)
         {
         };
+
+        #ifdef ROACHTX_AUTOSAVE
+        virtual void taskLP(void)
+        {
+            RoachMenu::taskLP();
+            settings_saveIfNeeded(2 * 1000);
+        };
+        #endif
 
         virtual void draw(void)
         {
@@ -158,6 +183,7 @@ class RoachMenuInfo : public RoachMenu
 
         virtual void onButton(uint8_t btn)
         {
+            RoachMenu::onButton(btn);
             switch (btn)
             {
                 case BTNID_G5:
@@ -187,6 +213,7 @@ void menu_run(void)
         current_menu = &menuHome;
         Serial.println("current menu is null, assigning home screen");
     }
+    Serial.printf("[u%]: running menu screen ID=%d\r\n", millis(), current_menu->getId());
     current_menu->run();
     int ec = current_menu->getExitCode();
     Serial.printf("[%u]: menu exited to top level, exitcode=%d\r\n", millis(), ec);

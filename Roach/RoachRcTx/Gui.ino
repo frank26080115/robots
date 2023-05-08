@@ -10,6 +10,11 @@ void gui_init(void)
     menu_setup();
 }
 
+void gui_reboot(void)
+{
+    oled.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+}
+
 extern const uint8_t splash[];
 
 void gui_drawSplash(void)

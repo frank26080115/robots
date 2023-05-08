@@ -46,12 +46,15 @@ enum
     BTNID_G6,
 };
 
+extern uint32_t gui_last_activity_time;
+
 class RoachMenu
 {
     public:
         RoachMenu(uint8_t id = 0);
         virtual void run(void);
         inline int getExitCode(void) { return _exit; };
+        inline uint8_t getId(void) { return _id; };
         void* prev_menu = NULL;
         void* next_menu = NULL;
         void* parent_menu = NULL;
@@ -174,7 +177,7 @@ class RoachMenuFileSaveList : public RoachMenuLister
         virtual void draw_title(void);
         //virtual RoachMenuListItem* getItem(int idx);
         virtual void onEnter(void);
-        virtual void onButton(uint8_t btn);;
+        virtual void onButton(uint8_t btn);
 };
 
 class RoachMenuCfgLister : public RoachMenuLister

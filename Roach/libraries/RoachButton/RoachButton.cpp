@@ -67,7 +67,7 @@ void RoachButton::handleIsr(void)
     if (digitalRead(_pin) == LOW)
     {
         _last_down_time = now;
-        if ((now - _last_up_time) >= _db)
+        if ((now - _last_up_time) >= _db && (now - _last_down_time) >= _db)
         {
             _pressed = true;
         }
@@ -80,8 +80,21 @@ void RoachButton::handleIsr(void)
 
 bool RoachButton::hasPressed(bool clr)
 {
-    uint32_t now = millis();
     __disable_irq();
+    uint32_t now = millis();
+    if (_disabled)
+    {
+        if (digitalRead(_pin) != LOW)
+        {
+            _disabled = false;
+        }
+        else
+        {
+            _pressed = false;
+            __enable_irq();
+            return false;
+        }
+    }
     bool x = _pressed;
     if (_rep != 0 && x == false && digitalRead(_pin) == LOW)
     {
@@ -99,6 +112,18 @@ bool RoachButton::hasPressed(bool clr)
 
 uint32_t RoachButton::isHeld(void)
 {
+    if (_disabled)
+    {
+        if (digitalRead(_pin) != LOW)
+        {
+            _disabled = false;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
     uint32_t d = 0;
     if (digitalRead(_pin) != LOW)
     {
@@ -110,6 +135,16 @@ uint32_t RoachButton::isHeld(void)
     d = d <= 0 ? 1 : d;
     __enable_irq();
     return d;
+}
+
+void RoachButton::disableUntilRelease(void)
+{
+    _disabled = true;
+}
+
+void RoachButton::fakePress(void)
+{
+    _pressed = true;
 }
 
 void RoachButton_clearAll(void)

@@ -14,6 +14,7 @@ static void twi_handler(nrfx_twim_evt_t const * p_event, void * p_context);
 static nrfx_twim_t m_twi = {.p_twim = NRF_TWIM0, .drv_inst_idx = 0, };//NRFX_TWIM_INSTANCE(TWI_INSTANCE_ID);
 static volatile bool m_xfer_done = true;
 static volatile int  m_xfer_err = 0;
+static int err_cnt = 0;
 
 extern nrfx_err_t nrfx_twim_init(nrfx_twim_t const *        p_instance,
                                  nrfx_twim_config_t const * p_config,
@@ -111,6 +112,11 @@ void nbtwi_task(void)
         {
             nrfx_twim_bus_recover(g_ADigitalPinMap[pin_scl], g_ADigitalPinMap[pin_sda]);
             m_xfer_err = 0;
+            err_cnt += 1;
+        }
+        else
+        {
+            err_cnt = 0;
         }
 
         if (head != NULL)
@@ -141,4 +147,13 @@ void nbtwi_wait(void)
     while (nbtwi_isBusy()) {
         yield();
     }
+}
+
+bool nbtwi_hasError(bool clr)
+{
+    bool x = err_cnt >= 4;
+    if (clr) {
+        err_cnt = 0;
+    }
+    return x;
 }

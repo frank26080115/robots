@@ -8,6 +8,7 @@ const cmd_def_t cmds[] = {
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
     { "save"        , save_func },
+    { "fakebtn"     , fakebtn_func },
     { "", NULL }, // end of table
 };
 
@@ -66,4 +67,29 @@ void regenrf_func(void* cmd, char* argstr, Stream* stream)
 void readrf_func(void* cmd, char* argstr, Stream* stream)
 {
     stream->printf("RF params: 0x%08X 0x%08X 0x%08X\r\n", nvm_rf.uid, nvm_rf.salt, nvm_rf.chan_map);
+}
+
+void fakebtn_func(void* cmd, char* argstr, Stream* stream)
+{
+    if (memcmp("up", argstr, 1) == 0) {
+        btn_up.fakePress();
+    }
+    if (memcmp("down", argstr, 1) == 0) {
+        btn_down.fakePress();
+    }
+    if (memcmp("left", argstr, 1) == 0) {
+        btn_left.fakePress();
+    }
+    if (memcmp("right", argstr, 1) == 0) {
+        btn_right.fakePress();
+    }
+    if (memcmp("center", argstr, 1) == 0) {
+        btn_center.fakePress();
+    }
+    if (memcmp("5", argstr, 1) == 0) {
+        btn_g5.fakePress();
+    }
+    if (memcmp("6", argstr, 1) == 0) {
+        btn_g6.fakePress();
+    }
 }

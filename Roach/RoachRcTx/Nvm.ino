@@ -46,6 +46,8 @@ roach_nvm_gui_desc_t cfggroup_ctrler[] = {
     ROACH_NVM_GUI_DESC_END,
 };
 
+uint32_t nvm_dirty = 0;
+
 void settings_init(void)
 {
     settings_factoryReset();
@@ -65,6 +67,20 @@ void settings_factoryReset(void)
 void settings_save(void)
 {
     settings_saveToFile(ROACH_STARTUP_FILE_NAME);
+}
+
+void settings_saveIfNeeded(uint32_t span)
+{
+    if (nvm_dirty > 0)
+    {
+        uint32_t now = millis();
+        if ((now - nvm_dirty) >= span)
+        {
+            Serial.printf("[%u]:autosaving startup file\r\n", millis());
+            settings_save();
+            nvm_dirty = 0;
+        }
+    }
 }
 
 void settings_loadFile(const char* fname)
@@ -96,6 +112,11 @@ void settings_loadFile(const char* fname)
             roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
         }
         f.close();
+        #ifdef ROACHTX_AUTOSAVE
+        if (strncmp(fname, ROACH_STARTUP_FILE_NAME, 32) != 0) {
+            settings_markDirty();
+        }
+        #endif
     }
 }
 
@@ -128,4 +149,9 @@ void settings_saveToFile(const char* fname)
         }
         f.close();
     }
+}
+
+void settings_markDirty(void)
+{
+    nvm_dirty = millis();
 }

@@ -10,6 +10,8 @@
 #define ROACHMENU_LIST_MAX          6
 #define QUICKACTION_HOLD_TIME       2000
 #define NRF5RAND_BUFF_SIZE          512
+#define ROACHTX_AUTOSAVE
+#define ROACHTX_AUTOEXIT
 
 #include "roachtx_conf_hw.h"
 

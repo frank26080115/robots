@@ -49,6 +49,7 @@ class QuickAction
                 if (t >= QUICKACTION_HOLD_TIME)
                 {
                     btns_clearAll();
+                    btns_disableAll();
                     return true;
                 }
 
@@ -279,8 +280,11 @@ void QuickAction_check(uint8_t btn)
         }
         case BTNID_RIGHT:
         {
-            //QuickActionCalibLimits* q = new QuickActionCalibLimits();
+            #ifdef ROACHTX_AUTOSAVE
+            QuickActionCalibLimits* q = new QuickActionCalibLimits();
+            #else
             QuickActionSaveStartup* q = new QuickActionSaveStartup();
+            #endif
             q->run();
             delete q;
             break;

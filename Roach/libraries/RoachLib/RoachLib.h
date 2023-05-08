@@ -44,6 +44,7 @@ int32_t roach_multiply_with_scale(int32_t a, int32_t b);
 int32_t roach_lpf(int32_t nval, int32_t oval_x, int32_t flt);
 int32_t roach_value_clamp(int32_t x, int32_t upper, int32_t lower);
 int32_t roach_value_map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, int32_t out_max, bool limit);
+int roach_div_rounded(const int n, const int d);
 double roach_expo_curve(double x, double curve);
 int32_t roach_expo_curve32(int32_t x, int32_t curve);
 uint32_t roach_crcCalc(uint8_t const * p_data, uint32_t size, uint32_t const * p_crc);

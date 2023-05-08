@@ -63,6 +63,17 @@ void btns_clearAll(void)
     btn_g6     .hasPressed(true);
 }
 
+void btns_disableAll(void)
+{
+    btn_up     .disableUntilRelease();
+    btn_down   .disableUntilRelease();
+    btn_left   .disableUntilRelease();
+    btn_right  .disableUntilRelease();
+    btn_center .disableUntilRelease();
+    btn_g5     .disableUntilRelease();
+    btn_g6     .disableUntilRelease();
+}
+
 bool switches_alarm = false;
 uint8_t switches_getFlags(void)
 {

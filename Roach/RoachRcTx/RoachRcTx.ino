@@ -133,6 +133,11 @@ void ctrler_tasks(void)
         RoachUsbMsd_task();  // handles tasks for USB flash mass storage
         cmdline.task();      // handles command line
 
+        if (nbtwi_hasError(true)) {
+            Serial.printf("ERROR[%u]: I2C bus problem, rebooting OLED\r\n", millis());
+            gui_reboot();
+        }
+
         ctrler_buildPkt();
         radio.send((uint8_t*)&tx_pkt);
 

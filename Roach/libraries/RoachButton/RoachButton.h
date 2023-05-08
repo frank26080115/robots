@@ -10,12 +10,15 @@ class RoachButton
         void begin(void);
         bool hasPressed(bool clr);
         uint32_t isHeld(void);
+        void disableUntilRelease(void);
+        void fakePress(void);
         void handleIsr(void);
     private:
         int _pin;
         volatile uint32_t _last_down_time, _last_up_time, _last_change_time;
         int _rep, _db;
         volatile bool _pressed;
+        bool _disabled = false;
 };
 
 void RoachButton_allBegin(void);

@@ -1,5 +1,7 @@
 #include "MenuClass.h"
 
+uint32_t gui_last_activity_time = 0;
+
 RoachMenu::RoachMenu(uint8_t id)
 {
     _id = id;
@@ -27,6 +29,9 @@ void RoachMenu::taskHP(void)
 
 void RoachMenu::taskLP(void)
 {
+    #ifdef ROACHTX_AUTOSAVE
+    settings_saveIfNeeded(10 * 1000);
+    #endif
 };
 
 void RoachMenu::run(void)
@@ -44,6 +49,17 @@ void RoachMenu::run(void)
         }
 
         checkButtons();
+
+        #ifdef ROACHTX_AUTOEXIT
+        if (gui_last_activity_time != 0 && _id != MENUID_HOME)
+        {
+            if ((millis() - gui_last_activity_time) >= 10000) {
+                gui_last_activity_time = 0;
+                _exit = EXITCODE_HOME;
+            }
+        }
+        #endif
+
         if (_exit == 0)
         {
             taskLP();
@@ -79,6 +95,9 @@ void RoachMenu::onExit(void)
 
 void RoachMenu::onButton(uint8_t btn)
 {
+    #ifdef ROACHTX_AUTOEXIT
+    gui_last_activity_time = millis();
+    #endif
 }
 
 void RoachMenu::checkButtons(void)
@@ -243,15 +262,18 @@ void RoachMenuCfgItemEditor::draw_title(void)
 
 void RoachMenuCfgItemEditor::onButton(uint8_t btn)
 {
+    RoachMenu::onButton(btn);
     switch (btn)
     {
         case BTNID_UP:
             roachnvm_incval((uint8_t*)_struct, _desc, _desc->step);
             cfg_last_change_time = millis();
+            settings_markDirty();
             break;
         case BTNID_DOWN:
             roachnvm_incval((uint8_t*)_struct, _desc, -_desc->step);
             cfg_last_change_time = millis();
+            settings_markDirty();
             break;
         case BTNID_G6:
             _exit = EXITCODE_BACK;
@@ -266,6 +288,7 @@ void RoachMenuCfgItemEditor::checkButtons(void)
     if (x != 0) {
         roachnvm_incval((uint8_t*)_struct, _desc, -x * _desc->step);
         cfg_last_change_time = millis();
+        settings_markDirty();
     }
 }
 
@@ -431,6 +454,7 @@ char* RoachMenuLister::getItemText(int idx)
 
 void RoachMenuLister::onButton(uint8_t btn)
 {
+    RoachMenu::onButton(btn);
     switch (btn)
     {
         case BTNID_UP:

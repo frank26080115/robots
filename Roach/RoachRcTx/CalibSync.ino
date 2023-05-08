@@ -30,6 +30,7 @@ class RoachMenuFuncCalibGyro : public RoachMenuFunctionItem
 
         virtual void onButton(uint8_t btn)
         {
+            RoachMenuFunctionItem::onButton(btn);
             switch (btn)
             {
                 case BTNID_G6:
@@ -98,6 +99,7 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
 
         virtual void onButton(uint8_t btn)
         {
+            RoachMenuFunctionItem::onButton(btn);
             switch (btn)
             {
                 case BTNID_G6:
@@ -170,6 +172,7 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
 
         virtual void onButton(uint8_t btn)
         {
+            RoachMenuFunctionItem::onButton(btn);
             switch (btn)
             {
                 case BTNID_G6:
@@ -216,6 +219,7 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
 
         virtual void onButton(uint8_t btn)
         {
+            RoachMenuFunctionItem::onButton(btn);
             switch (btn)
             {
                 case BTNID_G6:
@@ -259,6 +263,7 @@ class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
 
         virtual void onButton(uint8_t btn)
         {
+            RoachMenuFunctionItem::onButton(btn);
             switch (btn)
             {
                 case BTNID_G6:

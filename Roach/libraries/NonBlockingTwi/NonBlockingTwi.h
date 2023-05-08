@@ -13,6 +13,7 @@ void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len);
 void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len);
 void nbtwi_task(void);
 bool nbtwi_isBusy(void);
+bool nbtwi_hasError(bool);
 void nbtwi_wait(void);
 
 #ifdef __cplusplus

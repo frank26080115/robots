@@ -2,15 +2,7 @@
 
 int32_t roach_reduce_to_scale(int32_t x)
 {
-    if (x > 0) {
-        x += ROACH_SCALE_MULTIPLIER / 2;
-        x /= ROACH_SCALE_MULTIPLIER;
-    }
-    else if (x < 0) {
-        x -= ROACH_SCALE_MULTIPLIER / 2;
-        x /= ROACH_SCALE_MULTIPLIER;
-    }
-    return x;
+    return roach_div_rounded(x, ROACH_SCALE_MULTIPLIER);
 }
 
 int32_t roach_multiply_with_scale(int32_t a, int32_t b)
@@ -40,8 +32,8 @@ int32_t roach_value_map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_m
     int32_t a = x - in_min;
     int32_t b = out_max - out_min;
     int32_t c = in_max - in_min;
-    int32_t d = a + b + (c / 2);
-    int32_t y = d / c;
+    int32_t d = a + b;
+    int32_t y = roach_div_rounded(d, c);
     y += out_min;
     if (limit)
     {
@@ -65,6 +57,11 @@ int32_t roach_value_map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_m
         }
     }
     return y;
+}
+
+int roach_div_rounded(const int n, const int d)
+{
+    return ((n < 0) ^ (d < 0)) ? ((n - (d / 2)) / d) : ((n + (d / 2)) / d);
 }
 
 double roach_expo_curve(double x, double curve)
