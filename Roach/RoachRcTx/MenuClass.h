@@ -118,6 +118,9 @@ class RoachMenuCfgItemEditor : public RoachMenu
     protected:
         roach_nvm_gui_desc_t* _desc = NULL;
         void* _struct = NULL;
+        virtual void draw(void);
+        virtual void draw_sidebar(void);
+        virtual void draw_title(void);
         virtual void taskLP(void);
         virtual void onEnter(void);
         virtual void onExit(void);

@@ -52,6 +52,7 @@ typedef struct
 {
     uint16_t timestamp;
     uint32_t checksum;
+    uint16_t heading;
     uint16_t battery;
     uint8_t  temperature;
     int16_t  rssi;
@@ -133,6 +134,9 @@ roach_rx_nvm_t;
 typedef struct
 {
     uint32_t magic;
+
+    uint8_t startup_switches;
+    uint8_t startup_switches_mask;
 
     roach_nvm_pot_t pot_throttle;
     roach_nvm_pot_t pot_steering;

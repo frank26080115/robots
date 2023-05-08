@@ -50,7 +50,9 @@ RoachButton btn_g6     = RoachButton(ROACHHW_PIN_BTN_G6);
 RoachButton btn_sw1    = RoachButton(ROACHHW_PIN_BTN_SW1);
 RoachButton btn_sw2    = RoachButton(ROACHHW_PIN_BTN_SW2);
 RoachButton btn_sw3    = RoachButton(ROACHHW_PIN_BTN_SW3);
+
 #ifdef ROACHHW_PIN_BTN_SW4
+// ran out of pins, switch 4 does not exist
 RoachButton btn_sw4    = RoachButton(ROACHHW_PIN_BTN_SW4);
 #endif
 
@@ -88,10 +90,7 @@ void setup(void)
 
 void loop(void)
 {
-    // detect if weapon switch is on at boot
-    if (btn_sw1.isHeld() > 0) {
-        weap_sw_warning = true;
-    }
+    switches_getFlags(); // this call here will get the initial switch states and check if they are safe
 
     // show splash screen for a short time, user can exit with a button
     // this will also ensure that the RNG buffer fills up
@@ -103,6 +102,9 @@ void loop(void)
         }
     }
     RoachButton_clearAll();
+
+    Serial.println("splash screen ended, entering menu system loop");
+
     menu_run(); // the menu's run loop will execute other tasks, such as ctrler_task
 
     Serial.printf("ERROR[%u]: menu loop has exited\r\n", millis());
@@ -182,19 +184,7 @@ void ctrler_buildPkt(void)
     tx_pkt.pot_weap = (pots_locked == false) ? pot_weapon.get() : 0;
     tx_pkt.pot_aux  = (pots_locked == false) ? pot_aux.get()    : 0;
 
-    // if the user turns off the switch, no more warning is needed
-    if (btn_sw1.isHeld() <= 0) {
-        weap_sw_warning = false;
-    }
-
-    uint32_t f = 0;
-    f |= (btn_sw1.isHeld() > 0 && weap_sw_warning == false) ? ROACHPKTFLAG_BTN1 : 0;
-    f |= btn_sw2.isHeld() > 0 ? ROACHPKTFLAG_BTN2 : 0;
-    f |= btn_sw3.isHeld() > 0 ? ROACHPKTFLAG_BTN3 : 0;
-    #ifdef ROACHHW_PIN_BTN_SW4
-    f |= btn_sw4.isHeld() > 0 ? ROACHPKTFLAG_BTN4 : 0;
-    #endif
-    tx_pkt.flags = f;
+    tx_pkt.flags = switches_getFlags();
 }
 
 void ctrler_pktDebug(void)

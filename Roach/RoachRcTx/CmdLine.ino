@@ -5,6 +5,9 @@ const cmd_def_t cmds[] = {
     { "reboot"      , reboot_func },
     { "debug"       , debug_func },
     { "conttx"      , conttx_func },
+    { "regenrf"     , regenrf_func },
+    { "readrf"      , readrf_func },
+    { "save"        , save_func },
     { "", NULL }, // end of table
 };
 
@@ -15,6 +18,12 @@ void factory_reset_func(void* cmd, char* argstr, Stream* stream)
     settings_factoryReset();
     settings_save();
     stream->println("factory reset performed");
+}
+
+void save_func(void* cmd, char* argstr, Stream* stream)
+{
+    settings_save();
+    stream->println("settings saved");
 }
 
 void echo_func(void* cmd, char* argstr, Stream* stream)
@@ -43,6 +52,18 @@ void debug_func(void* cmd, char* argstr, Stream* stream)
 void conttx_func(void* cmd, char* argstr, Stream* stream)
 {
     int f = atoi(argstr);
-    Serial.printf("RF cont-tx test f=%d\r\n", f);
+    stream->printf("RF cont-tx test f=%d\r\n", f);
     radio.cont_tx(f);
+}
+
+void regenrf_func(void* cmd, char* argstr, Stream* stream)
+{
+    nvm_rf.uid  = nrf5rand_u32();
+    nvm_rf.salt = nrf5rand_u32();
+    stream->printf("new RF params 0x%08X 0x%08X\r\n", nvm_rf.uid, nvm_rf.salt);
+}
+
+void readrf_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("RF params: 0x%08X 0x%08X 0x%08X\r\n", nvm_rf.uid, nvm_rf.salt, nvm_rf.chan_map);
 }

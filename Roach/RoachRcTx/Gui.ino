@@ -17,7 +17,7 @@ void gui_drawSplash(void)
     oled.clearDisplay();
     oled.drawBitmap(0, 0, splash, SCREEN_WIDTH, SCREEN_HEIGHT, 1);
     oled.display();
-    gui_drawNow();
+    //gui_drawNow();
 }
 
 bool gui_canDisplay(void)
@@ -112,9 +112,9 @@ void drawTitleBar(const char* s, bool center, bool line, bool arrows)
     if (arrows)
     {
         oled.setCursor(0, 0);
-        oled.write('<');
+        oled.write((char)0x1B);
         oled.setCursor(SCREEN_WIDTH - 12 - 5, 0);
-        oled.write('>');
+        oled.write((char)0x1A);
     }
     if (line)
     {

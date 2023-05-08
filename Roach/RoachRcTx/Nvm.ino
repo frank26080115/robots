@@ -41,6 +41,8 @@ roach_nvm_gui_desc_t cfggroup_ctrler[] = {
     { ((uint32_t)(&(nvm_tx.pot_aux     .expo       )) - (uint32_t)(&nvm_tx)), "POT expo"    , "s16x10" ,                      0, -ROACH_SCALE_MULTIPLIER, ROACH_SCALE_MULTIPLIER, 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .filter     )) - (uint32_t)(&nvm_tx)), "POT filter"  , "s16x10" ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
     { ((uint32_t)(&(nvm_tx.pot_battery .filter     )) - (uint32_t)(&nvm_tx)), "BAT filter"  , "s16x10" ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
+    { ((uint32_t)(&(nvm_tx.startup_switches        )) - (uint32_t)(&nvm_tx)), "ST SW"       , "hex"    ,                   0x01,                       0,                   0x07, 1, },
+    { ((uint32_t)(&(nvm_tx.startup_switches_mask   )) - (uint32_t)(&nvm_tx)), "ST SW mask"  , "hex"    ,                   0x01,                       0,                   0x07, 1, },
     ROACH_NVM_GUI_DESC_END,
 };
 

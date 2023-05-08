@@ -47,6 +47,7 @@ void RoachMenu::run(void)
         if (_exit == 0)
         {
             taskLP();
+
             draw();
 
             display();
@@ -219,6 +220,27 @@ void RoachMenuCfgItemEditor::onExit(void)
     encoder_mode = 0;
 }
 
+void RoachMenuCfgItemEditor::draw(void)
+{
+    RoachMenu::draw();
+    char valstr[64];
+    roachnvm_formatitem(valstr, (uint8_t*)_struct, _desc);
+    oled.setCursor(0, ROACHGUI_LINE_HEIGHT * 2);
+    oled.print(valstr);
+}
+
+void RoachMenuCfgItemEditor::draw_sidebar(void)
+{
+    drawSideBar("SET", "", true);
+}
+
+void RoachMenuCfgItemEditor::draw_title(void)
+{
+    char str[64];
+    sprintf(str, "EDIT: %s", _desc->name);
+    drawTitleBar(str, true, true, false);
+}
+
 void RoachMenuCfgItemEditor::onButton(uint8_t btn)
 {
     switch (btn)
@@ -231,7 +253,6 @@ void RoachMenuCfgItemEditor::onButton(uint8_t btn)
             roachnvm_incval((uint8_t*)_struct, _desc, -_desc->step);
             cfg_last_change_time = millis();
             break;
-        case BTNID_G5:
         case BTNID_G6:
             _exit = EXITCODE_BACK;
             break;
@@ -254,6 +275,7 @@ RoachMenuLister::RoachMenuLister(uint8_t id) : RoachMenu(id)
 
 void RoachMenuLister::draw(void)
 {
+    oled.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     draw_title();
     draw_sidebar();
 
@@ -284,15 +306,15 @@ void RoachMenuLister::draw(void)
         oled.setCursor(0, ROACHGUI_LINE_HEIGHT * (i + 2));
         if (j == _list_idx)
         {
-            oled.printf(">");
+            oled.write((char)0x10);
         }
         else if (i == 0 && _draw_start_idx != 0)
         {
-            oled.printf("^");
+            oled.write((char)0x18);
         }
         else if (i >= (ROACHMENU_LIST_MAX - 1) && _draw_end_idx < (_list_cnt - 1))
         {
-            oled.printf("v");
+            oled.write((char)0x19);
         }
         if (j >= _draw_start_idx && j <= _draw_end_idx)
         {

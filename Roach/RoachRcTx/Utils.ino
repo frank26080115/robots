@@ -62,3 +62,27 @@ void btns_clearAll(void)
     btn_g5     .hasPressed(true);
     btn_g6     .hasPressed(true);
 }
+
+bool switches_alarm = false;
+uint8_t switches_getFlags(void)
+{
+    static bool released = false;
+    uint8_t f;
+    f |= btn_sw1.isHeld() > 0 ? ROACHPKTFLAG_BTN1 : 0;
+    f |= btn_sw2.isHeld() > 0 ? ROACHPKTFLAG_BTN2 : 0;
+    f |= btn_sw3.isHeld() > 0 ? ROACHPKTFLAG_BTN3 : 0;
+    #ifdef ROACHHW_PIN_BTN_SW4
+    f |= btn_sw4.isHeld() > 0 ? ROACHPKTFLAG_BTN4 : 0;
+    #endif
+    if (released == false) {
+        if (f == (nvm_tx.startup_switches & nvm_tx.startup_switches_mask)) {
+            switches_alarm = false;
+            released = true;
+        }
+        else {
+            f = nvm_tx.startup_switches;
+            switches_alarm = true;
+        }
+    }
+    return f;
+}
