@@ -1,4 +1,5 @@
 #include "RoachPot.h"
+#include <AsyncAdc.h>
 
 #define POT_CNT_MAX 8
 static int pot_cnt = 0;
@@ -10,7 +11,7 @@ static uint8_t adc_state_machine = ROACHPOT_SM_IDLE;
 RoachPot::RoachPot(int pin, roach_nvm_pot_t* c)
 {
     _pin = pin;
-    _cfg = c;
+    cfg = c;
     pot_inst[pot_cnt] = this;
     pot_pin[pot_cnt] = _pin;
     pot_cnt++;
@@ -34,7 +35,7 @@ int16_t RoachPot_task(int p)
     if (adc_state_machine == ROACHPOT_SM_IDLE)
     {
         adcStart(cur_pin);
-        adc_state_machine = ROACHPOT_SM_WAIT;
+        adc_state_machine = ROACHPOT_SM_CONVERTING;
     }
     else if (adc_state_machine == ROACHPOT_SM_CONVERTING)
     {
@@ -60,7 +61,7 @@ void RoachPot::task(void)
     last_adc_raw = x32;
     if (cfg->filter != 0)
     {
-        int32_t filtered = roach_lpf(x32, last_val_filter, cfg->filter);
+        int32_t filtered = roach_lpf(x32, last_adc_filter, cfg->filter);
         last_adc_filter = filtered;
         last_adc = roach_reduce_to_scale(filtered);
     }
@@ -126,9 +127,9 @@ void RoachPot::task(void)
             last_val = 0;
         }
 
-        if (cfg->curve != 0)
+        if (cfg->expo != 0)
         {
-            last_val = roach_expo_curve32(last_val, cfg->curve);
+            last_val = roach_expo_curve32(last_val, cfg->expo);
         }
     }
 }

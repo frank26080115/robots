@@ -4,9 +4,9 @@ extern roach_rx_nvm_t nvm_rx;
 extern roach_rf_nvm_t nvm_rf;
 
 roach_nvm_gui_desc_t cfggroup_rf[] = {
-    { ((uint32_t)(&(nvm_rf.uid     )) - (uint32_t)(&nvm_rf)), "UID"     , "hex", 0x1234ABCD, 0, 0xFFFFFFFF, 1, },
-    { ((uint32_t)(&(nvm_rf.salt    )) - (uint32_t)(&nvm_rf)), "salt"    , "hex", 0xDEADBEEF, 0, 0xFFFFFFFF, 1, },
-    { ((uint32_t)(&(nvm_rf.chan_map)) - (uint32_t)(&nvm_rf)), "chan map", "hex", 0x0FFFFFFF, 0, 0xFFFFFFFF, 1, },
+    { ((uint32_t)(&(nvm_rf.uid     )) - (uint32_t)(&nvm_rf)), "UID"     , "hex", (int32_t)0x1234ABCD, 0, 0, 1, },
+    { ((uint32_t)(&(nvm_rf.salt    )) - (uint32_t)(&nvm_rf)), "salt"    , "hex", (int32_t)0xDEADBEEF, 0, 0, 1, },
+    { ((uint32_t)(&(nvm_rf.chan_map)) - (uint32_t)(&nvm_rf)), "chan map", "hex", (int32_t)0x0FFFFFFF, 0, 0, 1, },
     ROACH_NVM_GUI_DESC_END,
 };
 
@@ -35,6 +35,13 @@ roach_nvm_gui_desc_t cfggroup_weap[] = {
     { ((uint32_t)(&(nvm_rx.weapon.scale      )) - (uint32_t)(&nvm_rx)), "WM scale"   , "s16x10" , ROACH_SCALE_MULTIPLIER,                                 0,                           INT_MAX, 1, },
     { ((uint32_t)(&(nvm_rx.weapon.limit_min  )) - (uint32_t)(&nvm_rx)), "WM lim min" , "s16"    ,        ROACH_SERVO_MIN, ROACH_SERVO_MIN - ROACH_SERVO_OVR,                   ROACH_SERVO_MID, 1, },
     { ((uint32_t)(&(nvm_rx.weapon.limit_max  )) - (uint32_t)(&nvm_rx)), "WM lim max" , "s16"    ,        ROACH_SERVO_MAX,                   ROACH_SERVO_MID, ROACH_SERVO_MAX + ROACH_SERVO_OVR, 1, },
+    { ((uint32_t)(&(nvm_rx.pid_spindown.p    )) - (uint32_t)(&nvm_rx)), "SD P"       ,  "s16x10", ROACH_SCALE_MULTIPLIER, INT_MIN, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_spindown.i    )) - (uint32_t)(&nvm_rx)), "SD I"       ,  "s16x10",                      0, INT_MIN, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_spindown.d    )) - (uint32_t)(&nvm_rx)), "SD D"       ,  "s16x10",                      0, INT_MIN, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_spindown.output_limit))      - (uint32_t)(&nvm_rx)), "SD out lim", "s16",         INT_MAX,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_spindown.accumulator_limit)) - (uint32_t)(&nvm_rx)), "SD i lim"  , "s16",         INT_MAX,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_spindown.accumulator_decay)) - (uint32_t)(&nvm_rx)), "SD i decay", "s16",               0,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.spindown_limit)) - (uint32_t)(&nvm_rx)), "SD limit", "s16",                               200,       0, INT_MAX  ,   1, },
     ROACH_NVM_GUI_DESC_END,
 };
 
@@ -44,9 +51,9 @@ roach_nvm_gui_desc_t cfggroup_imu[] = {
     { ((uint32_t)(&(nvm_rx.pid_heading.p    )) - (uint32_t)(&nvm_rx)), "PID P"       , "s16x10" , ROACH_SCALE_MULTIPLIER, INT_MIN, INT_MAX  ,   1, },
     { ((uint32_t)(&(nvm_rx.pid_heading.i    )) - (uint32_t)(&nvm_rx)), "PID I"       , "s16x10" ,                      0, INT_MIN, INT_MAX  ,   1, },
     { ((uint32_t)(&(nvm_rx.pid_heading.d    )) - (uint32_t)(&nvm_rx)), "PID D"       , "s16x10" ,                      0, INT_MIN, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm_rx.pid_heading.output_limit))      - (uint32_t)(&nvm_rx)), "PID out lim" , "s16" ,       INT_MAX,       0, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm_rx.pid_heading.accumulator_limit)) - (uint32_t)(&nvm_rx)), "PID i lim"   , "s16" ,       INT_MAX,       0, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm_rx.pid_heading.accumulator_decay)) - (uint32_t)(&nvm_rx)), "PID i decay" , "s16" ,             0,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_heading.output_limit))      - (uint32_t)(&nvm_rx)), "PID out lim",   "s16",       INT_MAX,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_heading.accumulator_limit)) - (uint32_t)(&nvm_rx)), "PID i lim"  ,   "s16",       INT_MAX,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm_rx.pid_heading.accumulator_decay)) - (uint32_t)(&nvm_rx)), "PID i decay",   "s16",             0,       0, INT_MAX  ,   1, },
     ROACH_NVM_GUI_DESC_END,
 };
 

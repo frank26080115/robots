@@ -109,7 +109,7 @@ void nbtwi_task(void)
     {
         if (m_xfer_err != 0)
         {
-            nrfx_twim_bus_recover(pin_scl, pin_sda);
+            nrfx_twim_bus_recover(g_ADigitalPinMap[pin_scl], g_ADigitalPinMap[pin_sda]);
             m_xfer_err = 0;
         }
 

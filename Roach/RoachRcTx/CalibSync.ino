@@ -304,7 +304,7 @@ class RoachMenuCalibSync : public RoachMenuLister
                 {
                     case BTNID_CENTER:
                         {
-                            RoachMenuFunctionItem* itm = (RoachMenuFunctionItem*)getCurItem();
+                            RoachMenuFunctionItem* itm = (RoachMenuFunctionItem*)getNodeAt(_list_idx);
                             itm->run();
                         }
                         break;

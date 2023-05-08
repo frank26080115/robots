@@ -78,7 +78,7 @@ void setup(void)
     Serial.begin(115200);
     RoachUsbMsd_begin();
     settings_init();
-    radio.begin(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt, ROACHHW_PIN_FEM_TX, ROACHHW_PIN_FEM_RX);
+    radio_init();
     RoachButton_allBegin();
     RoachPot_allBegin();
     RoachEnc_begin(ROACHHW_PIN_ENC_A, ROACHHW_PIN_ENC_B);
@@ -107,6 +107,11 @@ void loop(void)
 
     Serial.printf("ERROR[%u]: menu loop has exited\r\n", millis());
     // the code should not actually reach this point
+}
+
+void radio_init(void)
+{
+    radio.begin(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt, ROACHHW_PIN_FEM_TX, ROACHHW_PIN_FEM_RX);
 }
 
 void ctrler_tasks(void)

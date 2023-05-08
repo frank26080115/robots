@@ -83,6 +83,7 @@ void settings_loadFile(const char* fname)
     {
         if ((flags & (1 << 0)) != 0 || flags == 0) {
             roachnvm_readfromfile(&f, (uint8_t*)&nvm_rf, cfggroup_rf);
+            radio_init();
         }
         if ((flags & (1 << 1)) != 0 || flags == 0) {
             roachnvm_readfromfile(&f, (uint8_t*)&nvm_tx, cfggroup_ctrler);

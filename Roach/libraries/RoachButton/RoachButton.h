@@ -20,7 +20,7 @@ class RoachButton
 
 void RoachButton_allBegin(void);
 void RoachButton_clearAll(void);
-void RoachButton_hasAnyPressed(void);
-void RoachButton_isAnyHeld(void);
+bool RoachButton_hasAnyPressed(void);
+bool RoachButton_isAnyHeld(void);
 
 #endif

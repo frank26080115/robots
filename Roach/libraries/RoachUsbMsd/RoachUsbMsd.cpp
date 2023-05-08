@@ -71,7 +71,7 @@ uint64_t RoachUsbMsd_getFreeSpace(void)
 {
     uint64_t x;
     x = fatfs.freeClusterCount();
-    x *= fatfs.blocksPerCluster()/2;
+    x *= fatfs.sectorsPerCluster()/2;
     return x;
 }
 

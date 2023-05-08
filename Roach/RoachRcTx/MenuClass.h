@@ -86,7 +86,7 @@ class RoachMenuListItem
 class RoachMenuFunctionItem : public RoachMenuListItem, public RoachMenu
 {
     public:
-        RoachMenuFunctionItem(const char* fname);
+        RoachMenuFunctionItem(const char* name);
 };
 
 class RoachMenuFileItem : public RoachMenuListItem
@@ -132,8 +132,8 @@ class RoachMenuLister : public RoachMenu
         virtual void draw(void);
     protected:
         virtual void onExit(void);
-        virtual RoachMenuListItem* getItem(int idx);
-        inline  RoachMenuListItem* getCurItem(void) { return getItem(_list_idx); };
+        //virtual RoachMenuListItem* getItem(int idx);
+        //inline  RoachMenuListItem* getCurItem(void) { return getItem(_list_idx); };
         virtual char* getItemText(int idx);
         inline  char* getCurItemText(void) { return getItemText(_list_idx); };
         uint8_t _list_cnt, _list_idx;
@@ -154,7 +154,7 @@ class RoachMenuFileOpenList : public RoachMenuLister
     protected:
         virtual void draw_sidebar(void);
         virtual void draw_title(void);
-        virtual RoachMenuListItem* getItem(int idx);
+        //virtual RoachMenuListItem* getItem(int idx);
         virtual void onEnter(void);
         virtual void onButton(uint8_t btn);
 };
@@ -169,7 +169,7 @@ class RoachMenuFileSaveList : public RoachMenuLister
         char _newfilename[32];
         virtual void draw_sidebar(void);
         virtual void draw_title(void);
-        virtual RoachMenuListItem* getItem(int idx);
+        //virtual RoachMenuListItem* getItem(int idx);
         virtual void onEnter(void);
         virtual void onButton(uint8_t btn);;
 };

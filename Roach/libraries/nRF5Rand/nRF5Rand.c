@@ -131,7 +131,7 @@ void nrf5rand_stopIrq(void)
 
 void nrf5rand_task(void)
 {
-    if (NRF_RNG->EVENT_VALRDY) {
+    if (NRF_RNG->EVENTS_VALRDY) {
         rng_handler(nrf_rng_random_value_get(NRF_RNG));
         #ifdef NRF_RNG_USE_NEW_VERSION
         nrf_rng_event_clear(NRF_RNG_EVENT_VALRDY);

@@ -170,6 +170,7 @@ void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt, int fem
     }
 
     // Power on into disabled mode
+    NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos) | (RADIO_SHORTS_END_DISABLE_Enabled << RADIO_SHORTS_END_DISABLE_Pos);
     NRF_RADIO->EVENTS_DISABLED = 0;
     NRF_RADIO->TASKS_DISABLE = 1;
     while (NRF_RADIO->EVENTS_DISABLED == 0) {
@@ -935,6 +936,12 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             _sm_time = now;
             break;
          case NRFRR_SM_CONT_TX:
+            {
+                if (NRF_RADIO->STATE != RADIO_STATE_STATE_Tx && NRF_RADIO->STATE != RADIO_STATE_STATE_TxRu && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle)
+                {
+                    NRF_RADIO->TASKS_TXEN = 1;
+                }
+            }
             break;
     }
 
@@ -1300,8 +1307,11 @@ void nRF52RcRadio::resume(void)
 {
     if (_statemachine == NRFRR_SM_CONT_TX) {
         NRF_RADIO->EVENTS_DISABLED = 0;
+        #ifdef NRF51
         NRF_RADIO->TEST            = 0;
+        #endif
         NRF_RADIO->TASKS_DISABLE   = 1;
+        NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos) | (RADIO_SHORTS_END_DISABLE_Enabled << RADIO_SHORTS_END_DISABLE_Pos);
         _statemachine = NRFRR_SM_HALT_START;
     }
     if (_statemachine >= NRFRR_SM_HALT_START)
@@ -1318,9 +1328,15 @@ void nRF52RcRadio::resume(void)
 void nRF52RcRadio::cont_tx(uint16_t freq)
 {
     pause();
-    set_freq(freq);
     _statemachine = NRFRR_SM_CONT_TX;
+    NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos);
+    // RADIO_SHORTS_END_DISABLE must not be enabled
     NRF_RADIO->FREQUENCY  = freq;
-    NRF_RADIO->TEST       = (RADIO_TEST_CONST_CARRIER_Enabled << RADIO_TEST_CONST_CARRIER_Pos) | (RADIO_TEST_PLL_LOCK_Enabled << RADIO_TEST_PLL_LOCK_Pos);
+    #ifdef NRF51
+    NRF_RADIO->TEST       = (RADIO_TEST_CONSTCARRIER_Enabled << RADIO_TEST_CONSTCARRIER_Pos) | (RADIO_TEST_PLLLOCK_Enabled << RADIO_TEST_PLLLOCK_Pos);
+    #endif
     NRF_RADIO->TASKS_TXEN = 1;
+    while (NRF_RADIO->STATE != RADIO_STATE_STATE_Tx && NRF_RADIO->STATE != RADIO_STATE_STATE_TxRu && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle) {
+        yield();
+    }
 }

@@ -120,6 +120,9 @@ typedef struct
     roach_nvm_servo_t weapon;
 
     roach_nvm_pid_t pid_heading;
+    roach_nvm_pid_t pid_spindown;
+    uint16_t spindown_limit;
+
     uint16_t heading_timeout;
 
     uint32_t checksum;

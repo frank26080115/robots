@@ -14,10 +14,10 @@ void RoachMenuFileOpenList::draw_title(void)
     drawTitleBar("LOAD FILE", true, true, false);
 }
 
-RoachMenuListItem* RoachMenuFileOpenList::getItem(int idx)
-{
-    return getNodeAt(idx);
-}
+//RoachMenuListItem* RoachMenuFileOpenList::getItem(int idx)
+//{
+//    return getNodeAt(idx);
+//}
 
 void RoachMenuFileOpenList::onEnter(void)
 {
@@ -81,10 +81,10 @@ void RoachMenuFileSaveList::draw_title(void)
     drawTitleBar("SAVE FILE", true, true, false);
 }
 
-RoachMenuListItem* RoachMenuFileSaveList::getItem(int idx)
-{
-    return getNodeAt(idx);
-}
+//RoachMenuListItem* RoachMenuFileSaveList::getItem(int idx)
+//{
+//    return getNodeAt(idx);
+//}
 
 void RoachMenuFileSaveList::onEnter(void)
 {

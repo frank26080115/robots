@@ -21,7 +21,7 @@ class RoachPot
         int16_t get(void);
         int16_t getAdcFiltered(void);
         int16_t getAdcRaw(void);
-        bool task(void);
+        void task(void);
         void calib_center(void);
         void calib_limits(void);
         void calib_stop(void);

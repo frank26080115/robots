@@ -3,6 +3,7 @@
 #if defined(ESP32)
 #include <SPIFFS.h>
 #define RoachFile File
+#define roachfileprint print
 #elif defined(NRF52840_XXAA)
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
@@ -10,6 +11,7 @@
 #include "SdFat.h"
 #include "Adafruit_SPIFlash.h"
 #define RoachFile FatFile
+#define roachfileprint write
 #endif
 
 int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
@@ -177,20 +179,11 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
 
 void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
-    #if defined(NRF52840_XXAA)
     char temp_buff[64];
-    #endif
     while (f->available())
     {
-        #if defined(ESP32)
-        String s = f->readStringUntil('\n');
-        int spci = s.indexOf('=');
-        String left = s.substring(0, spci);
-        String right = s.substring(spci + 1, s.length());
-        roachnvm_parseitem(struct_ptr, desc_tbl, left.c_str(), right.c_str());
-        #elif defined(NRF52840_XXAA)
         int i = 0;
-        while (true)
+        while (f->available())
         {
             int c = f->read();
             bool is_end = (c == 0 || c == '\n' || c == '\r' || c < 0);
@@ -218,7 +211,6 @@ void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc
                 break;
             }
         }
-        #endif
     }
 }
 
@@ -283,12 +275,12 @@ void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_
         if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
             break;
         }
-        f->print(desc_itm->name);
-        f->print('=');
+        f->roachfileprint(desc_itm->name);
+        f->roachfileprint('=');
         char str[32];
-        roach_nvm_format_item(str, struct_ptr, desc_itm);
-        f->print(str);
-        f->print("\r\n");
+        roachnvm_formatitem(str, struct_ptr, desc_itm);
+        f->roachfileprint(str);
+        f->roachfileprint("\r\n");
     }
 }
 
@@ -302,18 +294,23 @@ void roachnvm_writedescfile(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl)
         if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
             break;
         }
-        f->print(desc_itm->name);
-        f->print(',');
-        f->print(desc_itm->type_code);
-        f->print(',');
-        f->printf("%d", desc_itm->def_val);
-        f->print(',');
-        f->printf("%d", desc_itm->limit_min);
-        f->print(',');
-        f->printf("%d", desc_itm->limit_max);
-        f->print(',');
-        f->printf("%d", desc_itm->step);
-        f->print(";\r\n");
+        f->roachfileprint(desc_itm->name);
+        f->roachfileprint(',');
+        f->roachfileprint(desc_itm->type_code);
+        f->roachfileprint(',');
+        char str[32];
+        sprintf(str, "%d", desc_itm->def_val);
+        f->roachfileprint(str);
+        f->roachfileprint(',');
+        sprintf(str, "%d", desc_itm->limit_min);
+        f->roachfileprint(str);
+        f->roachfileprint(',');
+        sprintf(str, "%d", desc_itm->limit_max);
+        f->roachfileprint(str);
+        f->roachfileprint(',');
+        sprintf(str, "%d", desc_itm->step);
+        f->roachfileprint(str);
+        f->roachfileprint(";\r\n");
     }
 }
 

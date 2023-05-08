@@ -122,6 +122,13 @@ char* RoachMenuListItem::getName(void)
     return _txt;
 }
 
+RoachMenuFunctionItem::RoachMenuFunctionItem(const char* name)
+{
+    int slen = strlen(name);
+    _txt   = (char*)malloc(slen + 1);
+    strncpy(_txt, name, slen);
+}
+
 RoachMenuFileItem::RoachMenuFileItem(const char* fname)
 {
     int slen = strlen(fname);
@@ -393,7 +400,7 @@ void RoachMenuLister::addNode(RoachMenuListItem* item)
 
 char* RoachMenuLister::getItemText(int idx)
 {
-    RoachMenuListItem* n = getItem(idx);
+    RoachMenuListItem* n = (RoachMenuListItem*)getNodeAt(idx);
     if (n == NULL) {
         return NULL;
     }

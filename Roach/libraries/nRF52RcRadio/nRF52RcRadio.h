@@ -121,6 +121,7 @@ class nRF52RcRadio
 
     private:
         bool     _is_tx;
+        int8_t   _fem_tx, _fem_rx;
         uint32_t _session_id;
         uint32_t _seq_num;
         uint32_t _seq_num_prev;

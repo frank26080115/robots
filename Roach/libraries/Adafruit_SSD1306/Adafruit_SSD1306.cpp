@@ -102,7 +102,7 @@
     @note   Call the object's begin() function before use -- buffer
             allocation is performed there!
 */
-Adafruit_SSD1306::Adafruit_SSD1306(uint8_t w, uint8_t h int8_t rst_pin)
+Adafruit_SSD1306::Adafruit_SSD1306(uint8_t w, uint8_t h, int8_t rst_pin)
     : Adafruit_GFX(w, h), buffer(NULL), rstPin(rst_pin)
 {
 }
@@ -148,7 +148,7 @@ void Adafruit_SSD1306::ssd1306_command1(uint8_t c) {
     @note
 */
 void Adafruit_SSD1306::ssd1306_commandList(const uint8_t *c, uint8_t n) {
-  nbtwi_writec(i2caddr, 0, c, n);
+  nbtwi_writec(i2caddr, 0, (uint8_t*)c, n);
 }
 
 // A public version of ssd1306_command1(), for existing user code that
