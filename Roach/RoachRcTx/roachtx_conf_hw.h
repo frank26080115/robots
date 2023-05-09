@@ -30,6 +30,6 @@
 #define ROACHHW_PIN_FEM_TX  2
 #define ROACHHW_PIN_FEM_RX  0
 
-#define SCREEN_ADDRESS 0x3D
+#define SCREEN_ADDRESS 0x3C
 
 #endif

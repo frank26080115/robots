@@ -1,4 +1,5 @@
 #include "roachtx_conf.h"
+#include <Adafruit_TinyUSB.h>
 #include <RoachLib.h>
 #include <nRF52RcRadio.h>
 #include <RoachPot.h>
@@ -16,6 +17,7 @@
 #include "Adafruit_SPIFlash.h"
 #endif
 
+#include <AsyncAdc.h>
 #include <nRF5Rand.h>
 #include <NonBlockingTwi.h>
 #include "MenuClass.h"
@@ -84,14 +86,20 @@ void setup(void)
     RoachButton_allBegin();
     RoachPot_allBegin();
     RoachEnc_begin(ROACHHW_PIN_ENC_A, ROACHHW_PIN_ENC_B);
-    gui_init();
+    nbtwi_init(ROACHHW_PIN_I2C_SCL, ROACHHW_PIN_I2C_SDA);
     Serial.println("\r\nRoach RC Transmitter - Hello World!");
-}
 
-void loop(void)
-{
     switches_getFlags(); // this call here will get the initial switch states and check if they are safe
 
+    // seems like the OLED needs a bit more time to power up
+    while (millis() <= 500)
+    {
+        ctrler_tasks();
+    }
+
+    Serial.println("OLED init start");
+
+    gui_init();
     // show splash screen for a short time, user can exit with a button
     // this will also ensure that the RNG buffer fills up
     while (millis() <= 3000)
@@ -104,11 +112,11 @@ void loop(void)
     RoachButton_clearAll();
 
     Serial.println("splash screen ended, entering menu system loop");
+}
 
+void loop(void)
+{
     menu_run(); // the menu's run loop will execute other tasks, such as ctrler_task
-
-    Serial.printf("ERROR[%u]: menu loop has exited\r\n", millis());
-    // the code should not actually reach this point
 }
 
 void radio_init(void)
@@ -194,12 +202,14 @@ void ctrler_buildPkt(void)
 
 void ctrler_pktDebug(void)
 {
+    return;
     static uint32_t last_time = 0;
     uint32_t now = millis();
     if ((now - last_time) >= 1000)
     {
         last_time = now;
         Serial.printf("TX[%u]:  %d , %d , %d , %d , 0x%08X\r\n"
+            , now
             , tx_pkt.throttle
             , tx_pkt.steering
             , tx_pkt.pot_weap

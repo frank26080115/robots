@@ -113,8 +113,7 @@ public:
 
   ~Adafruit_SSD1306(void);
 
-  bool begin(uint8_t switchvcc = SSD1306_SWITCHCAPVCC, uint8_t i2caddr = 0,
-             bool reset = true, bool periphBegin = true);
+  bool begin(uint8_t switchvcc = SSD1306_SWITCHCAPVCC, uint8_t i2caddr = 0, bool reset = true);
   void display(void);
   void clearDisplay(void);
   void invertDisplay(bool i);

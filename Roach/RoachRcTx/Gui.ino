@@ -4,8 +4,11 @@ uint32_t gui_last_draw_time = 0;
 
 void gui_init(void)
 {
-    nbtwi_init(ROACHHW_PIN_I2C_SCL, ROACHHW_PIN_I2C_SDA);
     oled.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+    oled.setRotation(0);
+    oled.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    oled.setCursor(0, 0);
+    oled.setTextWrap(false);
     gui_drawSplash();
     menu_setup();
 }
@@ -20,9 +23,8 @@ extern const uint8_t splash[];
 void gui_drawSplash(void)
 {
     oled.clearDisplay();
-    oled.drawBitmap(0, 0, splash, SCREEN_WIDTH, SCREEN_HEIGHT, 1);
-    oled.display();
-    //gui_drawNow();
+    oled.drawBitmap(0, 0, splash, SCREEN_WIDTH, SCREEN_HEIGHT, SSD1306_WHITE);
+    gui_drawNow();
 }
 
 bool gui_canDisplay(void)

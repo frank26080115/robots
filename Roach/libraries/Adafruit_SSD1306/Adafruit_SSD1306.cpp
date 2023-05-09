@@ -148,6 +148,9 @@ void Adafruit_SSD1306::ssd1306_command1(uint8_t c) {
     @note
 */
 void Adafruit_SSD1306::ssd1306_commandList(const uint8_t *c, uint8_t n) {
+  //for (int i = 0; i < n; i++) {
+  //    ssd1306_command1(c[i]);
+  //}
   nbtwi_writec(i2caddr, 0, (uint8_t*)c, n);
 }
 
@@ -190,22 +193,12 @@ void Adafruit_SSD1306::ssd1306_command(uint8_t c) {
             on the first display being initialized, false on all others,
             else the already-initialized displays would be reset. Default if
             unspecified is true.
-    @param  periphBegin
-            If true, and if a hardware peripheral is being used (I2C or SPI,
-            but not software SPI), call that peripheral's begin() function,
-            else (false) it has already been done in one's sketch code.
-            Cases where false might be used include multiple displays or
-            other devices sharing a common bus, or situations on some
-            platforms where a nonstandard begin() function is available
-            (e.g. a TwoWire interface on non-default pins, as can be done
-            on the ESP8266 and perhaps others).
     @return true on successful allocation/init, false otherwise.
             Well-behaved code should check the return value before
             proceeding.
     @note   MUST call this function before any drawing or updates!
 */
-bool Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, bool reset,
-                             bool periphBegin) {
+bool Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, bool reset) {
 
   if ((!buffer) && !(buffer = (uint8_t *)malloc(WIDTH * ((HEIGHT + 7) / 8))))
     return false;
@@ -241,31 +234,31 @@ bool Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, bool reset,
   TRANSACTION_START
 
   // Init sequence
-  static const uint8_t PROGMEM init1[] = {SSD1306_DISPLAYOFF,         // 0xAE
+  static const uint8_t init1[] = {SSD1306_DISPLAYOFF,         // 0xAE
                                           SSD1306_SETDISPLAYCLOCKDIV, // 0xD5
                                           0x80, // the suggested ratio 0x80
                                           SSD1306_SETMULTIPLEX}; // 0xA8
   ssd1306_commandList(init1, sizeof(init1));
-  nbtwi_wait();
+  nbtwi_transfer();
   ssd1306_command1(HEIGHT - 1);
-  nbtwi_wait();
+  nbtwi_transfer();
 
-  static const uint8_t PROGMEM init2[] = {SSD1306_SETDISPLAYOFFSET, // 0xD3
+  static const uint8_t init2[] = {SSD1306_SETDISPLAYOFFSET, // 0xD3
                                           0x0,                      // no offset
                                           SSD1306_SETSTARTLINE | 0x0, // line #0
                                           SSD1306_CHARGEPUMP};        // 0x8D
   ssd1306_commandList(init2, sizeof(init2));
-  nbtwi_wait();
+  nbtwi_transfer();
 
   ssd1306_command1((vccstate == SSD1306_EXTERNALVCC) ? 0x10 : 0x14);
-  nbtwi_wait();
+  nbtwi_transfer();
 
-  static const uint8_t PROGMEM init3[] = {SSD1306_MEMORYMODE, // 0x20
-                                          0x00, // 0x0 act like ks0108
+  static const uint8_t init3[] = {SSD1306_MEMORYMODE, // 0x20
+                                          0x0, // 0x0 act like ks0108
                                           SSD1306_SEGREMAP | 0x1,
                                           SSD1306_COMSCANDEC};
   ssd1306_commandList(init3, sizeof(init3));
-  nbtwi_wait();
+  nbtwi_transfer();
 
   uint8_t comPins = 0x02;
   contrast = 0x8F;
@@ -287,11 +280,11 @@ bool Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, bool reset,
   ssd1306_command1(comPins);
   ssd1306_command1(SSD1306_SETCONTRAST);
   ssd1306_command1(contrast);
-  nbtwi_wait();
+  nbtwi_transfer();
 
   ssd1306_command1(SSD1306_SETPRECHARGE); // 0xd9
   ssd1306_command1((vccstate == SSD1306_EXTERNALVCC) ? 0x22 : 0xF1);
-  nbtwi_wait();
+  nbtwi_transfer();
   static const uint8_t PROGMEM init5[] = {
       SSD1306_SETVCOMDETECT, // 0xDB
       0x40,
@@ -300,7 +293,7 @@ bool Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, bool reset,
       SSD1306_DEACTIVATE_SCROLL,
       SSD1306_DISPLAYON}; // Main screen turn on
   ssd1306_commandList(init5, sizeof(init5));
-  nbtwi_wait();
+  nbtwi_transfer();
 
   TRANSACTION_END
 

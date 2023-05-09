@@ -15,6 +15,7 @@ void nbtwi_task(void);
 bool nbtwi_isBusy(void);
 bool nbtwi_hasError(bool);
 void nbtwi_wait(void);
+void nbtwi_transfer(void);
 
 #ifdef __cplusplus
 }

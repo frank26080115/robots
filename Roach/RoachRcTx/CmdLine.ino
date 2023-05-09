@@ -4,6 +4,7 @@ const cmd_def_t cmds[] = {
     { "mem"         , memcheck_func },
     { "reboot"      , reboot_func },
     { "debug"       , debug_func },
+    { "initgfx"     , initgfx_func },
     { "conttx"      , conttx_func },
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
@@ -92,4 +93,10 @@ void fakebtn_func(void* cmd, char* argstr, Stream* stream)
     if (memcmp("6", argstr, 1) == 0) {
         btn_g6.fakePress();
     }
+}
+
+void initgfx_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("init gui\r\n");
+    gui_init();
 }

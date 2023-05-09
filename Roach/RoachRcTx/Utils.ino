@@ -10,14 +10,25 @@ uint32_t getFreeRam(void)
 
     // current position of the stack.
     stackTop = (uint32_t) &stackTop;
+    stackTop &= 0xFFFFFF;
 
     // current position of heap.
     void* hTop = malloc(1);
+    if (hTop == NULL) {
+        return 0;
+    }
     heapTop = (uint32_t) hTop;
     free(hTop);
+    heapTop &= 0xFFFFFF;
 
     // The difference is the free, available ram.
-    uint32_t x = (stackTop - heapTop);// - current_stack_depth();
+    uint32_t x;
+    if (stackTop > heapTop) {
+        x = (stackTop - heapTop);// - current_stack_depth();
+    }
+    else {
+        x = 256000 - heapTop;
+    }
     minimum_ram = x < minimum_ram ? x : minimum_ram;
     return x;
 }
