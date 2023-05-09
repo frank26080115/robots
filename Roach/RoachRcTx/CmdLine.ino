@@ -2,14 +2,18 @@ const cmd_def_t cmds[] = {
     { "factoryreset", factory_reset_func},
     { "echo"        , echo_func },
     { "mem"         , memcheck_func },
+    { "perf"        , perfcheck_func },
     { "reboot"      , reboot_func },
     { "debug"       , debug_func },
-    { "initgfx"     , initgfx_func },
     { "conttx"      , conttx_func },
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
     { "save"        , save_func },
     { "fakebtn"     , fakebtn_func },
+    { "fakepott"    , fakepott_func },
+    { "fakepots"    , fakepots_func },
+    { "fakepotw"    , fakepotw_func },
+    { "fakeenc"     , fakeenc_func },
     { "", NULL }, // end of table
 };
 
@@ -40,10 +44,14 @@ void reboot_func(void* cmd, char* argstr, Stream* stream)
     NVIC_SystemReset();
 }
 
-extern uint32_t minimum_ram;
 void memcheck_func(void* cmd, char* argstr, Stream* stream)
 {
-    stream->printf("free mem: %u , min: %u\r\n", getFreeRam(), minimum_ram);
+    stream->printf("free mem: %u\r\n", PerfCnt_ram());
+}
+
+void perfcheck_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("perf: %u / sec\r\n", PerfCnt_get());
 }
 
 void debug_func(void* cmd, char* argstr, Stream* stream)
@@ -72,31 +80,79 @@ void readrf_func(void* cmd, char* argstr, Stream* stream)
 
 void fakebtn_func(void* cmd, char* argstr, Stream* stream)
 {
+    bool done = false;
     if (memcmp("up", argstr, 1) == 0) {
         btn_up.fakePress();
+        done = true;
     }
     if (memcmp("down", argstr, 1) == 0) {
         btn_down.fakePress();
+        done = true;
     }
     if (memcmp("left", argstr, 1) == 0) {
         btn_left.fakePress();
+        done = true;
     }
     if (memcmp("right", argstr, 1) == 0) {
         btn_right.fakePress();
+        done = true;
     }
     if (memcmp("center", argstr, 1) == 0) {
         btn_center.fakePress();
+        done = true;
     }
     if (memcmp("5", argstr, 1) == 0) {
         btn_g5.fakePress();
+        done = true;
     }
     if (memcmp("6", argstr, 1) == 0) {
         btn_g6.fakePress();
+        done = true;
+    }
+    if (memcmp("1", argstr, 1) == 0) {
+        btn_sw1.fakeToggle();
+        done = true;
+    }
+    if (memcmp("2", argstr, 1) == 0) {
+        btn_sw2.fakeToggle();
+        done = true;
+    }
+    if (memcmp("3", argstr, 1) == 0) {
+        btn_sw3.fakeToggle();
+        done = true;
+    }
+    if (done) {
+        stream->printf("fake btn press %s\r\n", argstr);
+    }
+    else {
+        stream->printf("fake btn %s error: not found\r\n", argstr);
     }
 }
 
-void initgfx_func(void* cmd, char* argstr, Stream* stream)
+void fakepots_func(void* cmd, char* argstr, Stream* stream)
 {
-    stream->printf("init gui\r\n");
-    gui_init();
+    int x = atoi(argstr);
+    pot_steering.simulate(x);
+    stream->printf("fake steering %d\r\n", x);
+}
+
+void fakepott_func(void* cmd, char* argstr, Stream* stream)
+{
+    int x = atoi(argstr);
+    pot_throttle.simulate(x);
+    stream->printf("fake throttle %d\r\n", x);
+}
+
+void fakepotw_func(void* cmd, char* argstr, Stream* stream)
+{
+    int x = atoi(argstr);
+    pot_weapon.simulate(x);
+    stream->printf("fake weapon %d\r\n", x);
+}
+
+void fakeenc_func(void* cmd, char* argstr, Stream* stream)
+{
+    int x = atoi(argstr);
+    RoachEnc_simulate(x);
+    stream->printf("fake encoder %d\r\n", x);
 }

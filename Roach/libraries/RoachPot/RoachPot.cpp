@@ -57,6 +57,11 @@ void RoachPot::task(void)
         return;
     }
     has_new = true;
+
+    if (simulate_val != 0) {
+        simulate_val -= 1 * ((simulate_val > 0) ? 1 : (simulate_val < 0 ? -1 : 0));
+    }
+
     int32_t x32 = x;
     last_adc_raw = x32;
     if (cfg->filter != 0)
@@ -154,7 +159,7 @@ void RoachPot_allBegin(void)
 
 int16_t RoachPot::get(void)
 {
-    return last_val;
+    return last_val + simulate_val;
 }
 
 int16_t RoachPot::getAdcFiltered(void)
@@ -187,4 +192,9 @@ void RoachPot::calib_stop(void)
 {
     state_machine = ROACHPOT_SM_NORMAL;
     calib_done = true;
+}
+
+void RoachPot::simulate(int x)
+{
+    simulate_val = x;
 }

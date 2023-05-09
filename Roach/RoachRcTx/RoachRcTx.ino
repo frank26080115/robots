@@ -7,6 +7,7 @@
 #include <RoachRotaryEncoder.h>
 #include <RoachCmdLine.h>
 #include <RoachUsbMsd.h>
+#include <RoachPerfCnt.h>
 #if defined(ESP32)
 #include <SPIFFS.h>
 #elif defined(NRF52840_XXAA)
@@ -14,7 +15,7 @@
 #include <InternalFileSystem.h>
 #include <SPI.h>
 #include <SdFat.h>
-#include "Adafruit_SPIFlash.h"
+#include <Adafruit_SPIFlash.h>
 #endif
 
 #include <AsyncAdc.h>
@@ -87,6 +88,7 @@ void setup(void)
     RoachPot_allBegin();
     RoachEnc_begin(ROACHHW_PIN_ENC_A, ROACHHW_PIN_ENC_B);
     nbtwi_init(ROACHHW_PIN_I2C_SCL, ROACHHW_PIN_I2C_SDA);
+    PerfCnt_init();
     Serial.println("\r\nRoach RC Transmitter - Hello World!");
 
     switches_getFlags(); // this call here will get the initial switch states and check if they are safe
@@ -127,7 +129,7 @@ void radio_init(void)
 void ctrler_tasks(void)
 {
     //uint32_t now = millis();
-    getFreeRam(); // since ctrler_tasks is called from deeper menus, getting the free heap RAM here is a good idea
+    PerfCnt_task();
     RoachPot_allTask(); // polls ADCs non-blocking
     // TODO: buttons are using interrupts only, no tasks, but check reliability
     nbtwi_task(); // send any queued data to OLED

@@ -12,6 +12,7 @@ class RoachButton
         uint32_t isHeld(void);
         void disableUntilRelease(void);
         void fakePress(void);
+        void fakeToggle(void);
         void handleIsr(void);
     private:
         int _pin;
@@ -19,6 +20,7 @@ class RoachButton
         int _rep, _db;
         volatile bool _pressed;
         bool _disabled = false;
+        bool _faketoggle = false;
 };
 
 void RoachButton_allBegin(void);

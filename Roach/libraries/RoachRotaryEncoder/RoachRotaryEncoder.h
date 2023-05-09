@@ -17,5 +17,6 @@ void RoachEnc_begin(int pin_a, int pin_b);
 int32_t RoachEnc_get(bool clr);
 bool RoachEnc_hasMoved(bool clr);
 uint32_t RoachEnc_getLastTime(void);
+void RoachEnc_simulate(int x);
 
 #endif

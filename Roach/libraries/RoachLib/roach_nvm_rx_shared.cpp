@@ -42,6 +42,12 @@ roach_nvm_gui_desc_t cfggroup_weap[] = {
     { ((uint32_t)(&(nvm_rx.pid_spindown.accumulator_limit)) - (uint32_t)(&nvm_rx)), "SD i lim"  , "s16",         INT_MAX,       0, INT_MAX  ,   1, },
     { ((uint32_t)(&(nvm_rx.pid_spindown.accumulator_decay)) - (uint32_t)(&nvm_rx)), "SD i decay", "s16",               0,       0, INT_MAX  ,   1, },
     { ((uint32_t)(&(nvm_rx.spindown_limit)) - (uint32_t)(&nvm_rx)), "SD limit", "s16",                               200,       0, INT_MAX  ,   1, },
+    //{ ((uint32_t)(&(nvm_rx.weapon2.center    )) - (uint32_t)(&nvm_rx)), "W2 center"  , "s16"    ,        ROACH_SERVO_MIN,                   ROACH_SERVO_MIN,                   ROACH_SERVO_MAX, 1, },
+    //{ ((uint32_t)(&(nvm_rx.weapon2.deadzone  )) - (uint32_t)(&nvm_rx)), "W2 deadzone", "s16"    ,        ROACH_ADC_NOISE,                                 0,                   ROACH_SERVO_OVR, 1, },
+    //{ ((uint32_t)(&(nvm_rx.weapon2.trim      )) - (uint32_t)(&nvm_rx)), "W2 trim"    , "s32"    ,                      0,                                 0,                   ROACH_SERVO_OVR, 1, },
+    //{ ((uint32_t)(&(nvm_rx.weapon2.scale     )) - (uint32_t)(&nvm_rx)), "W2 scale"   , "s16x10" , ROACH_SCALE_MULTIPLIER,                                 0,                           INT_MAX, 1, },
+    //{ ((uint32_t)(&(nvm_rx.weapon2.limit_min )) - (uint32_t)(&nvm_rx)), "W2 lim min" , "s16"    ,        ROACH_SERVO_MIN, ROACH_SERVO_MIN - ROACH_SERVO_OVR,                   ROACH_SERVO_MID, 1, },
+    //{ ((uint32_t)(&(nvm_rx.weapon2.limit_max )) - (uint32_t)(&nvm_rx)), "W2 lim max" , "s16"    ,        ROACH_SERVO_MAX,                   ROACH_SERVO_MID, ROACH_SERVO_MAX + ROACH_SERVO_OVR, 1, },
     ROACH_NVM_GUI_DESC_END,
 };
 

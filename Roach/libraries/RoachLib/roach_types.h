@@ -119,6 +119,7 @@ typedef struct
     roach_nvm_servo_t drive_right;
     bool              drive_right_flip;
     roach_nvm_servo_t weapon;
+    //roach_nvm_servo_t weapon2;
 
     roach_nvm_pid_t pid_heading;
     roach_nvm_pid_t pid_spindown;

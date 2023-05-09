@@ -205,3 +205,9 @@ uint32_t RoachEnc_getLastTime(void)
 {
     return enc_time;
 }
+
+void RoachEnc_simulate(int x)
+{
+    enc_cnt += x;
+    enc_moved = true;
+}

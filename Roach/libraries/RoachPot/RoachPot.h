@@ -25,6 +25,7 @@ class RoachPot
         void calib_center(void);
         void calib_limits(void);
         void calib_stop(void);
+        void simulate(int x);
         bool has_new;
         bool calib_done;
         roach_nvm_pot_t* cfg;
@@ -36,6 +37,7 @@ class RoachPot
         int32_t last_adc, last_val, last_adc_raw;
         int32_t last_adc_filter;
         int32_t calib_sum, calib_cnt;
+        int32_t simulate_val;
 };
 
 void RoachPot_allTask(void);

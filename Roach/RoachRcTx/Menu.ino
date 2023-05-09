@@ -154,9 +154,11 @@ class RoachMenuInfo : public RoachMenu
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             oled.printf("dsk free %d kb", _freeSpace);
+            #ifdef PERFCNT_ENABLED
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("RAM free %d b", minimum_ram);
+            oled.printf("RAM free %d b", PerfCnt_ram());
+            #endif
         };
 
     protected:

@@ -125,7 +125,7 @@ uint32_t RoachButton::isHeld(void)
     }
 
     uint32_t d = 0;
-    if (digitalRead(_pin) != LOW)
+    if (digitalRead(_pin) != LOW && _faketoggle == false)
     {
         return 0;
     }
@@ -145,6 +145,15 @@ void RoachButton::disableUntilRelease(void)
 void RoachButton::fakePress(void)
 {
     _pressed = true;
+}
+
+void RoachButton::fakeToggle(void)
+{
+    _faketoggle = !_faketoggle;
+    if (_faketoggle) {
+        _pressed = true;
+        _last_down_time = millis();
+    }
 }
 
 void RoachButton_clearAll(void)
