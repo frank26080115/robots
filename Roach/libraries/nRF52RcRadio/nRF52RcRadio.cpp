@@ -161,6 +161,14 @@ void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt, int fem
 
     _fem_tx = fem_tx;
     _fem_rx = fem_rx;
+    if (_fem_tx >= 0) {
+        pinMode     (_fem_tx, OUTPUT);
+        digitalWrite(_fem_tx, LOW);
+    }
+    if (_fem_rx >= 0) {
+        pinMode     (_fem_rx, OUTPUT);
+        digitalWrite(_fem_rx, LOW);
+    }
 
     set_chan_map(chan_map);
 
@@ -687,6 +695,13 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                 _connected = false;
             }
 
+            if (_fem_tx >= 0) {
+                digitalWrite(_fem_tx, HIGH);
+            }
+            if (_fem_rx >= 0) {
+                digitalWrite(_fem_rx, LOW);
+            }
+
             // Maybe set the AES CCA module for the correct encryption mode
             if (_encrypting) {
                 NRF_CCM->MODE = (CCM_MODE_MODE_Encryption << CCM_MODE_MODE_Pos); // Encrypt
@@ -714,6 +729,9 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                 #ifdef NRFRR_DEBUG_PINS
                 digitalWrite(NRFRR_DEBUG_PIN_TX, LOW);
                 #endif
+                if (_fem_tx >= 0) {
+                    digitalWrite(_fem_tx, LOW);
+                }
 
                 if (_is_tx)
                 {
@@ -737,6 +755,13 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
         case NRFRR_SM_RX_START:
             if (NRF_RADIO->STATE == NRF_RADIO_STATE_DISABLED)
             {
+                if (_fem_tx >= 0) {
+                    digitalWrite(_fem_tx, LOW);
+                }
+                if (_fem_rx >= 0) {
+                    digitalWrite(_fem_rx, HIGH);
+                }
+
                 NRF_RADIO->EVENTS_DISABLED = 0;
                 NRF_RADIO->EVENTS_END = 0;
                 // Maybe set the AES CCA module for the correct encryption mode
@@ -935,7 +960,16 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             _statemachine = NRFRR_SM_HALT_WAIT;
             _sm_time = now;
             break;
-         case NRFRR_SM_CONT_TX:
+        case NRFRR_SM_HALT_WAIT:
+            if (NRF_RADIO->STATE == NRF_RADIO_STATE_DISABLED)
+            {
+                _statemachine = NRFRR_SM_HALTED;
+                _sm_time = now;
+            }
+            break;
+        case NRFRR_SM_HALTED:
+            break;
+        case NRFRR_SM_CONT_TX:
             {
                 if (NRF_RADIO->STATE != RADIO_STATE_STATE_Tx && NRF_RADIO->STATE != RADIO_STATE_STATE_TxRu && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle)
                 {
@@ -956,7 +990,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
 
 bool nRF52RcRadio::is_busy(void)
 {
-    if (_statemachine == NRFRR_SM_TX_WAIT) {
+    if (_statemachine == NRFRR_SM_TX_WAIT || _statemachine == NRFRR_SM_CONT_TX || _statemachine == NRFRR_SM_HALTED) {
         return true;
     }
     if (_statemachine == NRFRR_SM_RX) {

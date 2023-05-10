@@ -62,18 +62,39 @@ void gui_drawNow(void)
 
 void showError(const char* s)
 {
-    nbtwi_wait();
+    btns_disableAll();
     oled.clearDisplay();
     oled.setCursor(0, 0);
     oled.print("ERROR:");
     oled.setCursor(0, ROACHGUI_LINE_HEIGHT);
     oled.print(s);
     oled.display();
-    nbtwi_wait();
     uint32_t t = millis();
     while ((millis() - t) < ROACHGUI_ERROR_SHOW_TIME) {
         yield();
         ctrler_tasks();
+        if (btns_hasAnyPressed()) {
+            break;
+        }
+    }
+}
+
+void showMessage(const char* s1, const char* s2)
+{
+    btns_disableAll();
+    oled.clearDisplay();
+    oled.setCursor(0, 0);
+    oled.print(s1);
+    oled.setCursor(0, ROACHGUI_LINE_HEIGHT);
+    oled.print(s2);
+    oled.display();
+    uint32_t t = millis();
+    while ((millis() - t) < ROACHGUI_ERROR_SHOW_TIME) {
+        yield();
+        ctrler_tasks();
+        if (btns_hasAnyPressed()) {
+            break;
+        }
     }
 }
 

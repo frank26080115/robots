@@ -74,7 +74,7 @@ void settings_saveIfNeeded(uint32_t span)
     if (nvm_dirty > 0)
     {
         uint32_t now = millis();
-        if ((now - nvm_dirty) >= span)
+        if ((now - nvm_dirty) >= span && RoachUsbMsd_canSave())
         {
             Serial.printf("[%u]:autosaving startup file\r\n", millis());
             settings_save();

@@ -73,3 +73,13 @@ uint8_t switches_getFlags(void)
     }
     return f;
 }
+
+void waitFor(uint32_t x)
+{
+    uint32_t tstart = millis();
+    while ((millis() - tstart) < x)
+    {
+        yield();
+        ctrler_tasks();
+    }
+}

@@ -5,6 +5,8 @@ const cmd_def_t cmds[] = {
     { "perf"        , perfcheck_func },
     { "reboot"      , reboot_func },
     { "debug"       , debug_func },
+    { "usbmsd"      , usbmsd_func },
+    { "unusbmsd"    , unusbmsd_func },
     { "conttx"      , conttx_func },
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
@@ -42,6 +44,20 @@ void reboot_func(void* cmd, char* argstr, Stream* stream)
     stream->println("rebooting...\r\n\r\n");
     delay(100);
     NVIC_SystemReset();
+}
+
+void usbmsd_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("presenting USB MSD\r\n");
+    waitFor(300);
+    RoachUsbMsd_presentUsbMsd();
+}
+
+void unusbmsd_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("disconnecting USB MSD\r\n");
+    waitFor(300);
+    RoachUsbMsd_unpresent();
 }
 
 void memcheck_func(void* cmd, char* argstr, Stream* stream)

@@ -253,6 +253,40 @@ class QuickActionSaveStartup : public QuickAction
         };
 };
 
+class QuickActionUsbMsd : public QuickAction
+{
+    public:
+        QuickActionUsbMsd(void) : QuickAction("USB MSD", &btn_right)
+        {
+        };
+
+    protected:
+        int y, w;
+        virtual void action(void)
+        {
+            RoachUsbMsd_presentUsbMsd();
+            oled.setCursor(0, ROACHGUI_LINE_HEIGHT);
+            oled.print("done");
+            gui_drawNow();
+            while (btns_isAnyHeld()) {
+                ctrler_tasks();
+            }
+        };
+
+        virtual void draw_barOutline(void)
+        {
+            y = (SCREEN_HEIGHT / 2) - 4;
+            w = SCREEN_WIDTH;
+            oled.drawRect(0, y, w, 8, 1);
+        };
+
+        virtual void draw_barFill(void)
+        {
+            int x = map(t, 0, QUICKACTION_HOLD_TIME, 0, w);
+            oled.fillRect(0, y, x, 8, 1);
+        };
+};
+
 void QuickAction_check(uint8_t btn)
 {
     switch (btn)
@@ -280,13 +314,27 @@ void QuickAction_check(uint8_t btn)
         }
         case BTNID_RIGHT:
         {
-            #ifdef ROACHTX_AUTOSAVE
-            QuickActionCalibLimits* q = new QuickActionCalibLimits();
-            #else
-            QuickActionSaveStartup* q = new QuickActionSaveStartup();
+            #ifndef ROACHTX_AUTOSAVE
+            if (RoachUsbMsd_canSave())
+            {
+                QuickActionSaveStartup* q = new QuickActionSaveStartup();
+                q->run();
+                delete q;
+            }
+            else
             #endif
-            q->run();
-            delete q;
+            if (RoachUsbMsd_hasVbus() && RoachUsbMsd_isUsbPresented() == false)
+            {
+                QuickActionUsbMsd* q = new QuickActionUsbMsd();
+                q->run();
+                delete q;
+            }
+            else
+            {
+                QuickActionCalibLimits* q = new QuickActionCalibLimits();
+                q->run();
+                delete q;
+            }
             break;
         }
         case BTNID_CENTER:

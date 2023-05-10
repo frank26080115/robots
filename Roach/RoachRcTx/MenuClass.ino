@@ -481,7 +481,12 @@ char* RoachMenuCfgLister::getItemText(int idx)
 
 void RoachMenuCfgLister::draw_sidebar(void)
 {
-    drawSideBar("EXIT", "SAVE", true);
+    if (RoachUsbMsd_canSave()) {
+        drawSideBar("EXIT", "SAVE", true);
+    }
+    else {
+        drawSideBar("EXIT", "", true);
+    }
 }
 
 void RoachMenuCfgLister::draw_title(void)
@@ -505,9 +510,14 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
                 break;
             case BTNID_G5:
                 {
-                    RoachMenuFileSaveList* n = new RoachMenuFileSaveList(_filter);
-                    n->run();
-                    delete n;
+                    if (RoachUsbMsd_canSave()) {
+                        RoachMenuFileSaveList* n = new RoachMenuFileSaveList(_filter);
+                        n->run();
+                        delete n;
+                    }
+                    else {
+                        showError("cannot save");
+                    }
                 }
                 break;
         }

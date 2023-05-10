@@ -48,6 +48,7 @@ void RoachMenuFileOpenList::onButton(uint8_t btn)
                        )
                     {
                         settings_loadFile(x);
+                        showMessage("file loaded from", x);
                     }
                     else {
                         showError("invalid file name");
@@ -73,7 +74,12 @@ RoachMenuFileSaveList::RoachMenuFileSaveList(const char* filter) : RoachMenuList
 
 void RoachMenuFileSaveList::draw_sidebar(void)
 {
-    drawSideBar("EXIT", "SAVE", true);
+    if (RoachUsbMsd_canSave()) {
+        drawSideBar("EXIT", "SAVE", true);
+    }
+    else {
+        drawSideBar("EXIT", "", true);
+    }
 }
 
 void RoachMenuFileSaveList::draw_title(void)
@@ -89,11 +95,21 @@ void RoachMenuFileSaveList::draw_title(void)
 void RoachMenuFileSaveList::onEnter(void)
 {
     RoachMenuLister::onEnter();
-    RoachMenuFileItem* n = new RoachMenuFileItem("NEW FILE");
-    _head_node = (RoachMenuListItem*)n;
-    _tail_node = (RoachMenuListItem*)n;
-    _list_cnt++;
-    buildFileList(_filter[0] != 0 ? _filter : NULL);
+    if (RoachUsbMsd_canSave())
+    {
+        RoachMenuFileItem* n = new RoachMenuFileItem("NEW FILE");
+        _head_node = (RoachMenuListItem*)n;
+        _tail_node = (RoachMenuListItem*)n;
+        _list_cnt++;
+        buildFileList(_filter[0] != 0 ? _filter : NULL);
+    }
+    else
+    {
+        RoachMenuFileItem* n = new RoachMenuFileItem("ERR: cannot save");
+        _head_node = (RoachMenuListItem*)n;
+        _tail_node = (RoachMenuListItem*)n;
+        _list_cnt++;
+    }
 }
 
 void RoachMenuFileSaveList::onButton(uint8_t btn)
@@ -105,6 +121,10 @@ void RoachMenuFileSaveList::onButton(uint8_t btn)
         {
             case BTNID_G5:
             {
+                if (RoachUsbMsd_canSave() == false) {
+                    showError("cannot save");
+                    break;
+                }
                 char* x = getCurItemText();
                 if (x != NULL)
                 {
@@ -130,6 +150,7 @@ void RoachMenuFileSaveList::onButton(uint8_t btn)
                         if (can_save)
                         {
                             settings_saveToFile(_newfilename);
+                            showMessage("new file saved to", _newfilename);
                         }
                         else
                         {
@@ -138,6 +159,7 @@ void RoachMenuFileSaveList::onButton(uint8_t btn)
                     }
                     else if (memcmp(x, "ctrler", 6) == 0 || memcmp(x, "robot", 5) == 0) {
                         settings_saveToFile(x);
+                        showMessage("file saved to", x);
                     }
                     else {
                         showError("invalid file name");

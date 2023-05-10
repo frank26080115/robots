@@ -276,6 +276,43 @@ class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
         };
 };
 
+class RoachMenuFuncUsbMsd : public RoachMenuFunctionItem
+{
+    public:
+        RoachMenuFuncUsbMsd(void) : RoachMenuFunctionItem("USB MSD")
+        {
+        };
+
+    protected:
+        virtual void onEnter(void)
+        {
+            RoachMenu::onEnter();
+            if (RoachUsbMsd_hasVbus() && RoachUsbMsd_isUsbPresented() == false)
+            {
+                RoachUsbMsd_presentUsbMsd();
+                showMessage("USB MSD", "connecting");
+            }
+            else
+            {
+                showError("unable USB conn");
+            }
+            _exit = EXITCODE_BACK;
+        };
+
+        virtual void onButton(uint8_t btn)
+        {
+            RoachMenuFunctionItem::onButton(btn);
+            switch (btn)
+            {
+                case BTNID_G6:
+                    _exit = EXITCODE_BACK;
+                    break;
+                case BTNID_G5:
+                    break;
+            }
+        };
+};
+
 class RoachMenuCalibSync : public RoachMenuLister
 {
     public:
@@ -286,6 +323,7 @@ class RoachMenuCalibSync : public RoachMenuLister
             addNode((RoachMenuListItem*)(new RoachMenuFuncCalibAdcLimits()));
             addNode((RoachMenuListItem*)(new RoachMenuFuncSyncDownload()));
             addNode((RoachMenuListItem*)(new RoachMenuFuncSyncUpload()));
+            addNode((RoachMenuListItem*)(new RoachMenuFuncUsbMsd()));
             //addNode((RoachMenuListItem*)(new RoachMenuFuncFactoryReset()));
         };
 
