@@ -55,7 +55,7 @@ typedef struct
     uint16_t heading;
     uint16_t battery;
     uint8_t  temperature;
-    int16_t  rssi;
+    int8_t   rssi;
     int16_t  loss_rate;
 }
 PACK_STRUCT

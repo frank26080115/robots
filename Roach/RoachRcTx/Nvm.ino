@@ -64,9 +64,9 @@ void settings_factoryReset(void)
     roachnvm_setdefaults((uint8_t*)&nvm_rx, cfggroup_imu);
 }
 
-void settings_save(void)
+bool settings_save(void)
 {
-    settings_saveToFile(ROACH_STARTUP_FILE_NAME);
+    return settings_saveToFile(ROACH_STARTUP_FILE_NAME);
 }
 
 void settings_saveIfNeeded(uint32_t span)
@@ -83,7 +83,7 @@ void settings_saveIfNeeded(uint32_t span)
     }
 }
 
-void settings_loadFile(const char* fname)
+bool settings_loadFile(const char* fname)
 {
     RoachFile f;
     bool suc = f.open(fname);
@@ -117,10 +117,12 @@ void settings_loadFile(const char* fname)
             settings_markDirty();
         }
         #endif
+        return true;
     }
+    return false;
 }
 
-void settings_saveToFile(const char* fname)
+bool settings_saveToFile(const char* fname)
 {
     RoachFile f;
     bool suc = f.open(fname, O_RDWR | O_CREAT);
@@ -148,7 +150,9 @@ void settings_saveToFile(const char* fname)
             roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
         }
         f.close();
+        return true;
     }
+    return false;
 }
 
 void settings_markDirty(void)

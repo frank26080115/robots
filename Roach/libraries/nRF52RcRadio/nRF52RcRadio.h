@@ -89,11 +89,13 @@ class nRF52RcRadio
         void task     (void);                                  // periodic task, call from loop()
         bool state_machine_run(uint32_t t, bool is_isr);       // innards of task(), but can be called from ISR
         int  textAvail(void);                                  // check if text message is available
-        int  textRead (const char* buf);                             // read available text message
-        void textSend (const char* buf);                             // send text message
+        int  textRead (const char* buf);                       // read available text message
+        void textSend (const char* buf);                       // send text message
+        char* textReadPtr(bool clr);
+        bool textIsDone(void);
 
-        inline bool connected(void) { return _connected; };
-        inline int  get_rssi(void)  { return _stat_rx_rssi; };
+        inline bool   connected(void) { return _connected; };
+        inline int8_t get_rssi (void) { return _stat_rx_rssi; };
 
         void pause(void);
         void resume(void);
@@ -157,7 +159,7 @@ class nRF52RcRadio
 
         uint32_t _stat_rx_total;
         uint32_t _stat_rx_good;
-        signed   _stat_rx_rssi;
+        int8_t   _stat_rx_rssi;
         uint32_t _stat_rx_spent_time;
 
         uint32_t _last_rx_time;

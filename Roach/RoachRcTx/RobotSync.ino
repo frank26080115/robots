@@ -98,16 +98,13 @@ void RoSync_task(void)
         case ROSYNC_UPLOAD_START:
         case ROSYNC_UPLOAD:
             {
-                if (rosync_upload_lasttime == 0 || (now - rosync_upload_lasttime) >= 200)
+                if (radio.textIsDone())
                 {
-                    if (rosync_upload_lasttime == 0)
-                    {
-                        rosync_upload_idx = 0;
+                    if (rosync_upload_idx == 0) {
                         rosync_rxitems_cnt = roachnvm_rx_getcnt();
                         rosync_sync_complete = false;
                     }
-                    else
-                    {
+                    else {
                         rosync_upload_idx += 1;
                     }
                     if (rosync_upload_idx >= rosync_rxitems_cnt) {

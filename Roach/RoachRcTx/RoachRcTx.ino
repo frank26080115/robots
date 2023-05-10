@@ -160,6 +160,10 @@ void ctrler_tasks(void)
         {
             radio.textRead(telem_txt);
             Serial.printf("RX-TXT[%u]: %s\r\n", millis(), telem_txt);
+
+            if (memcmp("D ", telem_txt, 2) == 0) {
+                RoSync_decodeDownload(&(telem_txt[2]));
+            }
         }
 
         ctrler_pktDebug();

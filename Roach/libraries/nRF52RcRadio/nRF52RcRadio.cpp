@@ -1319,6 +1319,20 @@ void nRF52RcRadio::textSend(const char* buf)
     }
 }
 
+char* nRF52RcRadio::textReadPtr(bool clr)
+{
+    char* ret = (char*)txt_rx_buffer;
+    if (clr) {
+        txt_flag = false;
+    }
+    return ret;
+}
+
+bool nRF52RcRadio::textIsDone(void)
+{
+    return _text_send_timer <= 0;
+}
+
 void nRF52RcRadio::pause(void)
 {
     if (_statemachine < NRFRR_SM_HALT_START)

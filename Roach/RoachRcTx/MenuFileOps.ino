@@ -149,8 +149,12 @@ void RoachMenuFileSaveList::onButton(uint8_t btn)
                         }
                         if (can_save)
                         {
-                            settings_saveToFile(_newfilename);
-                            showMessage("new file saved to", _newfilename);
+                            if (settings_saveToFile(_newfilename)) {
+                                showMessage("new file saved to", _newfilename);
+                            }
+                            else {
+                                showError("cannot save new file");
+                            }
                         }
                         else
                         {
@@ -158,8 +162,12 @@ void RoachMenuFileSaveList::onButton(uint8_t btn)
                         }
                     }
                     else if (memcmp(x, "ctrler", 6) == 0 || memcmp(x, "robot", 5) == 0) {
-                        settings_saveToFile(x);
-                        showMessage("file saved to", x);
+                        if (settings_saveToFile(x)) {
+                            showMessage("file saved to", x);
+                        }
+                        else {
+                            showError("cannot save file");
+                        }
                     }
                     else {
                         showError("invalid file name");

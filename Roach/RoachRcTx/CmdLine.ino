@@ -24,14 +24,22 @@ RoachCmdLine cmdline(&Serial, (cmd_def_t*)cmds, false, (char*)">>>", (char*)"???
 void factory_reset_func(void* cmd, char* argstr, Stream* stream)
 {
     settings_factoryReset();
-    settings_save();
-    stream->println("factory reset performed");
+    if (settings_save()) {
+        stream->println("factory reset performed");
+    }
+    else {
+        stream->println("factory reset failed");
+    }
 }
 
 void save_func(void* cmd, char* argstr, Stream* stream)
 {
-    settings_save();
-    stream->println("settings saved");
+    if (settings_save()) {
+        stream->println("settings saved");
+    }
+    else {
+        stream->println("settings save failed");
+    }
 }
 
 void echo_func(void* cmd, char* argstr, Stream* stream)

@@ -32,7 +32,7 @@ roach_nvm_gui_desc_t* roachnvm_rx_getAt(int idx);
 int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm);
 void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val);
 int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t x);
-bool roachnvm_writeitemstr(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value);
+bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value);
 void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
 void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm);
 void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);

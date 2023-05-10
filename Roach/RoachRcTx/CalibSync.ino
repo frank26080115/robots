@@ -76,6 +76,7 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
             pot_steering.calib_center();
             pot_weapon.calib_center();
             pot_aux.calib_center();
+            settings_markDirty();
         };
 
         virtual void onExit(void)
@@ -85,6 +86,7 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
             pot_weapon.calib_stop();
             pot_aux.calib_stop();
             pots_locked = false;
+            settings_markDirty();
         };
 
         virtual void draw_sidebar(void)
@@ -149,6 +151,7 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
             pot_steering.calib_limits();
             pot_weapon.calib_limits();
             pot_aux.calib_limits();
+            settings_markDirty();
         };
 
         virtual void onExit(void)
@@ -158,6 +161,7 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
             pot_weapon.calib_stop();
             pot_aux.calib_stop();
             pots_locked = false;
+            settings_markDirty();
         };
 
         virtual void draw_sidebar(void)
@@ -313,6 +317,114 @@ class RoachMenuFuncUsbMsd : public RoachMenuFunctionItem
         };
 };
 
+class RoachMenuFuncRegenRf : public RoachMenuFunctionItem
+{
+    public:
+        RoachMenuFuncRegenRf(void) : RoachMenuFunctionItem("USB MSD")
+        {
+        };
+
+        virtual void draw(void)
+        {
+            int y = 0;
+            oled.setCursor(0, y);
+            oled.printf("UID : 0x%08X", _uid);
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("SALT: 0x%08X", _salt);
+            if (RoachUsbMsd_isUsbPresented() == false)
+            {
+                y += ROACHGUI_LINE_HEIGHT;
+                oled.setCursor(0, y);
+                oled.printf("%c ACCEPT+SAVE", 0x1B);
+                y += ROACHGUI_LINE_HEIGHT;
+                oled.setCursor(0, y);
+                oled.printf("%c NEW FILE", 0x1A);
+            }
+            else
+            {
+                y += ROACHGUI_LINE_HEIGHT;
+                oled.setCursor(0, y);
+                oled.printf("%c ACCEPT", 0x1B);
+                y += ROACHGUI_LINE_HEIGHT;
+                oled.setCursor(0, y);
+                oled.printf("WARN: cannot save");
+                y += ROACHGUI_LINE_HEIGHT;
+                oled.setCursor(0, y);
+                oled.printf("while USB is MSD");
+            }
+        };
+
+    protected:
+        uint32_t _uid;
+        uint32_t _salt;
+
+        virtual void onEnter(void)
+        {
+            RoachMenu::onEnter();
+            _uid  = nrf5rand_u32();
+            _salt = nrf5rand_u32();
+        };
+
+        virtual void draw_sidebar(void)
+        {
+            drawSideBar("BACK", "REDO", true);
+        };
+
+        virtual void draw_title(void)
+        {
+            drawTitleBar((const char*)_txt, true, true, false);
+        };
+
+        virtual void onButton(uint8_t btn)
+        {
+            RoachMenuFunctionItem::onButton(btn);
+            switch (btn)
+            {
+                case BTNID_LEFT:
+                    nvm_rf.uid  = _uid;
+                    nvm_rf.salt = _salt;
+                    if (RoachUsbMsd_isUsbPresented() == false)
+                    {
+                        if (settings_save() == false) {
+                            showError("did not save");
+                        }
+                    }
+                    else
+                    {
+                        showError("cannot save");
+                        settings_markDirty();
+                    }
+                    _exit = EXITCODE_BACK;
+                    break;
+                case BTNID_RIGHT:
+                    if (RoachUsbMsd_isUsbPresented() == false)
+                    {
+                        char newfilename[32];
+                        sprintf(newfilename, "rf_%08X.txt", _uid);
+                        if (settings_saveToFile(newfilename)) {
+                            showMessage("saved file", newfilename);
+                        }
+                        else {
+                            showError("cannot save file");
+                        }
+                    }
+                    else
+                    {
+                        showError("cannot save");
+                    }
+                    break;
+                case BTNID_G6:
+                    _exit = EXITCODE_BACK;
+                    break;
+                case BTNID_G5:
+                    _uid  = nrf5rand_u32();
+                    _salt = nrf5rand_u32();
+                    break;
+            }
+        };
+};
+
 class RoachMenuCalibSync : public RoachMenuLister
 {
     public:
@@ -324,6 +436,7 @@ class RoachMenuCalibSync : public RoachMenuLister
             addNode((RoachMenuListItem*)(new RoachMenuFuncSyncDownload()));
             addNode((RoachMenuListItem*)(new RoachMenuFuncSyncUpload()));
             addNode((RoachMenuListItem*)(new RoachMenuFuncUsbMsd()));
+            addNode((RoachMenuListItem*)(new RoachMenuFuncRegenRf()));
             //addNode((RoachMenuListItem*)(new RoachMenuFuncFactoryReset()));
         };
 

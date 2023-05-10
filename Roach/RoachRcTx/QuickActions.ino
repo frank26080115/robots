@@ -230,9 +230,13 @@ class QuickActionSaveStartup : public QuickAction
         int y, w;
         virtual void action(void)
         {
-            settings_save();
             oled.setCursor(0, ROACHGUI_LINE_HEIGHT);
-            oled.print("done");
+            if (settings_save()) {
+                oled.print("done");
+            }
+            else {
+                oled.print("ERR saving");
+            }
             gui_drawNow();
             while (btns_isAnyHeld()) {
                 ctrler_tasks();
