@@ -227,7 +227,9 @@ static int32_t msc_read_cb(uint32_t lba, void* buffer, uint32_t bufsize)
 {
   // Note: SPIFLash Block API: readBlocks/writeBlocks/syncBlocks
   // already include 4K sector caching internally. We don't need to cache it, yahhhh!!
-  return flash.readBlocks(lba, (uint8_t*) buffer, bufsize/512) ? bufsize : -1;
+  int32_t x = flash.readBlocks(lba, (uint8_t*) buffer, bufsize/512) ? bufsize : -1;
+  fs_change_time = millis();
+  return x;
 }
 
 // Callback invoked when received WRITE10 command.
@@ -237,7 +239,9 @@ static int32_t msc_write_cb(uint32_t lba, uint8_t* buffer, uint32_t bufsize)
 {
   // Note: SPIFLash Block API: readBlocks/writeBlocks/syncBlocks
   // already include 4K sector caching internally. We don't need to cache it, yahhhh!!
-  return flash.writeBlocks(lba, buffer, bufsize/512) ? bufsize : -1;
+  int32_t x = flash.writeBlocks(lba, buffer, bufsize/512) ? bufsize : -1;
+  fs_change_time = millis();
+  return x;
 }
 
 // Callback invoked when WRITE10 command is completed (status received and accepted by host).
@@ -253,4 +257,9 @@ static void msc_flush_cb(void)
   // indicate change
   fs_changed = true;
   fs_change_time = millis();
+}
+
+uint32_t RoachUsbMsd_lastActivityTime(void)
+{
+    return fs_change_time;
 }

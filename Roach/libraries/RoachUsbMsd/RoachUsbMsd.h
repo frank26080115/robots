@@ -12,6 +12,7 @@ bool RoachUsbMsd_isUsbPresented(void);
 bool RoachUsbMsd_hasChange(bool clr);
 bool RoachUsbMsd_hasVbus(void);
 bool RoachUsbMsd_canSave(void);
+uint32_t RoachUsbMsd_lastActivityTime(void);
 uint64_t RoachUsbMsd_getFreeSpace(void);
 
 #ifdef __cplusplus
