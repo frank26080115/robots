@@ -237,10 +237,8 @@ void menu_run(void)
 
 void menu_setup(void)
 {
-    menu_install(new RoachMenuCfgLister(MENUID_CONFIG_DRIVE , "DRIVE"     , "robot" , &nvm_rx, cfggroup_drive));
-    menu_install(new RoachMenuCfgLister(MENUID_CONFIG_IMU   , "IMU/PID"   , "robot" , &nvm_rx, cfggroup_imu));
-    menu_install(new RoachMenuCfgLister(MENUID_CONFIG_WEAP  , "WEAPON"    , "robot" , &nvm_rx, cfggroup_weap));
     menu_install_calibSync();
+    menu_install_robot();
     menu_install(new RoachMenuCfgLister(MENUID_CONFIG_CTRLER, "CONTROLLER", "ctrler", &nvm_tx, cfggroup_ctrler));
     menu_install_fileOpener();
 }

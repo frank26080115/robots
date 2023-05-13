@@ -98,6 +98,19 @@ void showMessage(const char* s1, const char* s2)
     }
 }
 
+void printEllipses(void)
+{
+    uint8_t ticks;
+    uint32_t now = millis();
+    uint32_t now_mod = now % 1500;
+    ticks = (now_mod / 500) + 1;
+    uint8_t i;
+    for (i = 0; i < 3; i++)
+    {
+        oled.write(i < ticks ? '.' : ' ');
+    }
+}
+
 void drawSideBar(const char* upper, const char* lower, bool line)
 {
     int i, x, y;
@@ -149,4 +162,10 @@ void drawTitleBar(const char* s, bool center, bool line, bool arrows)
         y = 9;
         oled.drawFastHLine(0, y, SCREEN_WIDTH - 12, 1);
     }
+}
+
+void drawProgressBar(int x, int y, int w, int h, int prog, int total)
+{
+    oled.drawRect(x, y, w, h, SSD1306_WHITE);
+    oled.drawFillRect(x, y, map(prog, 0, total, 0, w), h, SSD1306_WHITE);
 }

@@ -17,6 +17,7 @@ enum
     //MENUID_RAW,                   // display raw input data
     MENUID_CONFIG_CALIBSYNC,      // options for calibration and synchronization
     MENUID_CONFIG_FILELOAD,       // choose to load a file
+    MENUID_CONFIG_ROBOT,
     MENUID_CONFIG_DRIVE,          // edit parameters about drive train
     MENUID_CONFIG_WEAP,           // edit parameters about the weapon
     MENUID_CONFIG_CTRLER,         // edit parameters about the controller
@@ -55,12 +56,16 @@ class RoachMenu
         virtual void run(void);
         inline int getExitCode(void) { return _exit; };
         inline uint8_t getId(void) { return _id; };
+        inline void interrupt(int x) { _interrupt = x; } ;
+        inline bool isRunning(void) { return _running; };
         void* prev_menu = NULL;
         void* next_menu = NULL;
         void* parent_menu = NULL;
     protected:
         uint8_t  _id;
         int      _exit = 0;
+        volatile int _interrupt = 0;
+        bool _running = false;
         virtual void draw(void);
         virtual void clear(void);
                 void display(void);

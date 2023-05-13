@@ -36,6 +36,7 @@ void RoachMenu::taskLP(void)
 
 void RoachMenu::run(void)
 {
+    _running = true;
     onEnter();
 
     while (_exit == 0)
@@ -60,6 +61,10 @@ void RoachMenu::run(void)
         }
         #endif
 
+        if (_interrupt == EXITCODE_BACK) {
+            _exit = EXITCODE_BACK;
+        }
+
         if (_exit == 0)
         {
             taskLP();
@@ -71,6 +76,7 @@ void RoachMenu::run(void)
     }
 
     onExit();
+    _running = false;
 }
 
 void RoachMenu::draw_sidebar(void)
@@ -496,30 +502,90 @@ void RoachMenuCfgLister::draw_title(void)
 
 void RoachMenuCfgLister::onButton(uint8_t btn)
 {
-    RoachMenuLister::onButton(btn);
-    if (_exit == 0)
+    switch (btn)
     {
-        switch (btn)
-        {
-            case BTNID_CENTER:
-                {
-                    RoachMenuCfgItemEditor* n = new RoachMenuCfgItemEditor(_struct, &(_desc_tbl[_list_idx]));
-                    n->run();
-                    delete n;
+        case BTNID_LEFT:
+            {
+                if (_list_idx <= 0) {
+                    _exit = EXITCODE_LEFT;
+                    break;
                 }
-                break;
-            case BTNID_G5:
+                else
                 {
-                    if (RoachUsbMsd_canSave()) {
-                        RoachMenuFileSaveList* n = new RoachMenuFileSaveList(_filter);
+                    for (; _list_idx >= 0; _list_idx--)
+                    {
+                        if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0)
+                        {
+                            strncpy(_title, _desc_tbl[_list_idx].name, 30);
+                            break;
+                        }
+                    }
+                }
+            }
+            break;
+        case BTNID_RIGHT:
+            {
+                if (_list_idx >= _list_cnt - 1) {
+                    _exit = EXITCODE_RIGHT;
+                    break;
+                }
+                else
+                {
+                    for (; _list_idx < _list_cnt; _list_idx--)
+                    {
+                        if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0)
+                        {
+                            strncpy(_title, _desc_tbl[_list_idx].name, 30);
+                            break;
+                        }
+                    }
+                }
+            }
+            break;
+        case BTNID_UP:
+        case BTNID_DOWN:
+            {
+                RoachMenuLister::onButton(btn);
+                if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0)
+                {
+                    strncpy(_title, _desc_tbl[_list_idx].name, 30);
+                    break;
+                }
+            }
+            break;
+        case BTNID_CENTER:
+            {
+                if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0) // cannot click on a category item
+                {
+                    if (memcmp("func", _desc_tbl[_list_idx].type, 5))
+                    {
+                        // TODO: send a command
+                    }
+                    else
+                    {
+                        RoachMenuCfgItemEditor* n = new RoachMenuCfgItemEditor(_struct, &(_desc_tbl[_list_idx]));
                         n->run();
                         delete n;
                     }
-                    else {
-                        showError("cannot save");
-                    }
                 }
-                break;
-        }
+            }
+            break;
+        case BTNID_G5:
+            {
+                if (RoachUsbMsd_canSave()) {
+                    RoachMenuFileSaveList* n = new RoachMenuFileSaveList(_filter);
+                    n->run();
+                    delete n;
+                }
+                else {
+                    showError("cannot save");
+                }
+            }
+            break;
+        case BTNID_G6:
+            {
+                _exit = EXITCODE_BACK;
+            }
+            break;
     }
 }

@@ -201,14 +201,14 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
-            RoSync_downloadPrint();
+            rosync_draw();
         };
 
     protected:
         virtual void onEnter(void)
         {
             RoachMenu::onEnter();
-            RoSync_downloadStart();
+            rosync_downloadStart();
         };
 
         virtual void draw_sidebar(void)
@@ -230,7 +230,7 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
-                    RoSync_downloadStart();
+                    rosync_downloadStart();
                     break;
             }
         };
