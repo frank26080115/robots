@@ -93,6 +93,7 @@ class nRF52RcRadio
         void textSend (const char* buf);                       // send text message
         char* textReadPtr(bool clr);
         bool textIsDone(void);
+        uint8_t* readPtr(void);
 
         inline bool   connected(void) { return _connected; };
         inline int8_t get_rssi (void) { return _stat_rx_rssi; };

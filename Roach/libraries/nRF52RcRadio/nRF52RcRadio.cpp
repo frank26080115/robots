@@ -755,6 +755,11 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
         case NRFRR_SM_RX_START:
             if (NRF_RADIO->STATE == NRF_RADIO_STATE_DISABLED)
             {
+                // do this check for connectivity here, since it's not a frequent calculation
+                if ((now - _last_rx_time) >= (_is_tx ? 3000 : 1000)) {
+                    _connected = false;
+                }
+
                 if (_fem_tx >= 0) {
                     digitalWrite(_fem_tx, LOW);
                 }
@@ -1286,6 +1291,11 @@ int nRF52RcRadio::read(uint8_t* data)
     return -1; // report no data
 }
 
+uint8_t* nRF52RcRadio::readPtr(void)
+{
+    return (uint8_t*)rx_buffer;
+}
+
 int nRF52RcRadio::textAvail(void)
 {
     task();
@@ -1335,6 +1345,7 @@ bool nRF52RcRadio::textIsDone(void)
 
 void nRF52RcRadio::pause(void)
 {
+    _connected = false;
     if (_statemachine < NRFRR_SM_HALT_START)
     {
         _statemachine = NRFRR_SM_HALT_START;
