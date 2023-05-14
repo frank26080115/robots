@@ -4,7 +4,8 @@
 #define SCREEN_WIDTH  SSD1306_LCDWIDTH
 #define SCREEN_HEIGHT SSD1306_LCDHEIGHT
 
-#define ROACH_STARTUP_FILE_NAME     "startup.txt"
+#define ROACH_STARTUP_CONF_NAME     "startup.txt"
+#define ROACH_STARTUP_DESC_NAME     "startup_desc.bin"
 #define ROACHGUI_ERROR_SHOW_TIME    3000
 #define ROACHGUI_LINE_HEIGHT        8
 #define ROACHMENU_LIST_MAX          6

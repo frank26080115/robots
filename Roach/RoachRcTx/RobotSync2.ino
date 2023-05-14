@@ -35,7 +35,7 @@ void rosync_task(void)
                     // robot is not recognized
 
                     // if the user is in the menu, we cannot do anything yet
-                    // because rosync_loadDescFile calls delete on rosync_menu
+                    // because rosync_loadDescFileId calls delete on rosync_menu
                     if (rosync_menu != NULL) {
                         if (rosync_menu->isRunning()) {
                             rosync_menu->interrupt(EXITCODE_BACK);
@@ -44,9 +44,9 @@ void rosync_task(void)
                     }
 
                     // load the description file if it's available
-                    if (rosync_loadDescFile(telem_pkt.chksum_desc))
+                    if (rosync_loadDescFileId(telem_pkt.chksum_desc))
                     {
-                        rosync_loadNvmFile(ROACH_STARTUP_FILE_NAME);
+                        rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
                         uint32_t c = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
                         if (c == telem_pkt.chksum_nvm)
                         {
@@ -73,7 +73,7 @@ void rosync_task(void)
                         if (rosync_nvm == NULL)
                         {
                             // if the user is in the menu, we cannot do anything yet
-                            // because rosync_loadDescFile calls delete on rosync_menu
+                            // because rosync_loadDescFileId calls delete on rosync_menu
                             if (rosync_menu != NULL) {
                                 if (rosync_menu->isRunning()) {
                                     rosync_menu->interrupt(EXITCODE_BACK);
@@ -81,13 +81,13 @@ void rosync_task(void)
                                 }
                             }
 
-                            if (rosync_loadDescFile(telem_pkt.chksum_desc) == false)
+                            if (rosync_loadDescFileId(telem_pkt.chksum_desc) == false)
                             {
                                 rosync_statemachine = ROSYNC_SM_NODESC;
                                 break;
                             }
                             // at this point in the code, rosync_nvm is not null
-                            rosync_loadNvmFile(ROACH_STARTUP_FILE_NAME);
+                            rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
                         }
                         // at this point in the code, rosync_nvm is not null
                         uint32_t c = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
@@ -143,7 +143,7 @@ void rosync_task(void)
 bool rosync_downloadDescFile(void)
 {
     char fname[32];
-    sprintf(fname, "robotdesc_0x%08X.txt", telem_pkt.chksum_desc);
+    sprintf(fname, "robotdesc_0x%08X.bin", telem_pkt.chksum_desc);
     bool x = rosync_descDlFile.open(fname, O_RDWR | O_CREAT);
     if (x == false) {
         rosync_statemachine = ROSYNC_SM_NODESC_ERR;
@@ -187,11 +187,11 @@ void rosync_downloadDescChunk(char* str)
         if (slen <= 3)
         {
             rosync_descDlFile.close();
-            if (rosync_loadDescFile(telem_pkt.chksum_desc))
+            if (rosync_loadDescFileId(telem_pkt.chksum_desc))
             {
                 if (telem_pkt.chksum_nvm != rosync_checksum_nvm)
                 {
-                    rosync_loadNvmFile(ROACH_STARTUP_FILE_NAME);
+                    rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
                     if (rosync_checksum_nvm == telem_pkt.chksum_nvm)
                     {
                         rosync_statemachine = ROSYNC_SM_ALLGOOD;
@@ -275,11 +275,16 @@ void rosync_downloadNvmChunk(char* str)
     }
 }
 
-bool rosync_loadDescFile(uint32_t id)
+bool rosync_loadDescFileId(uint32_t id)
+{
+    char fname[32];
+    sprintf(fname, "robotdesc_0x%08X.bin", id);
+    return rosync_loadDescFile((const char*)fname);
+}
+
+bool rosync_loadDescFile(const char* fname)
 {
     RoachFile f;
-    char fname[32];
-    sprintf(fname, "robotdesc_0x%08X.txt", id);
     bool x = f.open(fname, O_RDONLY);
     if (x == false) {
         Serial.printf("ERR[%u]: tried loading robot desc file \"%s\" but file does not exist\r\n", millis(), fname);
@@ -355,6 +360,9 @@ bool rosync_loadDescFile(uint32_t id)
     }
 
     rosync_checksum_desc = id;
+    roachnvm_setdefaults(rosync_nvm, rosync_desc_tbl);
+    rosync_checksum_nvm = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+    rosync_markOnlyFile();
     return true;
 }
 
@@ -364,7 +372,7 @@ bool rosync_loadNvmFile(const char* fname)
     char fname_buf[32];
     if (fname == NULL)
     {
-        sprintf(fname_buf, ROACH_STARTUP_FILE_NAME);
+        sprintf(fname_buf, ROACH_STARTUP_CONF_NAME);
     }
     else
     {
@@ -415,6 +423,50 @@ void rosync_uploadNextChunk(void)
     }
     rosync_uploadChunk(desc);
     rosync_uploadIdx += 1;
+}
+
+void rosync_markOnlyFile(void)
+{
+    if (!root.open("/"))
+    {
+        Serial.println("open root failed");
+        return;
+    }
+    bool has_startup = false;
+    int cnt = 0;
+    char sfname[64];
+    char sfname_only[64];
+    while (file.openNext(&root, O_RDONLY))
+    {
+        if (file.isDir() == false)
+        {
+            file.getName7(sfname, 62);
+            if (strncmp("robotdesc", sfname, 9) == 0)
+            {
+                cnt++;
+                strncpy(sfname_only, sfname, 62);
+            }
+            else if (strcmp(ROACH_STARTUP_DESC_NAME, sfname) == 0)
+            {
+                has_startup = true;
+            }
+        }
+    }
+    if (has_startup == false || cnt == 1)
+    {
+        return rosync_markStartupFile(sfname_only);
+    }
+    return false;
+}
+
+bool rosync_markStartupFile(const char* fname)
+{
+    return roachnvm_fileCopy(fname, ROACH_STARTUP_DESC_NAME);
+}
+
+bool rosync_loadStartup(void)
+{
+    return rosync_loadDescFile(ROACH_STARTUP_DESC_NAME);
 }
 
 bool rosync_isSynced(void)
@@ -517,7 +569,7 @@ class RobotMenu : public RoachMenu
             }
             else
             {
-                // if there's no robot loaded, skip this
+                showError("robot not loaded");
                 _exit = EXITCODE_RIGHT;
             }
         };
