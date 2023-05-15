@@ -351,3 +351,24 @@ void roachnvm_setdefaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
         }
     }
 }
+
+uint32_t roachnvm_getChecksum(uint8_t* data, roach_nvm_gui_desc_t* desc_tbl)
+{
+    int i;
+    roach_nvm_gui_desc_t* desc_itm;
+    uint32_t crc = 0xFFFFFFFF;
+    for (i = 0; i < 0xFFFF; i++)
+    {
+        desc_itm = &desc_tbl[i];
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+            break;
+        }
+        uint32_t v = (uint32_t)roachnvm_getval(data, desc_itm);
+        crc = crc ^ v;
+        for (uint32_t j = 8; j > 0; j--)
+        {
+            crc = (crc >> 1) ^ (0xEDB88320U & ((crc & 1) ? 0xFFFFFFFF : 0));
+        }
+    }
+    return crc;
+}

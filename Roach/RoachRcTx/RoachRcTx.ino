@@ -139,7 +139,7 @@ void ctrler_tasks(void)
     {
         RoachEnc_task();     // transfers hardware values to RAM atomically
         nrf5rand_task();     // collect random numbers from RNG
-        RoSync_task();       // checks for robot synchronization
+        rosync_task();       // checks for robot synchronization
         RoachUsbMsd_task();  // handles tasks for USB flash mass storage
         cmdline.task();      // handles command line
 
@@ -154,16 +154,6 @@ void ctrler_tasks(void)
         if (radio.available())
         {
             radio.read((uint8_t*)&telem_pkt);
-        }
-
-        if (radio.textAvail())
-        {
-            radio.textRead(telem_txt);
-            Serial.printf("RX-TXT[%u]: %s\r\n", millis(), telem_txt);
-
-            if (memcmp("D ", telem_txt, 2) == 0) {
-                RoSync_decodeDownload(&(telem_txt[2]));
-            }
         }
 
         ctrler_pktDebug();

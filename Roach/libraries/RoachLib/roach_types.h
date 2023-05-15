@@ -51,7 +51,8 @@ roach_ctrl_pkt_t;
 typedef struct
 {
     uint16_t timestamp;
-    uint32_t checksum;
+    uint32_t chksum_desc;
+    uint32_t chksum_nvm;
     uint16_t heading;
     uint16_t battery;
     uint8_t  temperature;

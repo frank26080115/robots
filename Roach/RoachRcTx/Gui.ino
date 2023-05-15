@@ -167,5 +167,5 @@ void drawTitleBar(const char* s, bool center, bool line, bool arrows)
 void drawProgressBar(int x, int y, int w, int h, int prog, int total)
 {
     oled.drawRect(x, y, w, h, SSD1306_WHITE);
-    oled.drawFillRect(x, y, map(prog, 0, total, 0, w), h, SSD1306_WHITE);
+    oled.fillRect(x, y, map(prog, 0, total, 0, w), h, SSD1306_WHITE);
 }

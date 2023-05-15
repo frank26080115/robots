@@ -5,6 +5,9 @@
 #include <InternalFileSystem.h>
 #endif
 
+extern uint8_t* rosync_nvm;
+extern roach_nvm_gui_desc_t* rosync_desc_tbl;
+
 roach_nvm_gui_desc_t cfggroup_ctrler[] = {
     { ((uint32_t)(&(nvm_tx.heading_multiplier      )) - (uint32_t)(&nvm_tx)), "H scale"     , "s32x10" ,                     90,                 INT_MIN, INT_MAX               , 1, },
     { ((uint32_t)(&(nvm_tx.cross_mix               )) - (uint32_t)(&nvm_tx)), "X mix"       , "s32x10" ,                      0,                 INT_MIN, INT_MAX               , 1, },
@@ -51,7 +54,7 @@ uint32_t nvm_dirty = 0;
 void settings_init(void)
 {
     settings_factoryReset();
-    settings_loadFile(ROACH_STARTUP_FILE_NAME);
+    settings_loadFile(ROACH_STARTUP_CONF_NAME);
 }
 
 void settings_factoryReset(void)
@@ -66,7 +69,7 @@ void settings_factoryReset(void)
 
 bool settings_save(void)
 {
-    return settings_saveToFile(ROACH_STARTUP_FILE_NAME);
+    return settings_saveToFile(ROACH_STARTUP_CONF_NAME);
 }
 
 void settings_saveIfNeeded(uint32_t span)
@@ -91,11 +94,14 @@ bool settings_loadFile(const char* fname)
     if (memcmp(fname, "rf", 2) == 0) {
         flags |= (1 << 0);
     }
-    if (memcmp(fname, "ctrler", 6) == 0) {
+    else if (memcmp(fname, "ctrler", 6) == 0) {
         flags |= (1 << 1);
     }
-    if (memcmp(fname, "robot", 5) == 0) {
+    else if (memcmp(fname, "robot", 5) == 0) {
         flags |= (1 << 2);
+    }
+    else if (memcmp(fname, "rdesc", 5) == 0) {
+        flags |= (1 << 3);
     }
     if (suc)
     {
@@ -107,13 +113,14 @@ bool settings_loadFile(const char* fname)
             roachnvm_readfromfile(&f, (uint8_t*)&nvm_tx, cfggroup_ctrler);
         }
         if ((flags & (1 << 2)) != 0 || flags == 0) {
-            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_drive);
-            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_weap);
-            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
+            roachnvm_readfromfile(&f, (uint8_t*)rosync_nvm, rosync_desc_tbl);
+        }
+        if ((flags & (1 << 3)) != 0) {
+            rosync_loadDescFileObj(&f, 0);
         }
         f.close();
         #ifdef ROACHTX_AUTOSAVE
-        if (strncmp(fname, ROACH_STARTUP_FILE_NAME, 32) != 0) {
+        if (strncmp(fname, ROACH_STARTUP_CONF_NAME, 32) != 0) {
             settings_markDirty();
         }
         #endif
@@ -130,10 +137,10 @@ bool settings_saveToFile(const char* fname)
     if (memcmp(fname, "rf", 2) == 0) {
         flags |= (1 << 0);
     }
-    if (memcmp(fname, "ctrler", 6) == 0) {
+    else if (memcmp(fname, "ctrler", 6) == 0) {
         flags |= (1 << 1);
     }
-    if (memcmp(fname, "robot", 5) == 0) {
+    else if (memcmp(fname, "robot", 5) == 0) {
         flags |= (1 << 2);
     }
     if (suc)
@@ -145,9 +152,7 @@ bool settings_saveToFile(const char* fname)
             roachnvm_writetofile(&f, (uint8_t*)&nvm_tx, cfggroup_ctrler);
         }
         if ((flags & (1 << 2)) != 0 || flags == 0) {
-            roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_drive);
-            roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_weap);
-            roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
+            roachnvm_writetofile(&f, (uint8_t*)rosync_nvm, rosync_desc_tbl);
         }
         f.close();
         return true;
@@ -158,4 +163,38 @@ bool settings_saveToFile(const char* fname)
 void settings_markDirty(void)
 {
     nvm_dirty = millis();
+}
+
+bool roachnvm_fileCopy(const char* fin_name, const char* fout_name)
+{
+    RoachFile fin;
+    RoachFile fout;
+    bool suc;
+    suc = fin.open(fin_name);
+    if (suc == false) {
+        Serial.printf("ERR[%u]: roachnvm_fileCopy cannot open fin \"%s\"\r\n", millis(), fin_name);
+        return false;
+    }
+    suc = fout.open(fout_name, O_RDWR | O_CREAT);
+    if (suc == false) {
+        Serial.printf("ERR[%u]: roachnvm_fileCopy cannot open fout \"%s\"\r\n", millis(), fout_name);
+        fin.close();
+        return false;
+    }
+    #define ROACHNVM_FILECOPY_CHUNK 256
+    uint8_t tmpbuf[ROACHNVM_FILECOPY_CHUNK];
+    while (true)
+    {
+        int r = fin.read(tmpbuf, ROACHNVM_FILECOPY_CHUNK);
+        if (r > 0)
+        {
+            fout.write(tmpbuf, r);
+        }
+        else
+        {
+            fin.close();
+            fout.close();
+            return true;
+        }
+    }
 }

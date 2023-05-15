@@ -229,7 +229,7 @@ void RoachMenuCfgItemEditor::taskLP(void)
     if (cfg_last_change_time != 0 && (uint32_t)_struct == (uint32_t)&nvm_rx)
     {
         if ((millis() - cfg_last_change_time) >= 1000) {
-            RoSync_uploadChunk(_desc);
+            rosync_uploadChunk(_desc);
             cfg_last_change_time = 0;
         }
     }
@@ -239,7 +239,7 @@ void RoachMenuCfgItemEditor::onExit(void)
 {
     if ((uint32_t)_struct == (uint32_t)&nvm_rx && cfg_last_change_time != 0)
     {
-        RoSync_uploadChunk(_desc);
+        rosync_uploadChunk(_desc);
     }
     RoachMenu::onExit();
     encoder_mode = 0;
@@ -379,6 +379,7 @@ void RoachMenuLister::buildFileList(const char* filter)
                 matches = (   memcmp("rf"    , sfname, 2) == 0
                            || memcmp("robot" , sfname, 5) == 0
                            || memcmp("ctrler", sfname, 6) == 0
+                           || memcmp("rdesc" , sfname, 5) == 0
                           );
             }
             if (matches)
@@ -514,7 +515,7 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
                 {
                     for (; _list_idx >= 0; _list_idx--)
                     {
-                        if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0)
+                        if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0)
                         {
                             strncpy(_title, _desc_tbl[_list_idx].name, 30);
                             break;
@@ -533,7 +534,7 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
                 {
                     for (; _list_idx < _list_cnt; _list_idx--)
                     {
-                        if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0)
+                        if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0)
                         {
                             strncpy(_title, _desc_tbl[_list_idx].name, 30);
                             break;
@@ -546,7 +547,7 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
         case BTNID_DOWN:
             {
                 RoachMenuLister::onButton(btn);
-                if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0)
+                if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0)
                 {
                     strncpy(_title, _desc_tbl[_list_idx].name, 30);
                     break;
@@ -555,9 +556,9 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
             break;
         case BTNID_CENTER:
             {
-                if (memcmp("cat", _desc_tbl[_list_idx].type, 4) != 0) // cannot click on a category item
+                if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0) // cannot click on a category item
                 {
-                    if (memcmp("func", _desc_tbl[_list_idx].type, 5))
+                    if (memcmp("func", _desc_tbl[_list_idx].type_code, 5))
                     {
                         // TODO: send a command
                     }

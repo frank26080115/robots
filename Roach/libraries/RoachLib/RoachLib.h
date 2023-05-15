@@ -48,6 +48,7 @@ int roach_div_rounded(const int n, const int d);
 double roach_expo_curve(double x, double curve);
 int32_t roach_expo_curve32(int32_t x, int32_t curve);
 uint32_t roach_crcCalc(uint8_t const * p_data, uint32_t size, uint32_t const * p_crc);
+uint32_t roachnvm_getChecksum(uint8_t* data, roach_nvm_gui_desc_t* desc_tbl);
 
 void roach_drive_mix(int32_t throttle, int32_t steering, int32_t gyro_correction, uint8_t flip, int32_t* output_left, int32_t* output_right, roach_nvm_servo_t* cfg);
 int32_t roach_drive_applyServoParams(int32_t spd, roach_nvm_servo_t* cfg);

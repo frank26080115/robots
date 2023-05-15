@@ -1,6 +1,5 @@
 #include "MenuClass.h"
 
-extern bool rosync_matched;
 extern bool switches_alarm;
 
 extern const uint8_t icon_disconnected[];
@@ -16,7 +15,7 @@ int printRfStats(int y)
     }
     else
     {
-        if (rosync_matched)
+        if (rosync_isSynced())
         {
             oled.drawBitmap(0, 0, icon_connected, 16, 8, SSD1306_WHITE);
         }
@@ -149,6 +148,9 @@ class RoachMenuInfo : public RoachMenu
             //y += ROACHGUI_LINE_HEIGHT;
             //oled.setCursor(0, y);
             //oled.printf("map  %08X", nvm_rf.chan_map);
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            rosync_drawShort();
             y += ROACHGUI_LINE_HEIGHT;
             y = printRfStats(y);
             y += ROACHGUI_LINE_HEIGHT;

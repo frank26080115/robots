@@ -1,260 +1,641 @@
 enum
 {
-    ROSYNC_DISCONNECTED,
-    ROSYNC_DONE,
-    ROSYNC_QUERY,
-    ROSYNC_MISMATCHED,
-    ROSYNC_DONE_SYNCED,
-    ROSYNC_DOWNLOAD_START,
-    ROSYNC_DOWNLOAD_WAIT,
-    ROSYNC_DOWNLOAD_FAILED,
-    ROSYNC_DOWNLOAD_DONE,
-    ROSYNC_UPLOAD,
-    ROSYNC_UPLOAD_START,
-    ROSYNC_UPLOAD_WAIT,
-    ROSYNC_UPLOAD_DONE,
+    ROSYNC_SM_DISCONNECTED,
+    ROSYNC_SM_ALLGOOD,
+    ROSYNC_SM_NOSYNC,
+    ROSYNC_SM_NOSYNC_ERR,
+    ROSYNC_SM_NODESC,
+    ROSYNC_SM_NODESC_ERR,
+    ROSYNC_SM_DOWNLOADDESC,
+    ROSYNC_SM_DOWNLOADNVM,
+    ROSYNC_SM_UPLOAD,
+    ROSYNC_SM_UPLOAD_DONE,
 };
 
-uint8_t rosync_statemachine = 0;
-uint32_t rosync_state_timer = 0;
+uint8_t rosync_statemachine = ROSYNC_SM_DISCONNECTED;
 
-roach_rx_nvm_t rosync_nvm_cache;
-uint8_t* rosync_nvm_cache_ptr = (uint8_t*)&rosync_nvm_cache;
-bool rosync_sync_complete = false;
-int rosync_download_progress = 0;
-int rosync_retry_cnt = 0;
-bool rosync_matched = false;
+uint32_t rosync_checksum_nvm  = 0;
+uint32_t rosync_checksum_desc = 0;
 
-uint8_t rosync_rxitems_cnt;
-uint8_t rosync_upload_cache[NRFRR_PAYLOAD_SIZE];
-uint32_t rosync_upload_lasttime = 0;
-uint32_t rosync_upload_idx = 0;
+RoachMenuCfgLister* rosync_menu = NULL;
+roach_nvm_gui_desc_t* rosync_desc_tbl = NULL;
+uint8_t* rosync_nvm = NULL;
+uint32_t rosync_nvm_wptr = 0;
+uint32_t rosync_nvm_sz = 0;
+RoachFile rosync_descDlFile;
+uint32_t rosync_descDlFileSize = 0;
+uint32_t rosync_lastRxTime = 0;
+uint32_t rosync_uploadIdx = 0, rosync_uploadTotal = 0;
 
-void RoSync_task(void)
+void rosync_task(void)
 {
-    uint32_t now = millis();
+    if (rosync_statemachine != ROSYNC_SM_DISCONNECTED && radio.connected() == false)
+    {
+        if (rosync_descDlFile.isOpen()) {
+            rosync_descDlFile.close();
+        }
 
-    if (radio.connected() == false) {
-        rosync_statemachine = ROSYNC_DISCONNECTED;
+        rosync_statemachine = ROSYNC_SM_DISCONNECTED;
     }
 
     switch (rosync_statemachine)
     {
-        case ROSYNC_DISCONNECTED:
+        case ROSYNC_SM_DISCONNECTED:
+            if (radio.connected())
             {
-                if (radio.connected()) {
-                    // connected() requires at least one telemetry packet received
-                    rosync_statemachine = ROSYNC_QUERY;
-                    rosync_rxitems_cnt = roachnvm_rx_getcnt();
-                    rosync_matched = false;
-                    break;
-                }
-            }
-            break;
-        case ROSYNC_QUERY:
-            {
-                nvm_rx.magic = nvm_rf.salt;
-                nvm_rx.checksum = roach_crcCalc((uint8_t*)&nvm_rx, sizeof(roach_rx_nvm_t) - 4, NULL);
-                rosync_matched = (telem_pkt.checksum == nvm_rx.checksum);
-                rosync_statemachine = ROSYNC_DONE;
-                break;
-            }
-            break;
-        case ROSYNC_DOWNLOAD_START:
-            {
-                radio.textSend("syncdownload");
-                rosync_statemachine = ROSYNC_DOWNLOAD_WAIT;
-                rosync_state_timer = now;
-                rosync_sync_complete = false;
-                rosync_download_progress = 0;
-            }
-            break;
-        case ROSYNC_DOWNLOAD_WAIT:
-            {
-                if (rosync_sync_complete || (now - rosync_state_timer) >= 3000)
+                // the robot has reconnected, the disconnection might've been momentary, so all the previous data is kept and verified
+
+                if (telem_pkt.chksum_desc != rosync_checksum_desc)
                 {
-                    uint32_t old_checksum = rosync_nvm_cache.checksum;
-                    uint32_t new_checksum = roach_crcCalc((uint8_t*)&rosync_nvm_cache, sizeof(roach_rx_nvm_t) - 4, NULL);
-                    if (old_checksum == new_checksum)
-                    {
-                        memcpy(&nvm_rx, &rosync_nvm_cache, sizeof(roach_rx_nvm_t));
-                        rosync_statemachine = ROSYNC_DONE_SYNCED;
+                    // robot is not recognized
+
+                    // if the user is in the menu, we cannot do anything yet
+                    // because rosync_loadDescFileId calls delete on rosync_menu
+                    if (rosync_menu != NULL) {
+                        if (rosync_menu->isRunning()) {
+                            rosync_menu->interrupt(EXITCODE_BACK);
+                            break;
+                        }
                     }
-                    else
+
+                    // load the description file if it's available
+                    if (rosync_loadDescFileId(telem_pkt.chksum_desc))
                     {
-                        if (rosync_retry_cnt > 0)
+                        rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
+                        uint32_t c = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+                        if (c == telem_pkt.chksum_nvm)
                         {
-                            rosync_retry_cnt -= 1;
-                            rosync_statemachine = ROSYNC_DOWNLOAD_START;
+                            // in sync
+                            rosync_checksum_nvm = c;
+                            rosync_statemachine = ROSYNC_SM_ALLGOOD;
                         }
                         else
                         {
-                            rosync_statemachine = ROSYNC_DOWNLOAD_FAILED;
+                            rosync_statemachine = ROSYNC_SM_NOSYNC;
                         }
                     }
+                    else
+                    {
+                        rosync_statemachine = ROSYNC_SM_NODESC;
+                    }
                 }
-            }
-            break;
-        case ROSYNC_UPLOAD_START:
-        case ROSYNC_UPLOAD:
-            {
-                if (radio.textIsDone())
+                else
                 {
-                    if (rosync_upload_idx == 0) {
-                        rosync_rxitems_cnt = roachnvm_rx_getcnt();
-                        rosync_sync_complete = false;
+                    // robot is recognized
+                    // check if NVM is synchronized
+                    if (telem_pkt.chksum_nvm != rosync_checksum_nvm)
+                    {
+                        if (rosync_nvm == NULL)
+                        {
+                            // if the user is in the menu, we cannot do anything yet
+                            // because rosync_loadDescFileId calls delete on rosync_menu
+                            if (rosync_menu != NULL) {
+                                if (rosync_menu->isRunning()) {
+                                    rosync_menu->interrupt(EXITCODE_BACK);
+                                    break;
+                                }
+                            }
+
+                            if (rosync_loadDescFileId(telem_pkt.chksum_desc) == false)
+                            {
+                                rosync_statemachine = ROSYNC_SM_NODESC;
+                                break;
+                            }
+                            // at this point in the code, rosync_nvm is not null
+                            rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
+                        }
+                        // at this point in the code, rosync_nvm is not null
+                        uint32_t c = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+                        if (c == telem_pkt.chksum_nvm)
+                        {
+                            rosync_checksum_nvm = c;
+                            rosync_statemachine = ROSYNC_SM_ALLGOOD;
+                        }
+                        else
+                        {
+                            rosync_statemachine = ROSYNC_SM_NOSYNC;
+                        }
                     }
-                    else {
-                        rosync_upload_idx += 1;
+                    else
+                    {
+                        rosync_statemachine = ROSYNC_SM_ALLGOOD;
                     }
-                    if (rosync_upload_idx >= rosync_rxitems_cnt) {
-                        rosync_statemachine = ROSYNC_UPLOAD_DONE;
-                        rosync_sync_complete = true;
-                        break;
-                    }
-                    roach_nvm_gui_desc_t* desc = roachnvm_rx_getAt(rosync_upload_idx);
-                    RoSync_uploadChunk(desc);
                 }
             }
             break;
-        case ROSYNC_UPLOAD_DONE:
+        case ROSYNC_SM_DOWNLOADDESC:
+            if (radio.textAvail())
             {
-                if ((now - rosync_upload_lasttime) >= 2000)
+                if (rosync_downloadDescChunk(radio.textReadPtr(false)))
                 {
-                    rosync_statemachine = ROSYNC_DISCONNECTED;
-                    break;
+                    radio.textReadPtr(true);
                 }
+            }
+            if ((millis() - rosync_lastRxTime) >= 1000)
+            {
+                if (rosync_descDlFile.isOpen()) {
+                    rosync_descDlFile.close();
+                }
+                rosync_statemachine = ROSYNC_SM_NODESC_ERR;
+            }
+            break;
+        case ROSYNC_SM_DOWNLOADNVM:
+            if (radio.textAvail())
+            {
+                if (rosync_downloadNvmChunk(radio.textReadPtr(false)))
+                {
+                    radio.textReadPtr(true);
+                }
+            }
+            if ((millis() - rosync_lastRxTime) >= 1000)
+            {
+                rosync_statemachine = ROSYNC_SM_NOSYNC_ERR;
+            }
+            break;
+        case ROSYNC_SM_UPLOAD:
+            if (radio.textIsDone())
+            {
+                rosync_uploadNextChunk();
             }
             break;
     }
 }
 
-void RoSync_downloadStart(void)
+bool rosync_downloadDescFile(void)
 {
-    rosync_statemachine = ROSYNC_DOWNLOAD_START;
-    rosync_sync_complete = false;
-    rosync_download_progress = 0;
+    char fname[32];
+    sprintf(fname, "rdesc_0x%08X.bin", telem_pkt.chksum_desc);
+    bool x = rosync_descDlFile.open(fname, O_RDWR | O_CREAT);
+    if (x == false) {
+        rosync_statemachine = ROSYNC_SM_NODESC_ERR;
+        Serial.printf("ERR[%u]: unable to open or create \"%s\" to be written\r\n", millis(), fname);
+        return false;
+    }
+    radio.textSend("DLDESC");
+    rosync_statemachine = ROSYNC_SM_DOWNLOADDESC;
+    return true;
 }
 
-void RoSync_downloadChunk(int addr, uint8_t* data, int len)
+void rosync_downloadNvm(void)
 {
-    memcpy(&(rosync_nvm_cache_ptr[addr]), data, len);
-    rosync_download_progress = addr + len;
-    if (rosync_download_progress >= sizeof(roach_rx_nvm_t)) {
-        rosync_sync_complete = true;
-    }
+    radio.textSend("DLNVM");
+    rosync_nvm_wptr = 0;
+    rosync_statemachine = ROSYNC_SM_DOWNLOADNVM;
 }
 
-void RoSync_downloadPrint()
+bool rosync_downloadStart(void)
 {
-    int y = 11;
-    oled.setCursor(0, y);
-    if (rosync_statemachine == ROSYNC_DOWNLOAD_START)
+    if (rosync_statemachine == ROSYNC_SM_NODESC || rosync_statemachine == ROSYNC_SM_NODESC_ERR)
     {
-        oled.print("starting");
+        if (rosync_descDlFile.isOpen()) {
+            rosync_descDlFile.close();
+        }
+        return rosync_downloadDescFile();
     }
-    else if (rosync_sync_complete)
+    else if (rosync_nvm_sz > 0 && rosync_nvm != NULL && radio.connected())
     {
-        oled.print("done");
+        rosync_downloadNvm();
+        return true;
     }
-    else if (rosync_statemachine == ROSYNC_DOWNLOAD_WAIT)
+    return false;
+}
+
+bool rosync_downloadDescChunk(char* str)
+{
+    if (str[0] == 'D' && str[1] == 'D')
     {
-        int percent = map(rosync_download_progress, 0, sizeof(roach_rx_nvm_t), 0, 100);
-        oled.printf("progress %d %%", percent);
-        y += ROACHGUI_LINE_HEIGHT;
-        int w = SCREEN_WIDTH - 12;
-        int s = map(rosync_download_progress, 0, sizeof(roach_rx_nvm_t), 0, w);
-        oled.drawRect(0, y, w, y + ROACHGUI_LINE_HEIGHT, 1);
-        oled.fillRect(0, y, s, y + ROACHGUI_LINE_HEIGHT, 1);
+        int i, slen = strlen(str);
+        if (slen <= 3)
+        {
+            rosync_descDlFile.close();
+            if (rosync_loadDescFileId(telem_pkt.chksum_desc))
+            {
+                if (telem_pkt.chksum_nvm != rosync_checksum_nvm)
+                {
+                    rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
+                    if (rosync_checksum_nvm == telem_pkt.chksum_nvm)
+                    {
+                        rosync_statemachine = ROSYNC_SM_ALLGOOD;
+                    }
+                    else
+                    {
+                        rosync_downloadNvm();
+                    }
+                }
+                else
+                {
+                    rosync_statemachine = ROSYNC_SM_ALLGOOD;
+                }
+            }
+            else
+            {
+                rosync_statemachine = ROSYNC_SM_NODESC_ERR;
+            }
+            return true;
+        }
+
+        char tmphex[3];
+        tmphex[2] = 0;
+        for (i = 3; i < slen; i += 2)
+        {
+            tmphex[0] = str[i];
+            tmphex[1] = str[i + 1];
+            uint8_t x = (uint8_t)strtoul(tmphex, NULL, 16);
+            rosync_descDlFile.write(x);
+            rosync_descDlFileSize += 1;
+        }
+        rosync_lastRxTime = millis();
+        return true;
     }
-    else if (rosync_statemachine == ROSYNC_DOWNLOAD_FAILED)
+    return false;
+}
+
+bool rosync_downloadNvmChunk(char* str)
+{
+    if (rosync_nvm == NULL)
     {
-        oled.print("error: failed");
+        return false;
     }
-    else if (rosync_statemachine == ROSYNC_DISCONNECTED)
+
+    bool ret = false;
+    bool done = false;
+
+    if (str[0] == 'D' && str[1] == 'N')
     {
-        oled.print("error:");
-        y += ROACHGUI_LINE_HEIGHT;
-        oled.setCursor(0, y);
-        oled.print("disconnected");
+        ret = true;
+        int i, slen = strlen(str);
+        if (slen <= 3)
+        {
+            done = true;
+        }
+
+        char tmphex[3];
+        tmphex[2] = 0;
+        for (i = 3; done == false && i < slen && rosync_nvm_wptr < rosync_nvm_sz; i += 2)
+        {
+            tmphex[0] = str[i];
+            tmphex[1] = str[i + 1];
+            uint8_t x = (uint8_t)strtoul(tmphex, NULL, 16);
+            rosync_nvm[rosync_nvm_wptr] = x;
+            rosync_nvm_wptr += 1;
+        }
+        if (rosync_nvm_wptr >= rosync_nvm_sz) {
+            done = true;
+        }
+        rosync_lastRxTime = millis();
+    }
+
+    if (done)
+    {
+        rosync_checksum_nvm = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+        if (rosync_checksum_nvm == telem_pkt.chksum_nvm)
+        {
+            rosync_statemachine = ROSYNC_SM_ALLGOOD;
+        }
+        else
+        {
+            rosync_statemachine = ROSYNC_SM_NOSYNC_ERR;
+        }
+    }
+    return ret;
+}
+
+bool rosync_loadDescFileId(uint32_t id)
+{
+    char fname[32];
+    sprintf(fname, "rdesc_0x%08X.bin", id);
+    return rosync_loadDescFile((const char*)fname, id);
+}
+
+bool rosync_loadDescFile(const char* fname, uint32_t id)
+{
+    RoachFile f;
+    bool x = f.open(fname, O_RDONLY);
+    if (x == false) {
+        Serial.printf("ERR[%u]: tried loading robot desc file \"%s\" but file does not exist\r\n", millis(), fname);
+        return false;
+    }
+    return rosync_loadDescFileObj(&f, id);
+}
+
+bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
+{
+    if (rosync_menu != NULL)
+    {
+        if (rosync_menu->isRunning()) {
+            // there shouldn't actually be a way to reach here
+            rosync_menu->interrupt(EXITCODE_BACK);
+            return false;
+        }
+
+        delete rosync_menu;
+        rosync_menu = NULL;
+    }
+
+    if (rosync_desc_tbl != NULL)
+    {
+        free(rosync_desc_tbl);
+        rosync_desc_tbl = NULL;
+    }
+    if (rosync_nvm != NULL)
+    {
+        free(rosync_nvm);
+        rosync_nvm = NULL;
+    }
+    uint32_t sz = f->fileSize();
+    rosync_desc_tbl = (roach_nvm_gui_desc_t*)malloc(sz);
+    int chunk_sz = 256;
+    int i, j;
+    for (i = 0, j = 1; i < sz && j > 0; i += j)
+    {
+        j = f->read((void*)rosync_desc_tbl, chunk_sz);
+    }
+
+    f->close();
+
+    uint32_t chksum_desc = roach_crcCalc((uint8_t*)rosync_desc_tbl, sz, NULL);
+    if (chksum_desc != id && id != 0) {
+        char tmpname[32];
+        f->getName7(tmpname, 30);
+        Serial.printf("ERR[%u]: tried loading robot desc file \"%s\" but contents do not match checksum 0x%08X\r\n", millis(), tmpname, chksum_desc);
+        free(rosync_desc_tbl);
+        rosync_desc_tbl = NULL;
+        return false;
+    }
+
+    int sum = 0;
+    for (i = 0; ; i++)
+    {
+        roach_nvm_gui_desc_t* d = &rosync_desc_tbl[i];
+        sum = d->byte_offset > sum ? d->byte_offset : sum;
+    }
+    sum += 4;
+    rosync_nvm_sz = sum;
+    rosync_nvm = (uint8_t*)malloc(sum);
+
+    if (rosync_nvm == NULL) {
+        Serial.printf("ERR[%u]: unable to allocate memory for rosync_nvm\r\n", millis());
+        free(rosync_desc_tbl);
+        rosync_desc_tbl = NULL;
+        return false;
+    }
+
+    rosync_menu = new RoachMenuCfgLister(MENUID_CONFIG_ROBOT, "ROBOT CFG", "robot", (void*)rosync_nvm, rosync_desc_tbl);
+    if (rosync_menu == NULL) {
+        Serial.printf("ERR[%u]: unable to allocate memory for rosync_menu\r\n", millis());
+        free(rosync_desc_tbl);
+        rosync_desc_tbl = NULL;
+        free(rosync_nvm);
+        rosync_nvm = NULL;
+        return false;
+    }
+
+    rosync_checksum_desc = chksum_desc;
+    roachnvm_setdefaults(rosync_nvm, rosync_desc_tbl);
+    rosync_checksum_nvm = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+    rosync_markOnlyFile();
+    return true;
+}
+
+bool rosync_loadNvmFile(const char* fname)
+{
+    RoachFile f;
+    char fname_buf[32];
+    if (fname == NULL)
+    {
+        sprintf(fname_buf, ROACH_STARTUP_CONF_NAME);
     }
     else
     {
-        oled.print("error:");
-        y += ROACHGUI_LINE_HEIGHT;
-        oled.setCursor(0, y);
-        oled.print("unknown state");
+        sprintf(fname_buf, fname);
+    }
+    bool x = f.open(fname_buf, O_RDONLY);
+    if (x == false) {
+        Serial.printf("ERR[%u]: unable to find robot NVM file \"%s\"\r\n", millis(), fname_buf);
+        return false;
+    }
+
+    roachnvm_readfromfile(&f, (uint8_t*)rosync_nvm, rosync_desc_tbl);
+
+    f.close();
+
+    rosync_checksum_nvm = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+    return true;
+}
+
+void rosync_uploadStart(void)
+{
+    rosync_statemachine = ROSYNC_SM_UPLOAD;
+    rosync_uploadIdx = 0;
+    int i;
+    for (i = 0; ; i++) {
+        roach_nvm_gui_desc_t* desc = &rosync_desc_tbl[i];
+        if (desc->name[0] == 0) {
+            rosync_uploadTotal = i;
+            break;
+        }
     }
 }
 
-void RoSync_decodeDownload(const char* s)
+void rosync_uploadChunk(roach_nvm_gui_desc_t* desc)
 {
-    int slen = strlen(s);
-    int nbytes = (slen - 4) / 2;
-    uint8_t* data = (uint8_t*)malloc(nbytes);
-    if (data == NULL) {
+    static char rosync_uploadCache[NRFRR_PAYLOAD_SIZE];
+    char tmp[32];
+    roachnvm_formatitem(tmp, (uint8_t*)rosync_nvm, desc);
+    sprintf((char*)rosync_uploadCache, "UL %s=%s\n", desc->name, tmp);
+    radio.textSend((const char*)rosync_uploadCache);
+}
+
+void rosync_uploadNextChunk(void)
+{
+    roach_nvm_gui_desc_t* desc = &rosync_desc_tbl[rosync_uploadIdx];
+    if (desc->name[0] == 0) {
+        rosync_statemachine = ROSYNC_SM_UPLOAD_DONE;
         return;
     }
-    char hex[5];
-    int addr;
-    memcpy(hex, s, 4);
-    hex[4] = 0;
-    addr = strtol(hex, NULL, 16);
-    hex[3] = 0;
-    int i;
-    for (i = 0; i < nbytes; i++) {
-        hex[0] = s[4 + (i * 2)];
-        hex[1] = s[4 + (i * 2) + 1];
-        data[i] = strtol(hex, NULL, 16);
+    rosync_uploadChunk(desc);
+    rosync_uploadIdx += 1;
+}
+
+bool rosync_markOnlyFile(void)
+{
+    if (!fatroot.open("/"))
+    {
+        Serial.println("open root failed");
+        return false;
     }
-    RoSync_downloadChunk(addr, data, nbytes);
-    free(data);
+    bool has_startup = false;
+    int cnt = 0;
+    char sfname[64];
+    char sfname_only[64];
+    while (fatfile.openNext(&fatroot, O_RDONLY))
+    {
+        if (fatfile.isDir() == false)
+        {
+            fatfile.getName7(sfname, 62);
+            if (strncmp("rdesc", sfname, 5) == 0)
+            {
+                cnt++;
+                strncpy(sfname_only, sfname, 62);
+            }
+            else if (strcmp(ROACH_STARTUP_DESC_NAME, sfname) == 0)
+            {
+                has_startup = true;
+            }
+        }
+    }
+    if (has_startup == false || cnt == 1)
+    {
+        return rosync_markStartupFile(sfname_only);
+    }
+    return false;
 }
 
-void RoSync_uploadStart(void)
+bool rosync_markStartupFile(const char* fname)
 {
-    rosync_statemachine = ROSYNC_UPLOAD;
-    rosync_upload_idx = 0;
-    rosync_upload_lasttime = 0;
+    return roachnvm_fileCopy(fname, ROACH_STARTUP_DESC_NAME);
 }
 
-void RoSync_uploadChunk(roach_nvm_gui_desc_t* desc)
+bool rosync_loadStartup(void)
 {
-    sprintf((char*)rosync_upload_cache, "ul %s=%d\n", desc->name, roachnvm_getval((uint8_t*)&nvm_rx, desc));
-    radio.textSend((const char*)rosync_upload_cache);
-    rosync_upload_lasttime = millis();
+    return rosync_loadDescFile(ROACH_STARTUP_DESC_NAME, 0);
 }
 
-void RoSync_uploadPrint()
+bool rosync_isSynced(void)
 {
-    int y = 11;
+    return rosync_statemachine == ROSYNC_SM_ALLGOOD;
+}
+
+void rosync_draw(void)
+{
+    int y = 0;
     oled.setCursor(0, y);
-    if (rosync_sync_complete || rosync_statemachine == ROSYNC_UPLOAD_DONE)
+    oled.print("ROBOT SYNC");
+    y += ROACHGUI_LINE_HEIGHT;
+    oled.setCursor(0, y);
+    switch (rosync_statemachine)
     {
-        oled.print("done");
+        case ROSYNC_SM_ALLGOOD:
+            oled.print("SUCCESS");
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("C 0x%08X", rosync_checksum_desc);
+            break;
+        case ROSYNC_SM_DISCONNECTED:
+            oled.print("DISCONNECTED");
+            break;
+        case ROSYNC_SM_DOWNLOADDESC:
+            oled.print("downloading desc");
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("%u bytes ", rosync_descDlFileSize);
+            printEllipses();
+            break;
+        case ROSYNC_SM_DOWNLOADNVM:
+            oled.print("downloading conf");
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("%u / %u b ", rosync_nvm_wptr, rosync_nvm_sz);
+            printEllipses();
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("%u %%", map(rosync_nvm_wptr, 0, rosync_nvm_sz, 0, 100));
+            y += ROACHGUI_LINE_HEIGHT;
+            drawProgressBar(0, y, SCREEN_WIDTH - 16, 7, rosync_nvm_wptr, rosync_nvm_sz);
+            break;
+        case ROSYNC_SM_UPLOAD:
+            oled.print("uploading conf");
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("# %u / %u ", rosync_uploadIdx, rosync_uploadTotal);
+            printEllipses();
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("%u %%", map(rosync_uploadIdx, 0, rosync_uploadTotal, 0, 100));
+            y += ROACHGUI_LINE_HEIGHT;
+            drawProgressBar(0, y, SCREEN_WIDTH - 16, 7, rosync_uploadIdx, rosync_uploadTotal);
+            break;
+        case ROSYNC_SM_UPLOAD_DONE:
+            oled.print("uploading conf");
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("100%% done");
+            break;
+        case ROSYNC_SM_NODESC:
+            oled.print("no desc file");
+            break;
+        case ROSYNC_SM_NODESC_ERR:
+            oled.print("desc file error");
+            break;
+        case ROSYNC_SM_NOSYNC:
+            oled.print("not sync'ed");
+            break;
+        case ROSYNC_SM_NOSYNC_ERR:
+            oled.print("error:");
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.print("not sync'ed");
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("after download");
+            break;
     }
-    else if (rosync_statemachine == ROSYNC_UPLOAD)
+}
+
+void rosync_drawShort(void)
+{
+    switch (rosync_statemachine)
     {
-        int percent = map(rosync_upload_idx, 0, rosync_rxitems_cnt, 0, 100);
-        oled.printf("progress %d %%", percent);
-        y += ROACHGUI_LINE_HEIGHT;
-        int w = SCREEN_WIDTH - 12;
-        int s = map(rosync_upload_idx, 0, rosync_rxitems_cnt, 0, w);
-        oled.drawRect(0, y, w, y + 8, 1);
-        oled.fillRect(0, y, s, y + 8, 1);
+        case ROSYNC_SM_ALLGOOD:
+        case ROSYNC_SM_UPLOAD_DONE:
+            oled.printf("robot %08X", rosync_checksum_desc);
+            break;
+        case ROSYNC_SM_DOWNLOADDESC:
+        case ROSYNC_SM_DOWNLOADNVM:
+            oled.printf("sync busy %c", 0x19);
+            break;
+        case ROSYNC_SM_UPLOAD:
+            oled.printf("sync busy %c", 0x18);
+            break;
+        default:
+            oled.printf("not sync'ed");
+            break;
     }
-    else if (rosync_statemachine == ROSYNC_DISCONNECTED)
-    {
-        oled.print("error:");
-        y += ROACHGUI_LINE_HEIGHT;
-        oled.setCursor(0, y);
-        oled.print("disconnected");
-    }
-    else
-    {
-        oled.print("error:");
-        y += ROACHGUI_LINE_HEIGHT;
-        oled.setCursor(0, y);
-        oled.print("unknown state");
-    }
+}
+
+// this is a fake object that only exits, passing along the exit code, it doesn't actually show anything
+class RobotMenu : public RoachMenu
+{
+    public:
+        RobotMenu(void) : RoachMenu(0)
+        {
+        };
+
+    protected:
+        virtual void onEnter(void)
+        {
+            if (rosync_menu == NULL)
+            {
+                // robot is not loaded, try loading the file now
+                rosync_loadStartup();
+            }
+
+            if (rosync_menu != NULL)
+            {
+                rosync_menu->run();
+                int ec = rosync_menu->getExitCode();
+                _exit = ec;
+            }
+            else
+            {
+                showError("robot not loaded");
+                _exit = EXITCODE_RIGHT;
+            }
+        };
+};
+
+void menu_install_robot()
+{
+    static RobotMenu m;
+    menu_install(&m);
 }

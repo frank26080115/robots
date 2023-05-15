@@ -208,7 +208,13 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
         virtual void onEnter(void)
         {
             RoachMenu::onEnter();
-            rosync_downloadStart();
+            if (RoachUsbMsd_canSave()) {
+                rosync_downloadStart();
+            }
+            else {
+                showError("cannot download\nUSB MSD is on");
+                _exit = EXITCODE_BACK;
+            }
         };
 
         virtual void draw_sidebar(void)
@@ -230,7 +236,12 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
-                    rosync_downloadStart();
+                    if (RoachUsbMsd_canSave()) {
+                        rosync_downloadStart();
+                    }
+                    else {
+                        showError("cannot download\nUSB MSD is on");
+                    }
                     break;
             }
         };
@@ -245,14 +256,14 @@ class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
-            RoSync_uploadPrint();
+            rosync_draw();
         };
 
     protected:
         virtual void onEnter(void)
         {
             RoachMenu::onEnter();
-            RoSync_uploadStart();
+            rosync_uploadStart();
         };
 
         virtual void draw_sidebar(void)
@@ -274,7 +285,7 @@ class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
-                    RoSync_uploadStart();
+                    rosync_uploadStart();
                     break;
             }
         };
