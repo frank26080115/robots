@@ -87,7 +87,7 @@ void setup(void)
     RoachButton_allBegin();
     RoachPot_allBegin();
     RoachEnc_begin(ROACHHW_PIN_ENC_A, ROACHHW_PIN_ENC_B);
-    nbtwi_init(ROACHHW_PIN_I2C_SCL, ROACHHW_PIN_I2C_SDA);
+    nbtwi_init(ROACHHW_PIN_I2C_SCL, ROACHHW_PIN_I2C_SDA, (SCREEN_WIDTH * SCREEN_HEIGHT / 8) * 2);
     PerfCnt_init();
     Serial.println("\r\nRoach RC Transmitter - Hello World!");
 

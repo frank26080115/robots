@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "nrfx_twim.h"
-#include "hal/nrf_twim.h"
+//#include "nrfx_twim.h"
+//#include "hal/nrf_twim.h"
 
 enum
 {
@@ -13,17 +13,24 @@ enum
     NBTWI_SM_STARTED,
     NBTWI_SM_WAIT,
     NBTWI_SM_STOP,
+    NBTWI_SM_SUSPEND,
     NBTWI_SM_ERROR,
+    NBTWI_SM_TIMEOUT,
 };
 
 static uint32_t pin_scl, pin_sda;
-static uint8_t tx_buff[1024 * 2];
+static uint8_t* tx_buff = NULL;
+static uint32_t tx_buff_sz = 0;
 
 static volatile uint8_t  nbtwi_statemachine = 0;
+static volatile bool     nbtwi_isTx = false;
+static volatile uint8_t  nbtwi_curFlags = 0;
 static volatile bool     xfer_done = true;
 static volatile uint32_t xfer_err = 0;
+static volatile uint32_t xfer_err_last = 0;
+static volatile uint32_t xfer_time = 0;
+static volatile uint32_t xfer_time_est = 0;
 static int err_cnt = 0;
-
 
 // implement a FIFO with a linked list
 
@@ -33,11 +40,23 @@ typedef struct
     uint8_t* data;
     uint8_t i2c_addr;
     int len;
+    uint8_t flags;
 }
 nbtwi_node_t;
 
-static nbtwi_node_t* head = NULL;
-static nbtwi_node_t* tail = NULL;
+enum
+{
+    NBTWI_FLAG_RWMASK   = 0x03,
+    NBTWI_FLAG_WRITE    = 0,
+    NBTWI_FLAG_READ     = 1,
+    //NBTWI_FLAG_RESULT   = 2,
+    NBTWI_FLAG_NOSTOP   = 0x04,
+};
+
+static nbtwi_node_t* tx_head = NULL;
+static nbtwi_node_t* tx_tail = NULL;
+static nbtwi_node_t* rx_head = NULL;
+static nbtwi_node_t* rx_tail = NULL;
 
 static volatile uint32_t* pincfg_reg(uint32_t pin)
 {
@@ -45,7 +64,7 @@ static volatile uint32_t* pincfg_reg(uint32_t pin)
     return &port->PIN_CNF[pin];
 }
 
-void nbtwi_init(int scl, int sda)
+void nbtwi_init(int scl, int sda, int bufsz)
 {
     *pincfg_reg(g_ADigitalPinMap[pin_scl = scl]) = ((uint32_t)GPIO_PIN_CNF_DIR_Input        << GPIO_PIN_CNF_DIR_Pos)
                                                  | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect    << GPIO_PIN_CNF_INPUT_Pos)
@@ -64,6 +83,14 @@ void nbtwi_init(int scl, int sda)
     NRF_TWIM0->PSEL.SCL  = g_ADigitalPinMap[pin_scl];
     NRF_TWIM0->PSEL.SDA  = g_ADigitalPinMap[pin_sda];
 
+    if (bufsz == 0) {
+        bufsz = 1024;
+    }
+    tx_buff = (uint8_t*)malloc(bufsz);
+    tx_buff_sz = bufsz;
+    NRF_TWIM0->TXD.PTR = (uint32_t)(tx_buff);
+    NRF_TWIM0->RXD.PTR = (uint32_t)(tx_buff);
+
     //uint32_t irqn = nrfx_get_irq_number(NRF_TWIM0);
     //NVIC_ClearPendingIRQ(irqn);
     //NVIC_SetPriority(irqn, 3);
@@ -74,11 +101,15 @@ void nbtwi_init(int scl, int sda)
     #endif
 }
 
-void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len)
+void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len, bool no_stop)
 {
     nbtwi_node_t* n = (nbtwi_node_t*)malloc(sizeof(nbtwi_node_t));
     if (n == NULL) {
         return;
+    }
+    n->flags = NBTWI_FLAG_WRITE;
+    if (no_stop) {
+        n->flags |= NBTWI_FLAG_NOSTOP;
     }
     n->next = NULL;
     n->i2c_addr = i2c_addr;
@@ -89,14 +120,14 @@ void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len)
     }
     memcpy(n->data, data, len);
     n->len = len;
-    if (tail != NULL)
+    if (tx_tail != NULL)
     {
-        tail->next = (void*)n;
-        tail = n;
+        tx_tail->next = (void*)n;
+        tx_tail = n;
     }
-    if (head == NULL) {
-        head = n;
-        tail = n;
+    if (tx_head == NULL) {
+        tx_head = n;
+        tx_tail = n;
     }
     if (xfer_done) {
         nbtwi_task();
@@ -121,6 +152,7 @@ void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len)
     if (n == NULL) {
         return;
     }
+    n->flags = NBTWI_FLAG_WRITE;
     n->next = NULL;
     n->i2c_addr = i2c_addr;
     n->data = (uint8_t*)malloc(len + 1);
@@ -139,14 +171,14 @@ void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len)
     }
     #endif
 
-    if (tail != NULL)
+    if (tx_tail != NULL)
     {
-        tail->next = (void*)n;
-        tail = n;
+        tx_tail->next = (void*)n;
+        tx_tail = n;
     }
-    if (head == NULL) {
-        head = n;
-        tail = n;
+    if (tx_head == NULL) {
+        tx_head = n;
+        tx_tail = n;
     }
     #ifdef NBTWI_ENABLE_DEBUG
     Serial.printf(" done, mem %u\r\n", getFreeRam());
@@ -154,6 +186,97 @@ void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len)
     #endif
     if (xfer_done) {
         nbtwi_task();
+    }
+}
+
+void nbtwi_read(uint8_t i2c_addr, int len)
+{
+    nbtwi_node_t* n = (nbtwi_node_t*)malloc(sizeof(nbtwi_node_t));
+    if (n == NULL) {
+        return;
+    }
+    n->flags = NBTWI_FLAG_READ;
+    n->next = NULL;
+    n->i2c_addr = i2c_addr;
+    n->data = NULL;
+    n->len = len;
+    if (tx_tail != NULL)
+    {
+        tx_tail->next = (void*)n;
+        tx_tail = n;
+    }
+    if (tx_head == NULL) {
+        tx_head = n;
+        tx_tail = n;
+    }
+    if (xfer_done) {
+        nbtwi_task();
+    }
+}
+
+bool nbtwi_hasResult(void)
+{
+    return rx_head != NULL;
+}
+
+bool nbtwi_readResult(uint8_t* data, int len, bool clr)
+{
+    if (rx_head == NULL) {
+        return false;
+    }
+
+    if (data != NULL) {
+        memcpy(data, rx_head->data, len < rx_head->len ? len : rx_head->len);
+    }
+
+    if (clr)
+    {
+        if (rx_tail == rx_head)
+        {
+            rx_tail = NULL;
+        }
+        nbtwi_node_t* next = (nbtwi_node_t*)(rx_head->next);
+        free(rx_head->data);
+        free(rx_head);
+        rx_head = next;
+    }
+    return true;
+}
+
+static void nbtwi_handleResult(void)
+{
+    nbtwi_node_t* n = (nbtwi_node_t*)malloc(sizeof(nbtwi_node_t));
+    if (n == NULL) {
+        return;
+    }
+    //n->flags = NBTWI_FLAG_RESULT;
+    n->next = NULL;
+    //n->i2c_addr = NRF_TWIM0->ADDRESS;
+    int len = NRF_TWIM0->RXD.MAXCNT;
+    n->data = (uint8_t*)malloc(len);
+    if (n->data == NULL) {
+        free(n);
+        return;
+    }
+    memcpy(n->data, tx_buff, len);
+    n->len = len;
+    if (rx_tail != NULL)
+    {
+        rx_tail->next = (void*)n;
+        rx_tail = n;
+    }
+    if (rx_tail == NULL) {
+        rx_tail = n;
+        rx_tail = n;
+    }
+}
+
+static void nbtwi_checkTimeout(void)
+{
+    uint32_t now = millis();
+    if ((now - xfer_time) >= xfer_time_est)
+    {
+        nbtwi_statemachine = NBTWI_SM_TIMEOUT;
     }
 }
 
@@ -169,10 +292,22 @@ static void nbtwi_runStateMachine(void)
             NRF_TWIM0->TASKS_STOP = 0x1UL;
             nbtwi_statemachine = NBTWI_SM_ERROR;
         }
-        else if (NRF_TWIM0->EVENTS_TXSTARTED)
+        else
         {
-            NRF_TWIM0->EVENTS_TXSTARTED = 0;
-            nbtwi_statemachine = NBTWI_SM_WAIT;
+            if (nbtwi_isTx && NRF_TWIM0->EVENTS_TXSTARTED)
+            {
+                NRF_TWIM0->EVENTS_TXSTARTED = 0;
+                nbtwi_statemachine = NBTWI_SM_WAIT;
+            }
+            else if (nbtwi_isTx == false && NRF_TWIM0->EVENTS_RXSTARTED)
+            {
+                NRF_TWIM0->EVENTS_RXSTARTED = 0;
+                nbtwi_statemachine = NBTWI_SM_WAIT;
+            }
+            else
+            {
+                nbtwi_checkTimeout();
+            }
         }
     }
     if (nbtwi_statemachine == NBTWI_SM_WAIT)
@@ -185,11 +320,48 @@ static void nbtwi_runStateMachine(void)
             NRF_TWIM0->TASKS_STOP = 0x1UL;
             nbtwi_statemachine = NBTWI_SM_ERROR;
         }
-        else if (NRF_TWIM0->EVENTS_LASTTX)
+        else
         {
-            NRF_TWIM0->EVENTS_LASTTX = 0;
-            NRF_TWIM0->TASKS_STOP = 0x1UL;
-            nbtwi_statemachine = NBTWI_SM_STOP;
+            if (nbtwi_isTx && NRF_TWIM0->EVENTS_LASTTX)
+            {
+                NRF_TWIM0->EVENTS_LASTTX = 0;
+                if ((nbtwi_curFlags & NBTWI_FLAG_NOSTOP) == 0)
+                {
+                    NRF_TWIM0->TASKS_STOP = 0x1UL;
+                    nbtwi_statemachine = NBTWI_SM_STOP;
+                }
+                else
+                {
+                    NRF_TWIM0->TASKS_SUSPEND = 0x1UL;
+                    nbtwi_statemachine = NBTWI_SM_SUSPEND;
+                }
+            }
+            else if (nbtwi_isTx == false && NRF_TWIM0->EVENTS_LASTRX)
+            {
+                NRF_TWIM0->EVENTS_LASTRX = 0;
+                NRF_TWIM0->TASKS_STOP = 0x1UL;
+                nbtwi_statemachine = NBTWI_SM_STOP;
+                nbtwi_handleResult();
+            }
+            else
+            {
+                nbtwi_checkTimeout();
+            }
+        }
+    }
+    if (nbtwi_statemachine == NBTWI_SM_TIMEOUT)
+    {
+        NRF_TWIM0->TASKS_STOP = 0x1UL;
+        xfer_err = 0xFF00;
+        nbtwi_statemachine = NBTWI_SM_ERROR;
+    }
+    if (nbtwi_statemachine == NBTWI_SM_SUSPEND)
+    {
+        if (NRF_TWIM0->EVENTS_SUSPENDED)
+        {
+            NRF_TWIM0->EVENTS_SUSPENDED = 0;
+            nbtwi_statemachine = NBTWI_SM_IDLE;
+            xfer_done = true;
         }
     }
     if (nbtwi_statemachine == NBTWI_SM_STOP || nbtwi_statemachine == NBTWI_SM_ERROR)
@@ -198,6 +370,7 @@ static void nbtwi_runStateMachine(void)
         {
             NRF_TWIM0->EVENTS_STOPPED = 0;
             nbtwi_statemachine = NBTWI_SM_IDLE;
+            xfer_err_last = (nbtwi_statemachine == NBTWI_SM_ERROR) ? xfer_err : 0;
             xfer_done = true;
         }
     }
@@ -236,51 +409,64 @@ void nbtwi_task(void)
             err_cnt = 0;
         }
 
-        if (head != NULL)
+        if (tx_head != NULL)
         {
-            memcpy(tx_buff, head->data, head->len);
+            if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE) {
+                memcpy(tx_buff, tx_head->data, tx_head->len);
+            }
+
             xfer_done = false;
             xfer_err = 0;
 
             #ifdef NBTWI_ENABLE_DEBUG
-            Serial.printf("nbtwi_task next packet 0x%02X %u ... ", head->i2c_addr, head->len);
+            Serial.printf("nbtwi_task next packet 0x%02X %u ... ", tx_head->i2c_addr, tx_head->len);
             delay(20);
             #endif
 
-            NRF_TWIM0->ADDRESS        = head->i2c_addr;
+            NRF_TWIM0->ADDRESS        = tx_head->i2c_addr;
             NRF_TWIM0->EVENTS_STOPPED = 0x0UL;
             NRF_TWIM0->TASKS_RESUME   = 0x1UL;
-            NRF_TWIM0->TXD.PTR        = (uint32_t)(tx_buff);
-            NRF_TWIM0->TXD.MAXCNT     = (head->len);
-            NRF_TWIM0->TASKS_STARTTX  = 0x1UL;
+            NRF_TWIM0->TXD.MAXCNT     = (tx_head->len);
+            NRF_TWIM0->RXD.MAXCNT     = (tx_head->len);
+            nbtwi_curFlags = tx_head->flags;
+            if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE)
+            {
+                NRF_TWIM0->TASKS_STARTTX  = 0x1UL;
+                nbtwi_isTx = true;
+            }
+            else if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_READ)
+            {
+                NRF_TWIM0->TASKS_STARTRX  = 0x1UL;
+                nbtwi_isTx = false;
+            }
+            xfer_time = millis();
+            xfer_time_est = ((tx_head->len + 1) * 9 * 4) / 400;
+            xfer_time_est = (xfer_time_est < 5) ? 5 : 0;
             nbtwi_statemachine = NBTWI_SM_STARTED;
 
             #ifdef NBTWI_ENABLE_DEBUG
             int i;
-            for (i = 0; i < (head->len); i++) {
+            for (i = 0; i < (tx_head->len); i++) {
                 Serial.printf(" 0x%02X", tx_buff[i]);
             }
             Serial.printf(" done\r\n");
             #endif
 
-            if (tail == head)
+            if (tx_tail == tx_head)
             {
-                tail = NULL;
+                tx_tail = NULL;
             }
-            nbtwi_node_t* next = (nbtwi_node_t*)(head->next);
-            if (head == tail) {
-                tail = NULL;
-            }
-            free(head->data);
-            free(head);
-            head = next;
+            nbtwi_node_t* next = (nbtwi_node_t*)(tx_head->next);
+            free(tx_head->data);
+            free(tx_head);
+            tx_head = next;
         }
     }
 }
 
 bool nbtwi_isBusy(void)
 {
-    return xfer_done == false || head != NULL;
+    return xfer_done == false || tx_head != NULL;
 }
 
 void nbtwi_transfer(void)
@@ -291,12 +477,6 @@ void nbtwi_transfer(void)
 
     while (nbtwi_isBusy()) {
         nbtwi_task();
-    }
-}
-
-void nbtwi_wait(void)
-{
-    while (nbtwi_isBusy()) {
         yield();
     }
 }
@@ -308,4 +488,9 @@ bool nbtwi_hasError(bool clr)
         err_cnt = 0;
     }
     return x;
+}
+
+int nbtwi_lastError(void)
+{
+    return xfer_err_last;
 }

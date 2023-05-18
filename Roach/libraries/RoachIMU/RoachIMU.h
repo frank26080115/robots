@@ -10,19 +10,7 @@
 #if defined(ESP32)
 #include "nbe_i2c.h"
 #elif defined(NRF52840_XXAA)
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "nrfx_twim.h"
-#include "hal/nrf_twim.h"
-
-#ifdef __cplusplus
-}
-#endif
-
-#define TWI_INSTANCE_ID     0
+#include <NonBlockingTwi.h>
 #endif
 
 #define BNO08x_I2CADDR_DEFAULT 0x4A
