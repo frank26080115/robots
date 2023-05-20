@@ -19,10 +19,23 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
     _last_tgt = cur;
 
     _diff = tgt - cur;
+    while (_diff > 18000)
+    {
+        _diff -= 36000;
+    }
+    while (_diff < -18000)
+    {
+        _diff += 36000;
+    }
 
-    _p = cfg->p * diff;
-    
-    accumulator += diff;
+    _p = cfg->p * _diff;
+
+    if ((_diff >= 0 && _diff <= 9000 && last_diff < 0) || (_diff < 0 && _diff >= -9000 && last_diff >= 0)) {
+        // spun past target, accumulator should be 0 or pushing towards target, not away
+        accumulator = (accumulator >= 0 && _diff < 0) || (accumulator < 0 && _diff >= 0) ? 0 : accumulator;
+    }
+
+    accumulator += _diff;
     accumulator = accumulator > cfg->accumulator_limit ? cfg->accumulator_limit : (accumulator < -cfg->accumulator_limit ? -cfg->accumulator_limit : accumulator);
     _i = cfg->i * accumulator;
     if (accumulator > cfg->accumulator_decay) {
@@ -35,9 +48,35 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
         accumulator = 0;
     }
 
-    _delta_e = diff - last_diff;
-    last_diff = diff;
-    _d = cfg->d * delta_e;
+    if ((_diff >= 0 && last_diff <= -9000) || (_diff < 0 && last_diff >= 9000)) {
+        // rotated past 180
+        // accumulator should follow P term
+        if ((accumulator < 0 && _p >= 0) || (accumulator > 0 && _p < 0)) {
+            accumulator *= -1;
+        }
+    }
+
+    int32_t abs_e_n = _diff < 0 ? -_diff : _diff;
+    int32_t abs_e_o = last_diff < 0 ? -last_diff : last_diff;
+    int32_t abs_de, abs_td;
+    if (abs_e_n < abs_e_o)
+    {
+        // approaching target
+        abs_de = abs_e_o - abs_e_n;
+        abs_td = abs_de * cfg->d;
+        // D term should counter P term
+        _d = _p < 0 ? abs_td : -abs_td;
+    }
+    else
+    {
+        // leaving target
+        abs_de = abs_e_n - abs_e_o;
+        abs_td = abs_de * cfg->d;
+        // D term should follow P term
+        _d = _p < 0 ? -abs_td : abs_td;
+    }
+
+    last_diff = _diff;
 
     return roach_reduce_to_scale(_output = (_p + _i + _d));
 }
