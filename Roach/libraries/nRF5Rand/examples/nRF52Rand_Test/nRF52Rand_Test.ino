@@ -4,7 +4,7 @@
 void setup() {
   Serial.begin(115200);
   Serial.println("hello world");
-  nrf5rand_init(128);
+  nrf5rand_init(1024 * 8, true, true);
 }
 
 void loop() {

@@ -1,5 +1,4 @@
 #include "nRF5Rand.h"
-#include "nrfx_rng.h"
 
 #ifndef NRFX_RNG_CONFIG_ERROR_CORRECTION
 #define NRFX_RNG_CONFIG_ERROR_CORRECTION 1
@@ -15,33 +14,31 @@ static volatile int      rng_fifo_w;
 static volatile int      rng_fifo_r;
 
 static bool has_srand = false;
+static bool need_irq;
 static bool need_autorestart;
 
-static void rng_handler(uint8_t rng_data);
+static void rng_handler(void);
 
 void nrf5rand_init(int sz, bool use_irq, bool auto_restart)
 {
     need_autorestart = auto_restart;
+    need_irq = use_irq;
     rng_fifo = (uint8_t*)malloc(rng_fifo_size = sz);
-    static nrfx_rng_config_t cfg = NRFX_RNG_DEFAULT_CONFIG;
-    nrfx_rng_init(&cfg, rng_handler);
-    if (use_irq) {
-        nrfx_rng_start();
+
+    NRF_RNG->CONFIG = NRFX_RNG_CONFIG_ERROR_CORRECTION;
+    NRFX_IRQ_PRIORITY_SET(RNG_IRQn, NRFX_RNG_CONFIG_IRQ_PRIORITY);
+    if (need_irq) {
+        NRFX_IRQ_ENABLE(RNG_IRQn);
+        NRF_RNG->INTENSET = 1;
     }
-    else {
-        #ifdef NRF_RNG_USE_NEW_VERSION
-        nrf_rng_task_trigger(NRF_RNG_TASK_START);
-        #else
-        nrf_rng_task_trigger(NRF_RNG, NRF_RNG_TASK_START);
-        #endif
-    }
+    NRF_RNG->TASKS_START = 1;
 }
 
 void nrf5rand_vector(uint8_t* buf, int len)
 {
     if (nrf5rand_avail() < len) {
-        nrfx_rng_start();
         while (nrf5rand_avail() < len) {
+            nrf5rand_task();
             yield();
         }
     }
@@ -59,7 +56,7 @@ void nrf5rand_vector(uint8_t* buf, int len)
     if (need_autorestart)
     {
         if (nrf5rand_avail() < rng_fifo_size / 2) {
-            nrfx_rng_start();
+            NRF_RNG->INTENSET = 1;
         }
     }
 
@@ -105,7 +102,7 @@ int nrf5rand_avail(void)
     if (need_autorestart)
     {
         if (x < rng_fifo_size / 2) {
-            nrfx_rng_start();
+            NRF_RNG->INTENSET = 1;
         }
     }
     return x;
@@ -117,40 +114,41 @@ void nrf5rand_flush(void)
     rng_fifo_w = 0;
     rng_fifo_r = 0;
     __enable_irq();
-    nrfx_rng_start();
+    if (need_irq || need_autorestart) {
+        NRF_RNG->INTENSET = 1;
+    }
 }
 
 void nrf5rand_stopIrq(void)
 {
-    #ifdef NRF_RNG_USE_NEW_VERSION
-    nrf_rng_int_disable(NRF_RNG_INT_VALRDY_MASK);
-    #else
-    nrf_rng_int_disable(NRF_RNG, NRF_RNG_INT_VALRDY_MASK);
-    #endif
+    NRF_RNG->INTENCLR = 1;
 }
 
 void nrf5rand_task(void)
 {
     if (NRF_RNG->EVENTS_VALRDY) {
-        rng_handler(nrf_rng_random_value_get(NRF_RNG));
-        #ifdef NRF_RNG_USE_NEW_VERSION
-        nrf_rng_event_clear(NRF_RNG_EVENT_VALRDY);
-        #else
-        nrf_rng_event_clear(NRF_RNG, NRF_RNG_EVENT_VALRDY);
-        #endif
+        rng_handler();
+        NRF_RNG->EVENTS_VALRDY = 0;
     }
 }
 
-static void rng_handler(uint8_t rng_data)
+static void rng_handler(void)
 {
+    __disable_irq();
     uint16_t n = (rng_fifo_w + 1) % rng_fifo_size;
     if (n != rng_fifo_r)
     {
-        rng_fifo[rng_fifo_w] = rng_data;
+        rng_fifo[rng_fifo_w] = NRF_RNG->VALUE;
         rng_fifo_w = n;
     }
     else
     {
-        nrfx_rng_stop();
+        NRF_RNG->INTENCLR = 1;
     }
+    __enable_irq();
+}
+
+void RNG_IRQHandler(void)
+{
+    nrf5rand_task();
 }
