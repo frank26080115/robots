@@ -19,6 +19,7 @@ typedef struct
     // I think there's room here for 254 bytes
 
     // metadata
+    uint32_t zero_pad;
     #ifdef NRFRR_FINGER_QUOTES_RANDOMNESS
     uint32_t rand;
     #endif
@@ -55,6 +56,7 @@ static const uint16_t freq_lookup[] {
     0x100 + 30, // 2390 MHz
     0x100 + 35, // 2395 MHz
 #endif
+#ifndef NRFRR_USE_FREQ_LOWER_ONLY
     0x000 + 25, // 2425 MHz
 #ifdef NRFRR_USE_FREQ_EUROPEAN
     0x000 + 30, // 2430 MHz
@@ -69,6 +71,7 @@ static const uint16_t freq_lookup[] {
 #ifdef NRFRR_USE_FREQ_NORTHAMERICAN
     0x000 + 75, // 2475 MHz
     0x000 + 80, // 2480 MHz
+#endif
 #endif
 #ifdef NRFRR_USE_FREQ_UPPER
     // note: wifi chan 13 is 2472 MHz, ending at 2483 MHz
@@ -138,7 +141,7 @@ void nRF52RcRadio::var_reset(void)
     txt_flag = false;
 }
 
-void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt, int fem_tx, int fem_rx)
+void nRF52RcRadio::begin(int fem_tx, int fem_rx)
 {
     instance = (nRF52RcRadio*)this;
 
@@ -151,14 +154,6 @@ void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt, int fem
     digitalWrite(NRFRR_DEBUG_PIN_CH, _dbgpin_ch = LOW);
     #endif
 
-    if (_statemachine != NRFRR_SM_IDLE_WAIT) {
-        pause();
-    }
-
-    var_reset();
-    _uid = uid;
-    _salt = salt;
-
     _fem_tx = fem_tx;
     _fem_rx = fem_rx;
     if (_fem_tx >= 0) {
@@ -170,21 +165,23 @@ void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt, int fem
         digitalWrite(_fem_rx, LOW);
     }
 
-    set_chan_map(chan_map);
-
     if (hw_inited == false) {
         init_hw();
         hw_inited = true;
     }
+}
 
-    // Power on into disabled mode
-    NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos) | (RADIO_SHORTS_END_DISABLE_Enabled << RADIO_SHORTS_END_DISABLE_Pos);
-    NRF_RADIO->EVENTS_DISABLED = 0;
-    NRF_RADIO->TASKS_DISABLE = 1;
-    while (NRF_RADIO->EVENTS_DISABLED == 0) {
-        yield(); // wait for the radio to be disabled
+void nRF52RcRadio::config(uint32_t chan_map, uint32_t uid, uint32_t salt)
+{
+    if (_statemachine != NRFRR_SM_IDLE_WAIT) {
+        pause();
     }
-    NRF_RADIO->EVENTS_END = 0;
+
+    var_reset();
+    _uid = uid;
+    _salt = salt;
+
+    set_chan_map(chan_map);
 
     set_net_addr(_uid);
 
@@ -203,16 +200,19 @@ void nRF52RcRadio::begin(uint32_t chan_map, uint32_t uid, uint32_t salt, int fem
     #endif
     NRF_RADIO->CRCPOLY = 0x11021UL;     // CRC poly: x^16+x^12^x^5+1
 
-    if (_is_tx)
-    {
-        while (_session_id == 0) {
-            _session_id = nrfrr_rand();
-        }
+    // Power on into disabled mode
+    NRF_RADIO->EVENTS_DISABLED = 0;
+    NRF_RADIO->TASKS_DISABLE = 1;
+    while (NRF_RADIO->EVENTS_DISABLED == 0) {
+        yield(); // wait for the radio to be disabled
     }
+    NRF_RADIO->EVENTS_END = 0;
 }
 
 void nRF52RcRadio::init_hw(void)
 {
+    sd_softdevice_disable();
+
     if ((NRF_CLOCK->HFCLKSTAT & CLOCK_HFCLKSTAT_STATE_Msk) == 0)
     {
         // Enable the High Frequency clock to the system as a whole
@@ -240,8 +240,9 @@ void nRF52RcRadio::init_hw(void)
 
     // These shorts will make the radio transition from Ready to Start to Disable automatically
     // for both TX and RX, which makes for much shorter on-air times
-    NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos)
-                      | (RADIO_SHORTS_END_DISABLE_Enabled << RADIO_SHORTS_END_DISABLE_Pos)
+    NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled   << RADIO_SHORTS_READY_START_Pos)
+                      | (RADIO_SHORTS_RXREADY_START_Enabled << RADIO_SHORTS_RXREADY_START_Pos)
+                      | (RADIO_SHORTS_END_DISABLE_Enabled   << RADIO_SHORTS_END_DISABLE_Pos)
                       ;
 
     NRF_RADIO->PCNF0 =   (8 << RADIO_PCNF0_LFLEN_Pos)  // Payload size length in bits
@@ -258,7 +259,7 @@ void nRF52RcRadio::init_hw(void)
         << RADIO_MODE_MODE_Pos) & RADIO_MODE_MODE_Msk);
     NRF_RADIO->TXPOWER = ((
         #ifdef RADIO_TXPOWER_TXPOWER_Pos8dBm
-            RADIO_TXPOWER_TXPOWER_Pos8dBm
+            _fem_tx >= 0 ? RADIO_TXPOWER_TXPOWER_0dBm : RADIO_TXPOWER_TXPOWER_Pos8dBm
         #else
             RADIO_TXPOWER_TXPOWER_Pos4dBm
         #endif
@@ -446,7 +447,7 @@ void nRF52RcRadio::prep_tx(void)
     #endif
 
     #ifdef NRFRR_DEBUG_TX
-    Serial.printf("TX[t %u][c %u][s %u]: ", millis(), hop_table[_cur_chan], sizeof(nrfrr_pkt_t));
+    Serial.printf("TX[t %u][c %u][s %u]: ", millis(), _hop_table[_cur_chan], sizeof(nrfrr_pkt_t));
     int i;
     for (i = 0; i < sizeof(nrfrr_pkt_t); i++)
     {
@@ -481,6 +482,7 @@ void nRF52RcRadio::prep_tx(void)
     if (_seq_num == 0) {
         // roll-over occured, start new session
         _session_id = nrfrr_rand();
+        Serial.printf("NRFRR next session ID 0x%08X\r\n", _session_id);
         _seq_num++;
     }
 }
@@ -519,6 +521,7 @@ void nRF52RcRadio::gen_header(void)
     ptr->s0 = 0;
     ptr->s1 = 0;
     ptr->len = sizeof(nrfrr_pkt_t);
+    ptr->zero_pad = 0;
 
     uint32_t r =
         #ifdef NRFRR_FINGER_QUOTES_RANDOMNESS
@@ -665,6 +668,14 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
         case NRFRR_SM_IDLE:
             if (_is_tx)
             {
+                if (_session_id == 0)
+                {
+                    while (_session_id == 0) {
+                        _session_id = nrfrr_rand();
+                    }
+                    Serial.printf("NRFRR[%u] initial session ID 0x%08X\r\n", now, _session_id);
+                }
+
                 if ((now - _last_tx_time) >= _tx_interval)
                 {
                     prep_tx();
@@ -674,8 +685,6 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             }
             else
             {
-                //prep_tx();
-                //_statemachine = NRFRR_SM_TX_START;
                 _statemachine = NRFRR_SM_RX_START;
                 _sm_time = now;
             }
@@ -697,9 +706,10 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
 
             if (_fem_tx >= 0) {
                 digitalWrite(_fem_tx, HIGH);
-            }
-            if (_fem_rx >= 0) {
-                digitalWrite(_fem_rx, LOW);
+                if (_fem_rx >= 0) {
+                    digitalWrite(_fem_rx, LOW);
+                }
+                delayMicroseconds(2);
             }
 
             // Maybe set the AES CCA module for the correct encryption mode
@@ -840,7 +850,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                 }
                 else
                 {
-                    uint32_t timeout = ((now - _last_rx_time) <= 1000) ? _tx_interval : (_tx_interval * 3);
+                    uint32_t timeout = ((now - _last_rx_time) <= 1000) ? _tx_interval : (_tx_interval * 5);
 
                     // when we lose just one packet, probably just follow the same hop schedule for a while
                     // but after a while, the transmitter might've been rebooted
@@ -1105,6 +1115,7 @@ bool nRF52RcRadio::validate_rx(void)
         {
             // start the new session
             _session_id = rx_sess;
+            Serial.printf("NRFRR[%u] attached session 0x%08X\r\n", millis(), _session_id);
             _seq_num_prev = rx_seq;
         }
         else if (_session_id == rx_sess)
@@ -1170,6 +1181,7 @@ bool nRF52RcRadio::validate_rx(void)
             }
             // start new session
             _session_id = rx_sess;
+            Serial.printf("NRFRR[%u] changed session 0x%08X\r\n", millis(), _session_id);
             _seq_num_prev = rx_seq;
         }
 
@@ -1387,6 +1399,12 @@ void nRF52RcRadio::resume(void)
 void nRF52RcRadio::cont_tx(uint16_t freq)
 {
     pause();
+    if (_fem_tx >= 0) {
+        digitalWrite(_fem_tx, HIGH);
+    }
+    if (_fem_rx >= 0) {
+        digitalWrite(_fem_rx, LOW);
+    }
     _statemachine = NRFRR_SM_CONT_TX;
     NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos);
     // RADIO_SHORTS_END_DISABLE must not be enabled

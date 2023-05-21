@@ -25,11 +25,12 @@
 
 #define NRFRR_FINGER_QUOTES_RANDOMNESS
 #define NRFRR_USE_NRF_RNG
+//#define NRFRR_USE_MANUAL_CRC
 
 //#define NRFRR_DEBUG_PINS
-#define NRFRR_DEBUG_PIN_TX 27
-#define NRFRR_DEBUG_PIN_RX 14
-#define NRFRR_DEBUG_PIN_CH 15
+//#define NRFRR_DEBUG_PIN_TX 27
+//#define NRFRR_DEBUG_PIN_RX 14
+//#define NRFRR_DEBUG_PIN_CH 15
 
 #define NRFRR_BIDIRECTIONAL
 #define NRFRR_ADAPTIVE_INTERVAL
@@ -39,13 +40,13 @@
 #define NRFRR_USE_FREQ_NORTHAMERICAN
 //#define NRFRR_USE_FREQ_EUROPEAN
 #define NRFRR_USE_FREQ_UPPER
+//#define NRFRR_USE_FREQ_LOWER_ONLY
 
-#define NRFRR_DEBUG_HOPTABLE
+//#define NRFRR_DEBUG_HOPTABLE
 //#define NRFRR_DEBUG_TX
 //#define NRFRR_DEBUG_RX
 //#define NRFRR_DEBUG_HOP
 #define NRFRR_DEBUG_RX_ERRSTATS
-//#define NRFRR_COUNT_RX_SPENT_TIME
 
 #define RH_NRF51_AES_CCM_CNF_SIZE 33
 
@@ -82,7 +83,8 @@ class nRF52RcRadio
     public:
         nRF52RcRadio  (bool is_tx); // constructor, selects if the role is transmitter or receiver
         void var_reset(void);       // sets all variables to initial state
-        void begin    (uint32_t chan_map, uint32_t uid, uint32_t salt, int fem_tx = -1, int fem_rx = -1); // init, provide channel map as a bitmask, unique identifier for pairing, and security salt
+        void begin    (int fem_tx = -1, int fem_rx = -1);      // init hardware
+        void config   (uint32_t chan_map, uint32_t uid, uint32_t salt); // provide channel map as a bitmask, unique identifier for pairing, and security salt
         void send     (uint8_t* data);                         // queue data to be sent, and optionally: send immediately
         int  available(void);                                  // check if new packet has been received
         int  read     (uint8_t* data);                         // copy the new packet to a buffer

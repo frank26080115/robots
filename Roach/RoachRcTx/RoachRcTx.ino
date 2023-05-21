@@ -123,7 +123,8 @@ void loop(void)
 
 void radio_init(void)
 {
-    radio.begin(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt, ROACHHW_PIN_FEM_TX, ROACHHW_PIN_FEM_RX);
+    radio.begin();
+    radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 }
 
 void ctrler_tasks(void)

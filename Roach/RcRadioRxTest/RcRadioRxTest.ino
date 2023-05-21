@@ -8,7 +8,8 @@ char msg_buf[NRFRR_PAYLOAD_SIZE];
 void setup()
 {
     Serial.begin(500000);
-    radio.begin(0xFFFF, 12, 34); // initialize with default channel map, a unique ID, and a salt
+    radio.begin();
+    radio.config(1, 12, 34); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()

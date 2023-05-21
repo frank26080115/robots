@@ -1,4 +1,5 @@
 #include "nRF5Rand.h"
+#include <stdint.h>
 
 #ifndef NRFX_RNG_CONFIG_ERROR_CORRECTION
 #define NRFX_RNG_CONFIG_ERROR_CORRECTION 1
@@ -28,10 +29,19 @@ void nrf5rand_init(int sz, bool use_irq, bool auto_restart)
     NRF_RNG->CONFIG = NRFX_RNG_CONFIG_ERROR_CORRECTION;
     NRFX_IRQ_PRIORITY_SET(RNG_IRQn, NRFX_RNG_CONFIG_IRQ_PRIORITY);
     if (need_irq) {
-        NRFX_IRQ_ENABLE(RNG_IRQn);
-        NRF_RNG->INTENSET = 1;
+        nrf5rand_startIrq();
     }
     NRF_RNG->TASKS_START = 1;
+}
+
+void nrf5rand_seed(bool quit)
+{
+    srand(nrf5rand_u32());
+    if (quit) {
+        NRF_RNG->TASKS_STOP = 1;
+        NRFX_IRQ_DISABLE(RNG_IRQn);
+        NRF_RNG->INTENCLR = 1;
+    }
 }
 
 void nrf5rand_vector(uint8_t* buf, int len)
@@ -56,7 +66,7 @@ void nrf5rand_vector(uint8_t* buf, int len)
     if (need_autorestart)
     {
         if (nrf5rand_avail() < rng_fifo_size / 2) {
-            NRF_RNG->INTENSET = 1;
+            nrf5rand_startIrq();
         }
     }
 
@@ -102,7 +112,7 @@ int nrf5rand_avail(void)
     if (need_autorestart)
     {
         if (x < rng_fifo_size / 2) {
-            NRF_RNG->INTENSET = 1;
+            nrf5rand_startIrq();
         }
     }
     return x;
@@ -115,13 +125,20 @@ void nrf5rand_flush(void)
     rng_fifo_r = 0;
     __enable_irq();
     if (need_irq || need_autorestart) {
-        NRF_RNG->INTENSET = 1;
+        nrf5rand_startIrq();
     }
 }
 
 void nrf5rand_stopIrq(void)
 {
+    NRFX_IRQ_DISABLE(RNG_IRQn);
     NRF_RNG->INTENCLR = 1;
+}
+
+void nrf5rand_startIrq(void)
+{
+    NRFX_IRQ_ENABLE(RNG_IRQn);
+    NRF_RNG->INTENSET = 1;
 }
 
 void nrf5rand_task(void)
@@ -143,7 +160,7 @@ static void rng_handler(void)
     }
     else
     {
-        NRF_RNG->INTENCLR = 1;
+        nrf5rand_stopIrq();
     }
     __enable_irq();
 }

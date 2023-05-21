@@ -1,4 +1,5 @@
 #include <nRF52RcRadio.h>
+#include <nRF5Rand.h>
 #include <Adafruit_TinyUSB.h>
 
 nRF52RcRadio radio(true); // is transmitter
@@ -7,8 +8,12 @@ char msg_buf[NRFRR_PAYLOAD_SIZE];
 
 void setup()
 {
+    nrf5rand_init(512, true, false);
+    nrf5rand_seed(false);
     Serial.begin(500000);
-    radio.begin(0xFFFF, 12, 34); // initialize with default channel map, a unique ID, and a salt
+    //radio.begin(2, 0);
+    radio.begin();
+    radio.config(1, 12, 34); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()
@@ -25,16 +30,16 @@ void loop()
     if (radio.available() > 0) // new message available
     {
         radio.read((uint8_t*)msg_buf); // read the new message into our application buffer
-        Serial.printf("RX: %s\r\n", msg_buf);
+        Serial.printf("RX[%u]: %s\r\n", now, msg_buf);
     }
     if (radio.textAvail() > 0) // new text message available
     {
         radio.textRead((char*)msg_buf); // read the new message into our application buffer
-        Serial.printf("RX TXT: %s\r\n", msg_buf);
+        Serial.printf("RX TXT[%u]: %s\r\n", now, msg_buf);
     }
     #endif
 
-    // do a statistics report every 5 seconds
+    // send a text message report every 10 seconds
     if ((now - last_time_text) >= 10000)
     {
         sprintf(msg_buf, "BLARG %u\r\n", now);
@@ -45,10 +50,12 @@ void loop()
     // do state machine things (actually sends the queued packet at the correct interval)
     radio.task();
 
+    nrf5rand_task(); // collect random numbers being generated
+
     // do a statistics report every one second
     if ((now - last_time_stat) >= 1000)
     {
-        Serial.printf("pkt rate %u\r\n", radio.get_data_rate());
+        Serial.printf("[%u]: pkt rate %u\r\n", now, radio.get_data_rate());
         last_time_stat = now;
     }
 }
