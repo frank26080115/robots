@@ -76,6 +76,7 @@ enum
     NRFRR_FLAG_REPLYREQUEST,
     NRFRR_FLAG_REPLY,
     NRFRR_FLAG_TEXT,
+    NRFRR_FLAG_PAIRING,
 };
 
 class nRF52RcRadio
@@ -90,6 +91,7 @@ class nRF52RcRadio
         int  read     (uint8_t* data);                         // copy the new packet to a buffer
         void task     (void);                                  // periodic task, call from loop()
         bool state_machine_run(uint32_t t, bool is_isr);       // innards of task(), but can be called from ISR
+        void start_new_session(void);                          // randomly generate new session ID
         int  textAvail(void);                                  // check if text message is available
         int  textRead (const char* buf);                       // read available text message
         void textSend (const char* buf);                       // send text message
@@ -104,6 +106,9 @@ class nRF52RcRadio
         void resume(void);
         bool is_paused(void);
         bool is_busy(void);
+
+        void pairing_start(void);
+        void pairing_stop(void);
 
         inline void set_reply_req_rate(uint16_t x) { _reply_request_rate = x; };
         void set_chan_map(uint32_t x);
@@ -126,6 +131,7 @@ class nRF52RcRadio
 
     private:
         bool     _is_tx;
+        bool     _is_pairing;
         int8_t   _fem_tx, _fem_rx;
         uint32_t _session_id;
         uint32_t _seq_num;
@@ -184,6 +190,7 @@ class nRF52RcRadio
         bool validate_rx(void);        // process the packet, return if it is valid
         void set_net_addr(uint32_t x); // place UID into hardware registers
         void init_hw(void);            // low level hardware init
+        void init_txpwr(void);         // set RF transmit power
         void prep_tx(void);            // prepare payload
         void gen_header(void);         // generate the frame header
         void gen_hop_table(void);      // generate freq hop table

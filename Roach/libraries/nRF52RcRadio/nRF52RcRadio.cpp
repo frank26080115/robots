@@ -19,7 +19,6 @@ typedef struct
     // I think there's room here for 254 bytes
 
     // metadata
-    uint32_t zero_pad;
     #ifdef NRFRR_FINGER_QUOTES_RANDOMNESS
     uint32_t rand;
     #endif
@@ -257,19 +256,26 @@ void nRF52RcRadio::init_hw(void)
             // TODO: test 2Mbit to see reliability
         #endif
         << RADIO_MODE_MODE_Pos) & RADIO_MODE_MODE_Msk);
-    NRF_RADIO->TXPOWER = ((
-        #ifdef RADIO_TXPOWER_TXPOWER_Pos8dBm
-            _fem_tx >= 0 ? RADIO_TXPOWER_TXPOWER_0dBm : RADIO_TXPOWER_TXPOWER_Pos8dBm
-        #else
-            RADIO_TXPOWER_TXPOWER_Pos4dBm
-        #endif
-        << RADIO_TXPOWER_TXPOWER_Pos) & RADIO_TXPOWER_TXPOWER_Msk);
+    init_txpwr();
 
     #ifdef NRFRR_USE_INTERRUPTS
     NVIC_SetPriority(RADIO_IRQn, 0);
     NVIC_ClearPendingIRQ(RADIO_IRQn);
     NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk | RADIO_INTENSET_DISABLED_Msk | RADIO_INTENSET_ADDRESS_Msk | RADIO_INTENSET_RSSIEND_Msk;
     #endif
+}
+
+void nRF52RcRadio::init_txpwr(void)
+{
+    // sets to the maximum available power
+    // but limits to +4 dBm if a FEM is attached (FEM only rated for +5 dBm)
+    NRF_RADIO->TXPOWER = ((
+    #ifdef RADIO_TXPOWER_TXPOWER_Pos8dBm
+        _fem_tx >= 0 ? RADIO_TXPOWER_TXPOWER_Pos4dBm : RADIO_TXPOWER_TXPOWER_Pos8dBm
+    #else
+        RADIO_TXPOWER_TXPOWER_Pos4dBm
+    #endif
+    << RADIO_TXPOWER_TXPOWER_Pos) & RADIO_TXPOWER_TXPOWER_Msk);
 }
 
 #ifdef NRFRR_USE_INTERRUPTS
@@ -481,7 +487,7 @@ void nRF52RcRadio::prep_tx(void)
 
     if (_seq_num == 0) {
         // roll-over occured, start new session
-        _session_id = nrfrr_rand();
+        start_new_session();
         Serial.printf("NRFRR next session ID 0x%08X\r\n", _session_id);
         _seq_num++;
     }
@@ -491,6 +497,11 @@ void nRF52RcRadio::next_chan(void)
 {
     _cur_chan++;
     _cur_chan %= _hop_tbl_len;
+
+    if (_is_pairing) {
+        _cur_chan = 0;
+    }
+
     uint8_t nchan = _hop_table[_cur_chan] - 1;
     //if (nchan != _last_chan) // prevent wasting time changing to the same channel
     {
@@ -521,7 +532,6 @@ void nRF52RcRadio::gen_header(void)
     ptr->s0 = 0;
     ptr->s1 = 0;
     ptr->len = sizeof(nrfrr_pkt_t);
-    ptr->zero_pad = 0;
 
     uint32_t r =
         #ifdef NRFRR_FINGER_QUOTES_RANDOMNESS
@@ -547,6 +557,10 @@ void nRF52RcRadio::gen_header(void)
     ptr->interval   = _tx_interval ^ r;
     #endif
     ptr->flags      = 0;
+
+    if (_is_pairing) {
+        ptr->flags |= (1 << NRFRR_FLAG_PAIRING);
+    }
 
     #ifdef NRFRR_BIDIRECTIONAL
     if (_is_tx == false)
@@ -670,9 +684,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             {
                 if (_session_id == 0)
                 {
-                    while (_session_id == 0) {
-                        _session_id = nrfrr_rand();
-                    }
+                    start_new_session();
                     Serial.printf("NRFRR[%u] initial session ID 0x%08X\r\n", now, _session_id);
                 }
 
@@ -911,11 +923,19 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                     #ifdef NRFRR_BIDIRECTIONAL
                     if (_reply_requested)
                     {
+                        _reply_requested = false;
                         prep_tx();
                         _statemachine = NRFRR_SM_TX_START_DELAY;
                     }
                     else
                     #endif
+                    if (_is_pairing)
+                    {
+                        _reply_requested = false;
+                        prep_tx();
+                        _statemachine = NRFRR_SM_TX_START_DELAY;
+                    }
+                    else
                     {
                         if (_single_chan_mode == false) {
                             next_chan();
@@ -1081,17 +1101,20 @@ bool nRF52RcRadio::validate_rx(void)
     uint8_t  rx_flags = parsed->flags   ^ r;
     uint32_t rx_seq   = parsed->seq_num ^ r;
 
-    if (rx_uid != (_uid & 0x00FFFFFF)) { // UID must match
-        #ifdef NRFRR_DEBUG_RX_ERRSTATS
-        _stat_rx_errs[2]++;
-        #endif
-        return false;
-    }
-    if (rx_sess == 0) { // invalid session ID
-        #ifdef NRFRR_DEBUG_RX_ERRSTATS
-        _stat_rx_errs[3]++;
-        #endif
-        return false;
+    if (_is_pairing == false) // only check for validity if not in pairing mode
+    {
+        if (rx_uid != (_uid & 0x00FFFFFF)) { // UID must match
+            #ifdef NRFRR_DEBUG_RX_ERRSTATS
+            _stat_rx_errs[2]++;
+            #endif
+            return false;
+        }
+        if (rx_sess == 0) { // invalid session ID
+            #ifdef NRFRR_DEBUG_RX_ERRSTATS
+            _stat_rx_errs[3]++;
+            #endif
+            return false;
+        }
     }
 
     #ifdef NRFRR_USE_MANUAL_CRC
@@ -1109,6 +1132,15 @@ bool nRF52RcRadio::validate_rx(void)
     }
     // checksum needs to be valid for the next few security features to work and not be overwhelmed
 
+    if (_is_pairing)
+    {
+        // in pairing mode, skip all checks
+        if ((rx_flags & (1 << NRFRR_FLAG_PAIRING)) == 0)
+        {
+            return false;
+        }
+    }
+    else
     if (_is_tx == false) // only receiver requires additional security
     {
         if (_session_id == 0) // first packet ever received
@@ -1183,19 +1215,26 @@ bool nRF52RcRadio::validate_rx(void)
             _session_id = rx_sess;
             Serial.printf("NRFRR[%u] changed session 0x%08X\r\n", millis(), _session_id);
             _seq_num_prev = rx_seq;
+            _reply_requested = true; // reply with new session ID
+        }
+        else // if is tx
+        {
+            if (_session_id != rx_sess)
+            {
+                // that's weird... the receiver isn't using the session ID we are using
+                // this could indicate that we have been attacked with a replay attack
+                start_new_session();
+            }
         }
 
         #ifdef NRFRR_ADAPTIVE_INTERVAL
         _tx_interval = parsed->interval ^ r;
+        _tx_interval = (_tx_interval > NRFRR_TX_INTERV_MAX) ? NRFRR_TX_INTERV_MAX : ((_tx_interval < NRFRR_TX_INTERV_MIN) ? NRFRR_TX_INTERV_MIN : _tx_interval);
         #endif
 
         #ifdef NRFRR_BIDIRECTIONAL
         if ((rx_flags & (1 << NRFRR_FLAG_REPLYREQUEST)) != 0 || _text_send_timer > 0) {
             _reply_requested = true;
-        }
-        else
-        {
-            _reply_requested = false;
         }
         #endif
     }
@@ -1334,9 +1373,9 @@ void nRF52RcRadio::textSend(const char* buf)
     strncpy((char*)txt_tx_buffer, (const char*)buf, NRFRR_PAYLOAD_SIZE - 2);
     _text_send_timer = _hop_tbl_len * NRFRR_TX_RETRANS_TXT; // makes sure the text is sent over all the channels a few times
     _seq_num++; // make sure the text is considered fresh
-    while (_seq_num == 0) {
+    if (_seq_num == 0) {
         // roll-over occured, start new session
-        _session_id = nrfrr_rand();
+        start_new_session();
         _seq_num++;
     }
 }
@@ -1353,6 +1392,30 @@ char* nRF52RcRadio::textReadPtr(bool clr)
 bool nRF52RcRadio::textIsDone(void)
 {
     return _text_send_timer <= 0;
+}
+
+void nRF52RcRadio::start_new_session(void)
+{
+    do {
+        _session_id = nrfrr_rand();
+    }
+    while (_session_id == 0);
+    _seq_num = 0;
+}
+
+void nRF52RcRadio::pairing_start(void)
+{
+    _is_pairing = true;
+    if (_is_tx == false) {
+        // lower the output of the receiver so that it's less likely to be snooped on
+        NRF_RADIO->TXPOWER = (RADIO_TXPOWER_TXPOWER_Neg30dBm << RADIO_TXPOWER_TXPOWER_Pos) & RADIO_TXPOWER_TXPOWER_Msk;
+    }
+}
+
+void nRF52RcRadio::pairing_stop(void)
+{
+    _is_pairing = false;
+    init_txpwr();
 }
 
 void nRF52RcRadio::pause(void)
