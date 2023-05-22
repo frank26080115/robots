@@ -54,7 +54,7 @@ I ran into some problems during this project's development. First, my FEM didn't
 
 I love Nordic Semiconductor. They make the nRF24L01 that was very popular and affordable many years ago. They were amongst the first to make BLE easily accessible to the DIY hobby community, which actually meant them being the first to enable DIY projects that involved iPhones and iPads (because iOS had no security restrictions on BLE devices, but heavy restrictions on BT Classic). I was actually able to do independant contractor work making wearable devices while I was still in college because the nRF51 family of chips.
 
-Nordic Semiconductor is able to provide BLE functionality through what they market as SoftDevice, which is a binary blob Bluetooth stack. From my experience building wearable devices, I became familiar with it. It is closed source but distributed for free and it is actually delivered with the Adafruit nRF52840 Express.
+Nordic Semiconductor is able to provide BLE functionality through what they market as SoftDevice, which is a binary blob Bluetooth stack. From my experience building wearable devices, I became familiar with it. It is closed source but distributed for free and it is actually delivered with the Adafruit Feather nRF52840 Express.
 
 I originally ignored this. I thought that if I never call any BLE related APIs, the SoftDevice wouldn't do anything. I was wrong to assume this.
 
