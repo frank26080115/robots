@@ -1,22 +1,28 @@
 Using the nRF52840's Radio
 ==========================
 
+The Roach ecosystem uses [Nordic Semiconductor nRF52840](https://www.nordicsemi.com/products/nrf52840) on both the remote controller and the robot. Specifically, I am using Adafruit's nRF52840 [Feather Express](https://www.adafruit.com/product/4062) and [ItsyBitsy](https://www.adafruit.com/product/4481). I came up with a custom RF communication protocol for the two nRF52840 to communicate with. (why? you ask? [link: project readme](readme.md))
+
 Goals:
 
  * low latency, high refresh rate unidiretional control
  * must be somewhat immune to interference and to security attacks
- * must be stateless, recover quickly from disconnections
+ * must be stateless, recover quickly from disconnections, no requirement for being bidirectional
  * optional: bidirectional communication for telemetry and diagnostics
  * optional: execute auxiliary commands remotely
 
-The nRF24L01 is the backbone of many popular hobby remote controls. So are the CYRF6936 from Cypress and CC2500 from Texas Instruments. The commercially available RC remote controls that use these chips all feature [FHSS, frequency hopping spread spectrum](https://en.wikipedia.org/wiki/Frequency-hopping_spread_spectrum). This is key to avoid interference, allowing for any model airplanes to fly together without problems.
+The nRF24L01 is the backbone of many popular hobby remote controls. So are the CYRF6936 from Cypress and CC2500 from Texas Instruments. The commercially available RC remote controls that use these chips all feature [FHSS, frequency hopping spread spectrum](https://en.wikipedia.org/wiki/Frequency-hopping_spread_spectrum). This is key to avoid interference, allowing for any model airplanes to fly together without problems. ([link to a project that uses all of these modules together](https://github.com/pascallanger/DIY-Multiprotocol-TX-Module/))
 
 My communication protocol involves the nRF52840's radio being used in the same proprietary mode that can talk with a nRF24L01. The radio also supports 802.15.4 modes (think of Zigbee and Thread and such protocols) and BLE, but the Nordic proprietary protocol offers faster transmissions than the 802.15.4 mode, and is stateless, unlike BLE.
+
+The latency is as low as physically possible since the radio is internal to the microcontroller, there's no latency from using a SPI bus (such as with an actual nRF24L01).
 
 Operation
 ---------
 
 From the remote-controller's point of view, packets are sent every 10 ms. Right after transmission, it goes into a listening mode for the optional telemetry from the robot. Right before the 10 ms mark, it changes the carrier frequency. (the commercially available remote controller use 20 ms intervals)
+
+![](doc/imgs/nrf52rcradio_protocol.fw.png)
 
 From the robot's point of view, it receives a packet, then immediately sends off the telemetry packet, and then hop the carrier frequency. If a packet is missed, it continues to keep to the 10 ms frequency hopping schedule in order to catch the next packet, but with the time window shifted just slightly earlier to make sure it can catch the next packet.
 
@@ -33,19 +39,43 @@ It actually gets even cooler than that, I actually use the text message capabili
 Extended Frequency Range
 ------------------------
 
-There's a huge advantage of the nRF52840 chip: it can actually use frequencies below 2.4 GHz, the radio allows for an **extended frequency range down all the way to 2.36 GHz**. This means by using the nRF52840, I have the option of **avoiding all interference from Wi-Fi, Bluetooth, any 802.15.4 devices, and also anything from CC2500 and CYRF6936.** My research does say that this range could be used for 4G LTE cellular communications but not in North America.
+There's a huge advantage of the nRF52840 chip: it can actually use frequencies below 2.4 GHz, the radio allows for an **extended frequency range down all the way to 2.36 GHz**. This means by using the nRF52840, I have the option of **avoiding all interference from Wi-Fi, Bluetooth, any 802.15.4 devices, and also anything from CC2500 and CYRF6936.** My research does say that this range could be used for 4G LTE cellular communications but not in North America. So technically I'm avoiding interference because it would be illegal for anybody to actually use this frequency range... `¯\_(ツ)_/¯`
 
 The FEM RF Amplifier
 --------------------
 
-I also designed a FEM (front-end-module) using a [Skyworks RFX2401C chip](https://www.skyworksinc.com/Products/Front-end-Modules/RFX2401C). It's a RF power amplifier and LNA combo chip that's supposed to boost my transmission power by about +22 dBm. I designed a tiny PCB with this chip on it, with a u.FL connector to connect an antenna. The chip-antenna on the nRF52840 module is removed, and the small PCB is soldered on top of where the old chip-antenna used to be.
+I also designed a FEM (front-end-module) using a [Skyworks RFX2401C chip](https://www.skyworksinc.com/Products/Front-end-Modules/RFX2401C). It's a RF power amplifier and LNA combo chip that's supposed to boost my transmission power by about +22 dBm. I designed a tiny PCB with this chip on it, with a u.FL connector to connect an external high-gain antenna.
 
-It is very common to find nRF24L01 being sold with a similar FEM [already attached](https://protosupplies.com/product/nrf24l01palna-2-4ghz-rf-wireless-module/), which is one of the inspirations for me adding a FEM. These combos are typically advertising a transmission range over 1 kilometer. I don't need that much range for my robotics competitions, but I know that the common commercially available hobby remote controllers do actually implement some sort of amplifier internally, as model aircrafts do need long ranges.
+![](libraries/nRF52RcRadio/elec-fem/photos/nrf52840-with-fem.jpg)
+
+The chip-antenna on the nRF52840 module is removed, and the small PCB is soldered on top of where the old chip-antenna used to be, copper shielding sheets are used to establish the ground to the module shielding. The copper is quite thick so the connection is mechanically strong. All traces are very short to minimize losses from insertion and from impedance mismatch.
+
+![](libraries/nRF52RcRadio/elec-fem/screenshot_pcb.png)
+
+The design for this PCB is found in my repo: https://github.com/frank26080115/robots/tree/main/Roach/libraries/nRF52RcRadio/elec-fem
+
+The results looks good, showing a significant gain when testing with a continuous carrier wave, and RSSI is also improved.
+
+![](doc/imgs/rf_explorer_fem_comparison.fw.png)
+
+However, since this is not an automatically switching FEM, I had to use GPIO pins to place the FEM in either transmit mode or receive mode, toggled with my state machine code. This means the FEM is not compatible with Bluetooth usage, as the Bluetooth stack Nordic Semiconductor provides is closed source. (Nordic sells their own compatible FEM, but it's more complex, uses 2 antennas and needs a SPI bus to control)
+
+It is very common to find nRF24L01 being sold with a similar FEM already attached, which is one of the inspirations for me adding a FEM.
+
+![](doc/imgs/nrf24l01palna.fw.png)
+
+These combos are typically advertising a transmission range over 1 kilometer. I don't need that much range for my robotics competitions, but I know that the common commercially available hobby remote controllers do actually implement some sort of amplifier internally, as model aircrafts do need long ranges.
 
 Testing and Diagnosis
 ---------------------
 
-I purchased a portable spectrum analyzer, the [RF Explorer](https://j3.rf-explorer.com/), to verify the correct operation of my frequency hopping and the amplifier. It works great and is a neat toy to own, but it does have trouble actually catching each packet sent by the nRF52840. My payload length is usually 64 bytes, which means the transmission is very short and the spectrum analyzer is likely to miss the packets during the scans. So while testing, I maximize the packet length (it's about 256 bytes). Then they start showing up on the waterfall graph.
+I purchased a portable spectrum analyzer, the [RF Explorer](https://j3.rf-explorer.com/), to verify the correct operation of my frequency hopping and the amplifier.
+
+![](doc/imgs/rf_explorer.webp)
+
+It works great and is a neat toy to own, but it does have trouble actually catching each packet sent by the nRF52840. My payload length is usually 64 bytes, which means the transmission is very short and the spectrum analyzer is likely to miss the packets during the scans. So while testing, I maximize the packet length (it's about 256 bytes). Then they start showing up on the waterfall graph.
+
+![](doc/imgs/rf_explorer_hopping.fw.png)
 
 Problem Involving SoftDevice
 ----------------------------
@@ -90,9 +120,13 @@ Random Number Generator
 
 The nRF52840 features a hardware RNG. They don't say much about it, they don't talk about how it works. Once it is enabled, every once in a while, a random 8 bit number is generated, and optionally, an ISR can fire upon this event. Annoyingly, the datasheet specifically says that the rate of generation is actually unpredictable, they don't even offer a range of timings.
 
+![](doc/imgs/nrf_rng_speed_datasheet.png)
+
 Sooooo if anybody is wondering, **I managed to generate a bit over 6000 numbers in the span of one second**. The time interval between each number might vary. I am writing this down in hopes that somebody looking for this data will find it here.
 
 The code I wrote places these numbers in a FIFO buffer as they are generated. I don't use enough for the FIFO to ever fully drain. Once the FIFO is full, the ISR is disabled to prevent unnecessary interruptions of other processes. The FIFO can then also be filled from the main thread without using the ISR, or it can also automatically re-enable the ISR below a certain threshold. All of these behaviours can be adjusted in my code.
+
+Firmware code library I wrote for the nRF RNG: https://github.com/frank26080115/robots/tree/main/Roach/libraries/nRF5Rand
 
 Other Notes
 -----------
@@ -110,8 +144,10 @@ Diagnosing this involved using a logic analyzer. GPIO pin toggles were performed
 
 In an ideal everything-working situation, I expected to see neat square waves from the logic analyzer. What I actually saw was a giant mess.
 
-The ESP32's internal code did not actually perform the channel hopping and the transmission at the time of the function call. The `esp_wifi_set_channel` was not effective immediately, which caused some huge problems. The packets being sent were also queued together and sent in bursts, the receiver would receive 5 packets all at once, instead of one every 10 millisecond. 
+![](doc/imgs/e32rcrad_freqhop_logic_100hz_short.fw.png)
 
-I did use Espressif's support forum to ask for help, specifically to ask how I can check if the channel has finished changing, and how to check a packet has been actually sent. They actually deleted my forum topic, refusing to help, censoring the hint to other users that their products can be used this way. Technically this is an exploit, previously these APIs were used to perform denial-of-service attacks by sending disassociation packets (https://github.com/justcallmekoko/ESP8266_Deauth_All). Today the API actually does have internal checks to make sure you don't send any packets that might be used for an attack, but I'm pretty sure you can still do it if you obtained an older version of ESP-IDF.
+The ESP32's internal code did not actually perform the channel hopping and the transmission at the time of the function call. The `esp_wifi_set_channel()` call was not effective immediately, which caused some huge problems. The packets being sent were also queued together and sent in bursts, the receiver would receive 5 packets all at once, instead of one every 10 millisecond.
+
+I did use Espressif's support forum to ask for help, specifically to ask how I can check if the channel has finished changing, and how to check a packet has been actually sent. They actually deleted my forum topic, refusing to help, censoring the hint to other users that their products can be used this way. Technically this is an exploit, previously these APIs were used to [perform denial-of-service attacks by sending disassociation packets](https://github.com/justcallmekoko/ESP8266_Deauth_All). Today the API actually does have internal checks to make sure you don't send any packets that might be used for an attack, but I'm pretty sure you can still do it if you obtained an older version of ESP-IDF. (see projects like [this one](https://github.com/Jeija/esp32free80211) and also [this one](https://github.com/Jeija/esp32-80211-tx))
 
 After realizing that this approach was never going to work on ESP32, I switched to using the nRF52840.

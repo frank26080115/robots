@@ -862,12 +862,20 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                 }
                 else
                 {
-                    uint32_t timeout = ((now - _last_rx_time) <= 1000) ? _tx_interval : (_tx_interval * 5);
-
-                    // when we lose just one packet, probably just follow the same hop schedule for a while
-                    // but after a while, the transmitter might've been rebooted
-                    // so it's better to slow down the hopping, so the transmitter can get back in sync
-                    // (not hopping at all is another option but what if that channel is just bad?)
+                    uint32_t timeout = _tx_interval;
+                    if ((now - _last_rx_time) <= 1000)
+                    {
+                        // when we lose just one packet, probably just follow the same hop schedule for a while
+                        // but, what if, the transmitter might've been rebooted
+                        // so it's better to slow down the hopping significantly, so the transmitter can get back in sync (catch up)
+                        // (not hopping at all is another option but what if that channel is just jammed?)
+                        timeout = _tx_interval * 5;
+                    }
+                    else if (_rx_miss_cnt == 1)
+                    {
+                        // recover some of the lost schedule time from previous longer timeout
+                        timeout -= _tx_interval / 4;
+                    }
 
                     if ((now - _last_hop_time) >= timeout)
                     {
