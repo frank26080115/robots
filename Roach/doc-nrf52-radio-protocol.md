@@ -39,7 +39,15 @@ It actually gets even cooler than that, I actually use the text message capabili
 Extended Frequency Range
 ------------------------
 
-There's a huge advantage of the nRF52840 chip: it can actually use frequencies below 2.4 GHz, the radio allows for an **extended frequency range down all the way to 2.36 GHz**. This means by using the nRF52840, I have the option of **avoiding all interference from Wi-Fi, Bluetooth, any 802.15.4 devices, and also anything from CC2500 and CYRF6936.** My research does say that this range could be used for 4G LTE cellular communications but not in North America. So technically I'm avoiding interference because it would be illegal for anybody to actually use this frequency range... `¯\_(ツ)_/¯`
+There's a huge advantage of the nRF52840 chip: it can actually use frequencies below 2.4 GHz, the radio allows for an **extended frequency range down all the way to 2.36 GHz**.
+
+![](doc/imgs/nrf52_datasheet_frequencies.png)
+
+I was informed by Nordic Semiconductor's engineers:
+
+> I believe these frequencies are reserved for aeronautical mobile telemetry (AMT) systems used to support flight testing of aircraft, missiles, etc. I think there was some talk while back on using part of this band for medical (body sensor networks) as well.
+
+My own research from FCC registrations show that LTE cellular devices also use this band but they are only for the Asian market.
 
 The FEM RF Amplifier
 --------------------
@@ -75,7 +83,9 @@ I purchased a portable spectrum analyzer, the [RF Explorer](https://j3.rf-explor
 
 It works great and is a neat toy to own, but it does have trouble actually catching each packet sent by the nRF52840. My payload length is usually 64 bytes, which means the transmission is very short and the spectrum analyzer is likely to miss the packets during the scans. So while testing, I maximize the packet length (it's about 256 bytes). Then they start showing up on the waterfall graph.
 
-![](doc/imgs/rf_explorer_hopping.fw.png)
+![](doc/imgs/rf_explorer_hopping.png)
+
+The above screenshot shows my frequency hopping algorithm on 6 frequencies. There is another device at 2450 MHz, I don't know what it actually is.
 
 Problem Involving SoftDevice
 ----------------------------

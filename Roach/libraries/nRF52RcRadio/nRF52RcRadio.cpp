@@ -72,6 +72,9 @@ static const uint16_t freq_lookup[] {
     0x000 + 80, // 2480 MHz
 #endif
 #endif
+#ifdef NRFRR_USE_FREQ_FULL_LEGAL
+    0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80
+#endif
 #ifdef NRFRR_USE_FREQ_UPPER
     // note: wifi chan 13 is 2472 MHz, ending at 2483 MHz
     0x000 + 90,  // 2490 MHz
@@ -251,9 +254,9 @@ void nRF52RcRadio::init_hw(void)
     NRF_RADIO->MODE    = ((
         #if defined(RADIO_MODE_MODE_Nrf_250Kbit) && false
             RADIO_MODE_MODE_Nrf_250Kbit
+            #error nRF52 doesn't have 250 Kbit mode
         #else
             RADIO_MODE_MODE_Nrf_1Mbit
-            // TODO: test 2Mbit to see reliability
         #endif
         << RADIO_MODE_MODE_Pos) & RADIO_MODE_MODE_Msk);
     init_txpwr();
@@ -1012,11 +1015,29 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
             break;
         case NRFRR_SM_HALTED:
             break;
-        case NRFRR_SM_CONT_TX:
+        case NRFRR_SM_CONT_TX_CARRIER:
             {
                 if (NRF_RADIO->STATE != RADIO_STATE_STATE_Tx && NRF_RADIO->STATE != RADIO_STATE_STATE_TxRu && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle)
                 {
                     NRF_RADIO->TASKS_TXEN = 1;
+                }
+            }
+            break;
+        case NRFRR_SM_CONT_TX_MOD:
+            {
+                if ((NRF_RADIO->STATE != RADIO_STATE_STATE_Tx && NRF_RADIO->STATE != RADIO_STATE_STATE_TxRu && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle))
+                {
+                    // random payload
+                    uint32_t* ptr = (uint32_t*)tx_buffer;
+                    int i;
+                    for (i = 0; i < NRFRR_PAYLOAD_SIZE / 4; i++) {
+                        ptr[i] = rand();
+                    }
+                    prep_tx();
+                    NRF_RADIO->TASKS_TXEN = 1;
+                    while (NRF_RADIO->STATE != RADIO_STATE_STATE_Tx && NRF_RADIO->STATE != RADIO_STATE_STATE_TxRu && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle) {
+                        yield();
+                    }
                 }
             }
             break;
@@ -1033,7 +1054,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
 
 bool nRF52RcRadio::is_busy(void)
 {
-    if (_statemachine == NRFRR_SM_TX_WAIT || _statemachine == NRFRR_SM_CONT_TX || _statemachine == NRFRR_SM_HALTED) {
+    if (_statemachine == NRFRR_SM_TX_WAIT || _statemachine == NRFRR_SM_CONT_TX_CARRIER || _statemachine == NRFRR_SM_CONT_TX_MOD || _statemachine == NRFRR_SM_HALTED) {
         return true;
     }
     if (_statemachine == NRFRR_SM_RX) {
@@ -1447,7 +1468,7 @@ bool nRF52RcRadio::is_paused(void)
 
 void nRF52RcRadio::resume(void)
 {
-    if (_statemachine == NRFRR_SM_CONT_TX) {
+    if (_statemachine == NRFRR_SM_CONT_TX_CARRIER || _statemachine == NRFRR_SM_CONT_TX_MOD) {
         NRF_RADIO->EVENTS_DISABLED = 0;
         #ifdef NRF51
         NRF_RADIO->TEST            = 0;
@@ -1467,7 +1488,7 @@ void nRF52RcRadio::resume(void)
     _statemachine_next = _statemachine;
 }
 
-void nRF52RcRadio::cont_tx(uint16_t freq)
+void nRF52RcRadio::cont_tx(uint16_t freq, bool mod, bool whiten)
 {
     pause();
     if (_fem_tx >= 0) {
@@ -1476,9 +1497,14 @@ void nRF52RcRadio::cont_tx(uint16_t freq)
     if (_fem_rx >= 0) {
         digitalWrite(_fem_rx, LOW);
     }
-    _statemachine = NRFRR_SM_CONT_TX;
-    NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos);
-    // RADIO_SHORTS_END_DISABLE must not be enabled
+    _statemachine = mod ? NRFRR_SM_CONT_TX_MOD : NRFRR_SM_CONT_TX_CARRIER;
+    if (mod == false) {
+        NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos);
+        // RADIO_SHORTS_END_DISABLE must not be enabled
+    }
+    if (whiten) {
+        NRF_RADIO->PCNF1 |= (1 << 25);
+    }
     NRF_RADIO->FREQUENCY  = freq;
     #ifdef NRF51
     NRF_RADIO->TEST       = (RADIO_TEST_CONSTCARRIER_Enabled << RADIO_TEST_CONSTCARRIER_Pos) | (RADIO_TEST_PLLLOCK_Enabled << RADIO_TEST_PLLLOCK_Pos);

@@ -36,11 +36,12 @@
 #define NRFRR_ADAPTIVE_INTERVAL
 //#define NRFRR_USE_INTERRUPTS
 
-#define NRFRR_USE_FREQ_LOWER
+//#define NRFRR_USE_FREQ_LOWER
 #define NRFRR_USE_FREQ_NORTHAMERICAN
 //#define NRFRR_USE_FREQ_EUROPEAN
-#define NRFRR_USE_FREQ_UPPER
+//#define NRFRR_USE_FREQ_UPPER
 //#define NRFRR_USE_FREQ_LOWER_ONLY
+//#define NRFRR_USE_FREQ_FULL_LEGAL
 
 //#define NRFRR_DEBUG_HOPTABLE
 //#define NRFRR_DEBUG_TX
@@ -68,7 +69,8 @@ enum
     NRFRR_SM_HALT_START,
     NRFRR_SM_HALT_WAIT,
     NRFRR_SM_HALTED,
-    NRFRR_SM_CONT_TX,
+    NRFRR_SM_CONT_TX_CARRIER,
+    NRFRR_SM_CONT_TX_MOD,
 };
 
 enum
@@ -127,7 +129,7 @@ class nRF52RcRadio
         inline uint32_t* get_rx_err_stat(void) { return _stat_rx_errs; };
         #endif
 
-        void cont_tx(uint16_t f);
+        void cont_tx(uint16_t f, bool mod, bool whiten);
 
     private:
         bool     _is_tx;
