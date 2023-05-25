@@ -17,7 +17,7 @@ class RoachButton
     private:
         int _pin;
         volatile uint32_t _last_down_time, _last_up_time, _last_change_time;
-        int _rep, _db;
+        unsigned int _rep, _db;
         volatile bool _pressed;
         bool _disabled = false;
         bool _faketoggle = false;

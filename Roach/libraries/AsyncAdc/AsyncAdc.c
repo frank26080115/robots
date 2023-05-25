@@ -208,7 +208,6 @@ bool IRAM_ATTR adcStart(uint8_t pin)
     }
 
     uint32_t saadcResolution;
-    volatile int16_t value = 0;
 
     if (readResolution <= 8) {
         lastResolution = 8;
