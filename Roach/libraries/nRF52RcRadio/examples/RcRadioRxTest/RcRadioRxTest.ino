@@ -9,7 +9,7 @@ void setup()
 {
     Serial.begin(500000);
     radio.begin();
-    radio.config(1, 12, 34); // initialize with default channel map, a unique ID, and a salt
+    radio.config(0x00FF, 12, 34); // initialize with default channel map, a unique ID, and a salt
 }
 
 void loop()
@@ -36,7 +36,7 @@ void loop()
     if (radio.textAvail() > 0)
     {
         radio.textRead((char*)msg_buf); // read the new message into our application buffer
-        Serial.printf("TEXT[%u]: %s\r\n", radio.get_txt_cnt(), msg_buf);
+        Serial.printf("TEXT[%u]: %s\r\n", now, msg_buf);
     }
 
     #ifdef NRFRR_BIDIRECTIONAL
@@ -48,10 +48,13 @@ void loop()
     // do a statistics report every one second
     if ((now - last_time_stat) >= 1000)
     {
-        uint32_t rx_total, rx_good;
-        signed rssi;
-        radio.get_rx_stats(&rx_total, &rx_good, &rssi);
-        Serial.printf("STAT: %u , %u / %u , %u, %d", radio.get_data_rate(), rx_good, rx_total, radio.get_loss_rate(), rssi);
+        Serial.printf("STAT: %u , %u / %u , %u, %d"
+            , radio.stats_rate.drate
+            , radio.stats_rate.good
+            , radio.stats_rate.calls
+            , radio.stats_rate.loss
+            , radio.getRssi()
+            );
         #ifdef NRFRR_COUNT_RX_SPENT_TIME
         Serial.printf(" , %0.1f / %u", (float)(((float)radio.get_rx_spent_time()) / (((float)1000.0))), now);
         #endif
@@ -59,7 +62,7 @@ void loop()
         #ifdef NRFRR_DEBUG_RX_ERRSTATS
         Serial.printf(" , RX-ERRs: ");
         // print out the occurance of each type of error
-        uint32_t* rx_errs = radio.get_rx_err_stat();
+        uint32_t* rx_errs = radio.getRxErrStat();
         int erridx;
         for (erridx = 0; erridx < 12; erridx++)
         {

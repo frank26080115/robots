@@ -6,86 +6,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define RH_NRF51_MAX_PAYLOAD_LEN 254
-#define NRFRR_PAYLOAD_SIZE   (64 * 1)
-// we want this to be long enough for strings, but short enough to fit, also shorter sends faster
-// doc: Independent of the configuration of MAXLEN, the combined length of S0, LENGTH, S1 and PAYLOAD cannot exceed 258 bytes.
-
-#define NRFRR_TX_INTERV_DEF  10
-// maximum transmission time for a 258 byte packet is 2.064 milliseconds if sent at at 1 Mbit/s
-
-#define NRFRR_TX_INTERV_MAX  100
-#define NRFRR_TX_INTERV_MIN  5
-#define NRFRR_TX_MIN_TIME    2
-#define NRFRR_TX_RETRANS_TXT 2
-#define NRFRR_CHAN_MAP_DEFAULT        0x0FFFFFFF
-#define NRFRR_CHAN_MAP_DEFAULT_SINGLE 0x02
-
-#define NRFRR_REM_USED_SESSIONS 32
-
-#define NRFRR_FINGER_QUOTES_RANDOMNESS
-#define NRFRR_USE_NRF_RNG
-//#define NRFRR_USE_MANUAL_CRC
-
-//#define NRFRR_DEBUG_PINS
-//#define NRFRR_DEBUG_PIN_TX 27
-//#define NRFRR_DEBUG_PIN_RX 14
-//#define NRFRR_DEBUG_PIN_CH 15
-
-#define NRFRR_BIDIRECTIONAL
-#define NRFRR_ADAPTIVE_INTERVAL
-//#define NRFRR_USE_INTERRUPTS
-
-//#define NRFRR_USE_FREQ_LOWER
-#define NRFRR_USE_FREQ_NORTHAMERICAN
-//#define NRFRR_USE_FREQ_EUROPEAN
-//#define NRFRR_USE_FREQ_UPPER
-//#define NRFRR_USE_FREQ_LOWER_ONLY
-//#define NRFRR_USE_FREQ_FULL_LEGAL
-
-//#define NRFRR_DEBUG_HOPTABLE
-//#define NRFRR_DEBUG_TX
-//#define NRFRR_DEBUG_RX
-//#define NRFRR_DEBUG_HOP
-#define NRFRR_DEBUG_RX_ERRSTATS
-
-#define RH_NRF51_AES_CCM_CNF_SIZE 33
-
-enum
-{
-    NRFRR_SM_IDLE_WAIT,
-    NRFRR_SM_IDLE,
-    NRFRR_SM_TX_START,
-    NRFRR_SM_TX_START_DELAY,
-    NRFRR_SM_TX_WAIT,
-    NRFRR_SM_RX_START,
-    NRFRR_SM_RX,
-    NRFRR_SM_RX_END_WAIT,
-    NRFRR_SM_RX_END_WAIT2,
-    NRFRR_SM_RX_END,
-    NRFRR_SM_HOP_START,
-    NRFRR_SM_HOP_WAIT,
-    NRFRR_SM_CHAN_WAIT,
-    NRFRR_SM_HALT_START,
-    NRFRR_SM_HALT_WAIT,
-    NRFRR_SM_HALTED,
-    NRFRR_SM_CONT_TX_CARRIER,
-    NRFRR_SM_CONT_TX_MOD,
-};
-
-enum
-{
-    NRFRR_FLAG_REPLYREQUEST,
-    NRFRR_FLAG_REPLY,
-    NRFRR_FLAG_TEXT,
-    NRFRR_FLAG_PAIRING,
-};
+#include "nrfrr_conf.h"
+#include "nrfrr_defs.h"
+#include "nrfrr_types.h"
 
 class nRF52RcRadio
 {
     public:
         nRF52RcRadio  (bool is_tx); // constructor, selects if the role is transmitter or receiver
-        void var_reset(void);       // sets all variables to initial state
         void begin    (int fem_tx = -1, int fem_rx = -1);      // init hardware
         void config   (uint32_t chan_map, uint32_t uid, uint32_t salt); // provide channel map as a bitmask, unique identifier for pairing, and security salt
         void send     (uint8_t* data);                         // queue data to be sent, and optionally: send immediately
@@ -101,40 +29,43 @@ class nRF52RcRadio
         bool textIsDone(void);
         uint8_t* readPtr(void);
 
-        inline bool   connected(void) { return _connected; };
-        inline int8_t get_rssi (void) { return _stat_rx_rssi; };
+        inline bool   isConnected(void) { return _connected; }; // check if the other end is connected, based on a timeout
+        inline int8_t getRssi    (void) { return _rssi; };      // RSSI, 16 is the best it can do, higher numer is worse
 
-        void pause(void);
-        void resume(void);
-        bool is_paused(void);
-        bool is_busy(void);
+        void pause(void);        // halts the state machine until resume is called
+        void resume(void);       // resumes halted state machine
+        bool isPaused(void);     // checks if state machine is halted
+        bool isBusy(void);       // radio is busy waiting for something, so there's time for other application processing
 
-        void pairing_start(void);
-        void pairing_stop(void);
+        void pairingStart(void); // starts pairing mode
+        void pairingStop(void);  // stops pairing mode
 
-        inline void set_reply_req_rate(uint16_t x) { _reply_request_rate = x; };
-        void set_chan_map(uint32_t x);
-        void set_tx_interval(uint16_t x);
-        inline uint16_t get_tx_interval(void) { return _tx_interval; };
+        inline void setReplyReqRate(uint16_t x) { _reply_request_rate = x; }; // sets how often the robot is asked to reply
+        void setChanMap(uint32_t x);                                          // gives the radio a new channel map during runtime
+        void setTxInterval(uint16_t x);                                       // sets new transmission interval while respecting the limits
+        inline uint16_t getTxInterval(void) { return _tx_interval; };
 
-        inline uint32_t get_last_rx_time (void) { return _last_rx_time; };
-        inline uint32_t get_data_rate    (void) { return _stat_drate; };
-        inline uint32_t get_loss_rate    (void) { return _stat_loss_rate; };
-               void     get_rx_stats     (uint32_t* total, uint32_t* good, signed* rssi);
-        inline uint32_t get_rx_spent_time(void) { return _stat_rx_spent_time; };
-        inline void     add_rx_spent_time(uint32_t x) { _stat_rx_spent_time += x; };
-        inline uint32_t get_txt_cnt      (void) { return _stat_txt_cnt; };
+        radiostats_t stats_rate;
+        radiostats_t stats_sum;
 
         #ifdef NRFRR_DEBUG_RX_ERRSTATS
-        inline uint32_t* get_rx_err_stat(void) { return _stat_rx_errs; };
+        inline uint32_t* getRxErrStat(void) { return _stat_rx_errs; };
         #endif
 
-        void cont_tx(uint16_t f, bool mod, bool whiten);
+        void contTxTest(uint16_t f, bool mod); // continuous transmission test, modulated or unmodulated carrier
 
     private:
-        bool     _is_tx;
-        bool     _is_pairing;
-        int8_t   _fem_tx, _fem_rx;
+        bool     _is_tx; // role
+
+        // connection identifiers
+        uint32_t _salt;
+        uint32_t _uid;
+        uint32_t _chan_map;
+
+        int8_t   _fem_tx, _fem_rx;     // pin numbers for FEM, negative for unconnected
+
+        bool     _is_pairing;          // whether pairing mode is active or not, pairing disables packet validation
+
         uint32_t _session_id;
         uint32_t _seq_num;
         uint32_t _seq_num_prev;
@@ -143,9 +74,6 @@ class nRF52RcRadio
         uint32_t _sm_time;
         uint32_t _sm_evt_time;
         bool     _connected;
-        uint32_t _salt;
-        uint32_t _uid;
-        uint32_t _chan_map;
         uint8_t  _cur_chan;
         int8_t   _last_chan;
         bool     _single_chan_mode;
@@ -156,32 +84,25 @@ class nRF52RcRadio
         bool     _reply_requested;
         bool     _reply_request_latch;
         uint16_t _reply_request_rate;
-        uint32_t _stat_tx_cnt;
-        uint32_t _stat_rx_cnt;
-        uint32_t _stat_txt_cnt;
-        uint32_t _stat_rx_lost;
-        uint32_t _stat_tmr;
-        uint32_t _stat_drate;
-        uint32_t _stat_loss_rate;
-        uint32_t _rx_miss_cnt;
+
+        int8_t   _rssi;
+        radiostats_t stats_tmp;
+
+        uint32_t _last_rx_time;        // time of reception, after the packet is validated
+        uint32_t _last_hop_time;       // time of last frequency hop
+        uint32_t _last_tx_time;        // time of last transmission
+        uint32_t _rx_time_cache;       // time of reception, before the packet is validated
+        uint32_t _rx_miss_cnt;         // used to determine if a missed packet is the first, second, or n-th, missed packet
+        uint32_t _reply_bad_session;   // count bad session IDs in the replies, used to detect replay attacks
+
+        int32_t  _text_send_timer;     // counter for text sending redundancy
+
         #ifdef NRFRR_DEBUG_RX_ERRSTATS
         uint32_t _stat_rx_errs[12];
         #endif
 
-        uint32_t _stat_rx_total;
-        uint32_t _stat_rx_good;
-        int8_t   _stat_rx_rssi;
-        uint32_t _stat_rx_spent_time;
-
-        uint32_t _last_rx_time;
-        uint32_t _last_hop_time;
-        uint32_t _last_tx_time;
-        uint32_t _rx_time_cache;
-
-        int32_t  _text_send_timer;
-
         #ifdef NRFRR_DEBUG_PINS
-        uint8_t _dbgpin_tx, _dbgpin_rx, _dbgpin_ch;
+        uint8_t _dbgpin_tx, _dbgpin_rx, _dbgpin_ch; // used to track previous pin state for sake of toggling
         #endif
 
         bool    _encrypting;
@@ -189,6 +110,7 @@ class nRF52RcRadio
         uint8_t _scratch[RH_NRF51_MAX_PAYLOAD_LEN+1+16];
         void set_encryption(void);
 
+        void var_reset(void);          // sets all variables to initial state
         bool validate_rx(void);        // process the packet, return if it is valid
         void set_net_addr(uint32_t x); // place UID into hardware registers
         void init_hw(void);            // low level hardware init

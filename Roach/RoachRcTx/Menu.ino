@@ -9,7 +9,7 @@ extern const uint8_t icon_mismatched[];
 int printRfStats(int y)
 {
     oled.setCursor(0, y);
-    if (radio.connected() == false)
+    if (radio.isConnected() == false)
     {
         oled.drawBitmap(0, 0, icon_disconnected, 16, 8, SSD1306_WHITE);
     }
@@ -24,7 +24,7 @@ int printRfStats(int y)
             oled.drawBitmap(0, 0, icon_mismatched, 16, 8, SSD1306_WHITE);
         }
         oled.setCursor(16, y);
-        oled.printf("%d %d %0.1f", radio.get_rssi(), telem_pkt.rssi, ((float)telem_pkt.loss_rate) / 100.0);
+        oled.printf("%d %d %0.1f", radio.getRssi(), telem_pkt.rssi, ((float)telem_pkt.loss_rate) / 100.0);
     }
     return y;
 }
@@ -59,10 +59,10 @@ class RoachMenuHome : public RoachMenu
             oled.printf("%c%-4d %c%d", tx_pkt.throttle >= 0 ? 0x18 : 0x19, abs(tx_pkt.throttle), tx_pkt.steering < 0 ? 0x1B : 0x1A, abs(tx_pkt.steering));
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            if (radio.connected() && telem_pkt.heading == 0x7FFF) {
+            if (radio.isConnected() && telem_pkt.heading == 0x7FFF) {
                 oled.printf("IMUFAIL");
             }
-            else if (radio.connected()) {
+            else if (radio.isConnected()) {
                 oled.printf("H:%-4d  %d", roach_div_rounded(tx_pkt.heading, 100), telem_pkt.heading);
             }
             else {

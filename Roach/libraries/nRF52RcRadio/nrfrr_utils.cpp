@@ -42,3 +42,12 @@ uint32_t nrfrr_rand(void)
         return rand();
     }
 }
+
+void nrfrr_fakeCipher(uint8_t* buf, uint32_t x, uint32_t y)
+{
+    uint32_t* tmp32 = (uint32_t*)buf;
+    tmp32[0] = x;
+    tmp32[1] = y != 0 ? y : x;
+    tmp32[2] = nrfrr_getCheckSum(0, (uint8_t*)tmp32, 8);
+    tmp32[3] = nrfrr_getCheckSum(0, (uint8_t*)&(tmp32[1]), 8);
+}

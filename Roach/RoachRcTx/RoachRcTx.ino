@@ -136,7 +136,7 @@ void ctrler_tasks(void)
     nbtwi_task(); // send any queued data to OLED
     radio.task(); // run the radio state machine, sends buffered data when time is right
 
-    if (radio.is_busy()) // if the transmission is happening, then we have time to do extra stuff
+    if (radio.isBusy()) // if the transmission is happening, then we have time to do extra stuff
     {
         RoachEnc_task();     // transfers hardware values to RAM atomically
         nrf5rand_task();     // collect random numbers from RNG

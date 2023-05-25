@@ -8,43 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct
-{
-    uint8_t s0;
-    uint8_t len;
-    uint8_t s1;
-
-    // automatic encryption covers the following
-    // checksum coverage is from here as well
-    // I think there's room here for 254 bytes
-
-    // metadata
-    #ifdef NRFRR_FINGER_QUOTES_RANDOMNESS
-    uint32_t rand;
-    #endif
-    uint32_t uid;
-    uint32_t seq_num;
-    uint32_t session;
-    uint8_t  chan_hint; // what channel index was actually used to TX
-    uint8_t  flags;     // contains things like a reply-request
-    #ifdef NRFRR_ADAPTIVE_INTERVAL
-    uint8_t  interval;  // transmission interval that the receiver can adapt the timeout
-    #endif
-
-    // payload
-    uint8_t payload[NRFRR_PAYLOAD_SIZE];
-
-    #ifdef NRFRR_USE_MANUAL_CRC
-    uint32_t checksum; // checksum starting from end of the header, excluding self
-                       // not to be confused with automatic CRC
-    #endif
-}
-__attribute__ ((packed))
-nrfrr_pkt_t;
-
 // nRF52's frequency register doesn't care about 802.15.4 channels, it's actually just raw frequency
 // so we only make the "good" ones available
-static const uint16_t freq_lookup[] {
+static const uint16_t freq_lookup[] = {
 #ifdef NRFRR_USE_FREQ_LOWER
     0x100 +  0, // 2360 MHz
     0x100 +  5, // 2365 MHz
@@ -73,6 +39,7 @@ static const uint16_t freq_lookup[] {
 #endif
 #endif
 #ifdef NRFRR_USE_FREQ_FULL_LEGAL
+    // all channels between 2400 and 2480 MHz
     0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80
 #endif
 #ifdef NRFRR_USE_FREQ_UPPER
@@ -85,12 +52,12 @@ static const uint16_t freq_lookup[] {
 
 static uint8_t tx_buffer[NRFRR_PAYLOAD_SIZE];          // application buffer
 static uint8_t rx_buffer[NRFRR_PAYLOAD_SIZE];          // application buffer
-static uint8_t frame_buffer[sizeof(nrfrr_pkt_t) + 32]; // the buffer that's used by underlying hardware
+static uint8_t frame_buffer[64 * 5];                   // the buffer that's used by underlying hardware
 static bool    rx_flag;                                // indicator of new packet received
 
-static char    txt_rx_buffer[NRFRR_PAYLOAD_SIZE]; // application text buffer
-static char    txt_tx_buffer[NRFRR_PAYLOAD_SIZE]; // application text buffer
-static bool    txt_flag;                          // indicator of text packet received
+static char    txt_rx_buffer[sizeof(radio_binpkt_t)]; // application text buffer
+static char    txt_tx_buffer[sizeof(radio_binpkt_t)]; // application text buffer
+static bool    txt_flag;                              // indicator of text packet received
 
 static uint32_t invalid_sessions[NRFRR_REM_USED_SESSIONS];
 
@@ -100,6 +67,7 @@ static nRF52RcRadio* instance; // only one instance allowed for the callback
 
 extern uint32_t nrfrr_getCheckSum(uint32_t salt, uint8_t* data, uint8_t len);
 extern uint32_t nrfrr_rand(void);
+extern void     nrfrr_fakeCipher(uint8_t* buf, uint32_t x, uint32_t y);
 
 nRF52RcRadio::nRF52RcRadio(bool is_tx)
 {
@@ -117,28 +85,18 @@ void nRF52RcRadio::var_reset(void)
     _seq_num_prev = 0;
     _statemachine = 0;
     _statemachine_next = 0;
-    _stat_tmr = 0;
-    _stat_tx_cnt = 0;
-    _stat_rx_cnt = 0;
-    _stat_txt_cnt = 0;
-    _stat_drate = 0;
-    _stat_rx_lost = 0;
-    _stat_loss_rate = 0;
     #ifdef NRFRR_DEBUG_RX_ERRSTATS
     memset(_stat_rx_errs, 0, 4*12);
     #endif
-    _stat_rx_total = 0;
-    _stat_rx_good = 0;
     _last_rx_time = 0;
     _last_tx_time = 0;
     _last_hop_time = 0;
     _tx_replyreq_tmr = 0;
-    _reply_request_rate = 1000;
+    _reply_request_rate = 200;
     _reply_request_latch = false;
     _cur_chan = 0;
     _last_chan = -1;
     _text_send_timer = 0;
-    _stat_rx_spent_time = 0;
     rx_flag = false;
     txt_flag = false;
 }
@@ -183,7 +141,7 @@ void nRF52RcRadio::config(uint32_t chan_map, uint32_t uid, uint32_t salt)
     _uid = uid;
     _salt = salt;
 
-    set_chan_map(chan_map);
+    setChanMap(chan_map);
 
     set_net_addr(_uid);
 
@@ -254,7 +212,7 @@ void nRF52RcRadio::init_hw(void)
     NRF_RADIO->MODE    = ((
         #if defined(RADIO_MODE_MODE_Nrf_250Kbit) && false
             RADIO_MODE_MODE_Nrf_250Kbit
-            #error nRF52 doesn't have 250 Kbit mode
+            #error nRF52 does not have 250 Kbit mode
         #else
             RADIO_MODE_MODE_Nrf_1Mbit
         #endif
@@ -324,12 +282,9 @@ void nRF52RcRadio::set_encryption(void)
     {
         // fake an encryption key with existing information
         // TODO: maybe add a way to load a real key from flash file
-        uint32_t tmp32[4];
-        tmp32[0] = _uid;
-        tmp32[1] = _salt;
-        tmp32[2] = nrfrr_getCheckSum(0, (uint8_t*)tmp32, 8);
-        tmp32[3] = nrfrr_getCheckSum(0, (uint8_t*)&(tmp32[1]), 8);
-        uint8_t* tmp8 = (uint8_t*)tmp32;
+        uint8_t tmp8[RH_NRF51_AES_CCM_CNF_SIZE];
+        memset(tmp8, 0, RH_NRF51_AES_CCM_CNF_SIZE);
+        nrfrr_fakeCipher((uint8_t*)tmp8, _salt, _salt);
 
         int i, j;
         for (i = 0, j = 0; i < RH_NRF51_AES_CCM_CNF_SIZE; i++)
@@ -388,12 +343,9 @@ void nRF52RcRadio::gen_hop_table(void)
 
     if (_salt != 0)
     {
-        uint32_t tmp32[4];
-        tmp32[0] = _uid;
-        tmp32[1] = _salt;
-        tmp32[2] = nrfrr_getCheckSum(0, (uint8_t*)tmp32, 8);
-        tmp32[3] = nrfrr_getCheckSum(0, (uint8_t*)&(tmp32[1]), 8);
-        uint8_t* tmp8 = (uint8_t*)tmp32;
+        uint8_t tmp8[4 * 4];
+        memset(tmp8, 0, 4 * 4);
+        nrfrr_fakeCipher((uint8_t*)tmp8, _salt, _uid);
 
         // shuffle the table according to our salt
         // this prevents jamming by following a known hop sequence
@@ -414,9 +366,8 @@ void nRF52RcRadio::gen_hop_table(void)
     _cur_chan %= _hop_tbl_len;
 }
 
-void nRF52RcRadio::set_chan_map(uint32_t x)
+void nRF52RcRadio::setChanMap(uint32_t x)
 {
-    _single_chan_mode = (x & 0x80000000) != 0;
     uint32_t i, m;
     for (i = 0, m = 0; i < (sizeof(freq_lookup) / 2); i++)
     {
@@ -427,7 +378,7 @@ void nRF52RcRadio::set_chan_map(uint32_t x)
     gen_hop_table();
 }
 
-void nRF52RcRadio::set_tx_interval(uint16_t x)
+void nRF52RcRadio::setTxInterval(uint16_t x)
 {
     _tx_interval = x > NRFRR_TX_INTERV_MAX ? NRFRR_TX_INTERV_MAX : (x < NRFRR_TX_INTERV_MIN ? NRFRR_TX_INTERV_MIN : x);
 }
@@ -448,11 +399,17 @@ void nRF52RcRadio::prep_tx(void)
     }
 
     uint8_t* src_buf = is_text ? (uint8_t*)txt_tx_buffer : (uint8_t*)tx_buffer;
+    uint32_t buf_len = is_text ? sizeof(radio_binpkt_t) : NRFRR_PAYLOAD_SIZE;
+    uint32_t total_len = sizeof(nrfrr_pkt_t);
+    total_len += is_text ? (sizeof(radio_binpkt_t) - NRFRR_PAYLOAD_SIZE) : 0;
+    ptr->len = total_len;
 
-    memcpy(ptr->payload, src_buf, NRFRR_PAYLOAD_SIZE);
+    memcpy(ptr->payload, src_buf, buf_len);
 
     #ifdef NRFRR_USE_MANUAL_CRC
-    ptr->chksum = nrfrr_getCheckSum(_salt, &(frame_buffer[NRFRR_CHECKSUM_START_IDX]), sizeof(nrfrr_pkt_t) - 4 - NRFRR_CHECKSUM_START_IDX);
+    uint32_t* crc_ptr = (uint32_t*)&(frame_buffer[buf_len]);
+    *crc_ptr = nrfrr_getCheckSum(_salt, &(frame_buffer[NRFRR_CHECKSUM_START_IDX]), total_len - NRFRR_CHECKSUM_START_IDX);
+    ptr->len += 4;
     #endif
 
     #ifdef NRFRR_DEBUG_TX
@@ -465,7 +422,7 @@ void nRF52RcRadio::prep_tx(void)
     Serial.printf("\r\n");
     #endif
 
-    _stat_tx_cnt++;
+    stats_rate.tx++;
     _last_tx_time = millis();
 
     #ifdef NRFRR_DEBUG_HOP
@@ -719,13 +676,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                 _connected = false;
             }
 
-            if (_fem_tx >= 0) {
-                digitalWrite(_fem_tx, HIGH);
-                if (_fem_rx >= 0) {
-                    digitalWrite(_fem_rx, LOW);
-                }
-                delayMicroseconds(2);
-            }
+            FEM_TX();
 
             // Maybe set the AES CCA module for the correct encryption mode
             if (_encrypting) {
@@ -754,9 +705,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                 #ifdef NRFRR_DEBUG_PINS
                 digitalWrite(NRFRR_DEBUG_PIN_TX, LOW);
                 #endif
-                if (_fem_tx >= 0) {
-                    digitalWrite(_fem_tx, LOW);
-                }
+                FEM_OFF();
 
                 if (_is_tx)
                 {
@@ -785,12 +734,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                     _connected = false;
                 }
 
-                if (_fem_tx >= 0) {
-                    digitalWrite(_fem_tx, LOW);
-                }
-                if (_fem_rx >= 0) {
-                    digitalWrite(_fem_rx, HIGH);
-                }
+                FEM_RX();
 
                 NRF_RADIO->EVENTS_DISABLED = 0;
                 NRF_RADIO->EVENTS_END = 0;
@@ -857,6 +801,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                     if ((now - _last_rx_time) >= (_tx_interval + (_tx_interval / 2)))
                     {
                         _rx_miss_cnt++;
+                        stats_tmp.rx_miss++;
                         _statemachine = NRFRR_SM_HOP_START;
                         _statemachine_next = NRFRR_SM_RX_START;
                         _sm_time = now;
@@ -883,6 +828,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                     if ((now - _last_hop_time) >= timeout)
                     {
                         _rx_miss_cnt++;
+                        stats_tmp.rx_miss++;
                         _statemachine = NRFRR_SM_HOP_START;
                         _statemachine_next = NRFRR_SM_RX_START;
                         _sm_time = now;
@@ -922,9 +868,6 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
                 _connected = true;
                 if (_is_tx)
                 {
-                    if (_single_chan_mode == false) {
-                        next_chan();
-                    }
                     _statemachine = NRFRR_SM_CHAN_WAIT;
                     _statemachine_next = NRFRR_SM_IDLE;
                     _sm_time = now;
@@ -1052,7 +995,7 @@ bool nRF52RcRadio::state_machine_run(uint32_t now, bool is_isr)
     return ret;
 }
 
-bool nRF52RcRadio::is_busy(void)
+bool nRF52RcRadio::isBusy(void)
 {
     if (_statemachine == NRFRR_SM_TX_WAIT || _statemachine == NRFRR_SM_CONT_TX_CARRIER || _statemachine == NRFRR_SM_CONT_TX_MOD || _statemachine == NRFRR_SM_HALTED) {
         return true;
@@ -1073,22 +1016,18 @@ void nRF52RcRadio::task(void)
         yield();
     }
 
-    if ((now - _stat_tmr) >= 1000)
+    if ((now - stats_rate.timestamp) >= 1000)
     {
-        _stat_drate = _is_tx ? _stat_tx_cnt : _stat_rx_cnt;
-        _stat_loss_rate = _stat_rx_lost;
-        _stat_tx_cnt = 0;
-        _stat_rx_cnt = 0;
-        _stat_rx_lost = 0;
-        _stat_tmr = now;
-
-        // every second, if in single channel RX mode, assess if the data rate is poor, and switch channel if it is
-        if (_is_tx == false && _single_chan_mode)
-        {
-            if (_stat_drate < ((1000 / 20) - 5)) {
-                next_chan();
-            }
+        stats_tmp.loss = stats_tmp.seq_miss > stats_tmp.rx_miss ? stats_tmp.seq_miss : stats_tmp.rx_miss; // lost sequence numbers won't update if no packets are received, so take the timeout counts instead
+        stats_tmp.drate = _is_tx ? stats_tmp.tx : stats_tmp.rx;
+        memcpy(&stats_rate, &stats_tmp, sizeof(radiostats_t));
+        uint32_t* src_ptr = (uint32_t*)&stats_tmp;
+        uint32_t* dst_ptr = (uint32_t*)&stats_sum;
+        for (int i = 2; i < sizeof(radiostats_t); i++) {
+            dst_ptr[i] += src_ptr[i];
         }
+        memset(&stats_tmp, 0, sizeof(radiostats_t));
+        stats_rate.timestamp = now;
     }
 }
 
@@ -1096,7 +1035,7 @@ bool nRF52RcRadio::validate_rx(void)
 {
     uint32_t now = millis();
 
-    _stat_rx_total++;
+    stats_tmp.calls++;
 
     uint8_t* u8_ptr = (uint8_t*)frame_buffer;
     nrfrr_pkt_t* parsed = (nrfrr_pkt_t*)u8_ptr;
@@ -1148,8 +1087,10 @@ bool nRF52RcRadio::validate_rx(void)
 
     #ifdef NRFRR_USE_MANUAL_CRC
     // verify checksum of payload against claimed checksum
-    uint32_t chksum = nrfrr_getCheckSum(_salt, &(u8_ptr[NRFRR_CHECKSUM_START_IDX]), sizeof(nrfrr_pkt_t) - 4 - NRFRR_CHECKSUM_START_IDX);
-    if (parsed->chksum != chksum)
+    uint32_t pkt_len = parsed->len;
+    uint32_t chksum = nrfrr_getCheckSum(_salt, &(u8_ptr[NRFRR_CHECKSUM_START_IDX]), pkt_len - 4 - NRFRR_CHECKSUM_START_IDX);
+    uint32_t* chksum_ptr = (uint32_t*)&(u8_ptr[pkt_len - 4]);
+    if ((*chksum_ptr) != chksum)
     #else
     if (!NRF_RADIO->CRCSTATUS)
     #endif
@@ -1202,7 +1143,7 @@ bool nRF52RcRadio::validate_rx(void)
             uint32_t diff = rx_seq - _seq_num_prev;
             diff -= 1;
             diff = diff > 0xFFFF ? 0xFFFF : diff;
-            _stat_rx_lost += diff;
+            stats_tmp.seq_miss += diff;
 
             _seq_num_prev = rx_seq;
         }
@@ -1246,19 +1187,9 @@ bool nRF52RcRadio::validate_rx(void)
             _seq_num_prev = rx_seq;
             _reply_requested = true; // reply with new session ID
         }
-        else // if is tx
-        {
-            if (_session_id != rx_sess)
-            {
-                // that's weird... the receiver isn't using the session ID we are using
-                // this could indicate that we have been attacked with a replay attack
-                start_new_session();
-            }
-        }
 
         #ifdef NRFRR_ADAPTIVE_INTERVAL
-        _tx_interval = parsed->interval ^ r;
-        _tx_interval = (_tx_interval > NRFRR_TX_INTERV_MAX) ? NRFRR_TX_INTERV_MAX : ((_tx_interval < NRFRR_TX_INTERV_MIN) ? NRFRR_TX_INTERV_MIN : _tx_interval);
+        setTxInterval(parsed->interval ^ r);
         #endif
 
         #ifdef NRFRR_BIDIRECTIONAL
@@ -1271,12 +1202,25 @@ bool nRF52RcRadio::validate_rx(void)
     else // _is_tx == true
     {
         // a reply isn't critical, but make sure the session ID is correct
-        if (_session_id != rx_sess) {
+        if (_session_id != rx_sess)
+        {
+            if (_reply_bad_session > 4)
+            {
+                // that's weird... the receiver isn't using the session ID we are using
+                // this could indicate that we have been attacked with a replay attack
+                start_new_session();
+            }
+            else
+            {
+                _reply_bad_session++;
+            }
+
             #ifdef NRFRR_DEBUG_RX_ERRSTATS
             _stat_rx_errs[7]++;
             #endif
             return false;
         }
+        _reply_bad_session = 0;
 
         if (rx_seq <= _seq_num_prev)
         {
@@ -1305,7 +1249,7 @@ bool nRF52RcRadio::validate_rx(void)
     }
     else {
         txt_flag = true;
-        _stat_txt_cnt++;
+        stats_tmp.txt++;
     }
     _reply_request_latch = false;
 
@@ -1329,25 +1273,12 @@ bool nRF52RcRadio::validate_rx(void)
     #endif
 
     _last_rx_time = _rx_time_cache;
-    _stat_rx_rssi = NRF_RADIO->RSSISAMPLE;
-    _stat_rx_good++;
-    _stat_rx_cnt++;
+    _rssi = NRF_RADIO->RSSISAMPLE;
+    stats_tmp.good++;
+    stats_tmp.rx++;
     _rx_miss_cnt = 0;
 
     return true;
-}
-
-void nRF52RcRadio::get_rx_stats(uint32_t* total, uint32_t* good, signed* rssi)
-{
-    if (total != NULL) {
-        *total = _stat_rx_total;
-    }
-    if (good != NULL) {
-        *good = _stat_rx_good;
-    }
-    if (rssi != NULL) {
-        *rssi = _stat_rx_rssi;
-    }
 }
 
 int nRF52RcRadio::available(void)
@@ -1379,7 +1310,7 @@ uint8_t* nRF52RcRadio::readPtr(void)
 int nRF52RcRadio::textAvail(void)
 {
     task();
-    return txt_flag ? NRFRR_PAYLOAD_SIZE : 0;
+    return txt_flag ? sizeof(radio_binpkt_t) : 0;
 }
 
 int nRF52RcRadio::textRead(const char* buf)
@@ -1389,17 +1320,17 @@ int nRF52RcRadio::textRead(const char* buf)
     {
         if (buf != NULL) {
             // copy to user buffer if available
-            strncpy((char*)buf, (const char*)txt_rx_buffer, NRFRR_PAYLOAD_SIZE - 2);
+            memcpy((char*)buf, (const char*)txt_rx_buffer, sizeof(radio_binpkt_t));
         }
         txt_flag = false; // mark as read
-        return NRFRR_PAYLOAD_SIZE; // report success
+        return sizeof(radio_binpkt_t); // report success
     }
     return -1; // report no data
 }
 
 void nRF52RcRadio::textSend(const char* buf)
 {
-    strncpy((char*)txt_tx_buffer, (const char*)buf, NRFRR_PAYLOAD_SIZE - 2);
+    memcpy((char*)txt_tx_buffer, (const char*)buf, sizeof(radio_binpkt_t));
     _text_send_timer = _hop_tbl_len * NRFRR_TX_RETRANS_TXT; // makes sure the text is sent over all the channels a few times
     _seq_num++; // make sure the text is considered fresh
     if (_seq_num == 0) {
@@ -1432,7 +1363,7 @@ void nRF52RcRadio::start_new_session(void)
     _seq_num = 0;
 }
 
-void nRF52RcRadio::pairing_start(void)
+void nRF52RcRadio::pairingStart(void)
 {
     _is_pairing = true;
     if (_is_tx == false) {
@@ -1441,7 +1372,7 @@ void nRF52RcRadio::pairing_start(void)
     }
 }
 
-void nRF52RcRadio::pairing_stop(void)
+void nRF52RcRadio::pairingStop(void)
 {
     _is_pairing = false;
     init_txpwr();
@@ -1454,14 +1385,14 @@ void nRF52RcRadio::pause(void)
     {
         _statemachine = NRFRR_SM_HALT_START;
         _statemachine_next = _statemachine;
-        while (is_paused() == false) {
+        while (isPaused() == false) {
             task();
             yield();
         }
     }
 }
 
-bool nRF52RcRadio::is_paused(void)
+bool nRF52RcRadio::isPaused(void)
 {
     return _statemachine == NRFRR_SM_HALTED;
 }
@@ -1479,7 +1410,7 @@ void nRF52RcRadio::resume(void)
     }
     if (_statemachine >= NRFRR_SM_HALT_START)
     {
-        while (is_paused() == false) {
+        while (isPaused() == false) {
             task();
             yield();
         }
@@ -1488,22 +1419,14 @@ void nRF52RcRadio::resume(void)
     _statemachine_next = _statemachine;
 }
 
-void nRF52RcRadio::cont_tx(uint16_t freq, bool mod, bool whiten)
+void nRF52RcRadio::contTxTest(uint16_t freq, bool mod)
 {
     pause();
-    if (_fem_tx >= 0) {
-        digitalWrite(_fem_tx, HIGH);
-    }
-    if (_fem_rx >= 0) {
-        digitalWrite(_fem_rx, LOW);
-    }
+    FEM_TX();
     _statemachine = mod ? NRFRR_SM_CONT_TX_MOD : NRFRR_SM_CONT_TX_CARRIER;
     if (mod == false) {
         NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Enabled << RADIO_SHORTS_READY_START_Pos);
         // RADIO_SHORTS_END_DISABLE must not be enabled
-    }
-    if (whiten) {
-        NRF_RADIO->PCNF1 |= (1 << 25);
     }
     NRF_RADIO->FREQUENCY  = freq;
     #ifdef NRF51

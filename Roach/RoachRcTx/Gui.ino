@@ -32,7 +32,7 @@ bool gui_canDisplay(void)
     if (nbtwi_isBusy() != false) {
         return false;
     }
-    if (radio.is_busy())
+    if (radio.isBusy())
     {
         uint32_t now = millis();
         if ((now - gui_last_draw_time) >= 80) {

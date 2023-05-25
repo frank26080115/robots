@@ -87,7 +87,7 @@ void conttx_func(void* cmd, char* argstr, Stream* stream)
 {
     int f = atoi(argstr);
     stream->printf("RF cont-tx test f=%d\r\n", f);
-    radio.cont_tx(f, false, false);
+    radio.contTxTest(f, false);
 }
 
 void regenrf_func(void* cmd, char* argstr, Stream* stream)

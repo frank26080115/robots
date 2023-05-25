@@ -29,7 +29,7 @@ uint32_t rosync_uploadIdx = 0, rosync_uploadTotal = 0;
 
 void rosync_task(void)
 {
-    if (rosync_statemachine != ROSYNC_SM_DISCONNECTED && radio.connected() == false)
+    if (rosync_statemachine != ROSYNC_SM_DISCONNECTED && radio.isConnected() == false)
     {
         if (rosync_descDlFile.isOpen()) {
             rosync_descDlFile.close();
@@ -41,7 +41,7 @@ void rosync_task(void)
     switch (rosync_statemachine)
     {
         case ROSYNC_SM_DISCONNECTED:
-            if (radio.connected())
+            if (radio.isConnected())
             {
                 // the robot has reconnected, the disconnection might've been momentary, so all the previous data is kept and verified
 
@@ -192,7 +192,7 @@ bool rosync_downloadStart(void)
         }
         return rosync_downloadDescFile();
     }
-    else if (rosync_nvm_sz > 0 && rosync_nvm != NULL && radio.connected())
+    else if (rosync_nvm_sz > 0 && rosync_nvm != NULL && radio.isConnected())
     {
         rosync_downloadNvm();
         return true;

@@ -13,7 +13,7 @@ void setup()
     Serial.begin(500000);
     //radio.begin(2, 0);
     radio.begin();
-    radio.config(1, 12, 34); // initialize with default channel map, a unique ID, and a salt
+    radio.config(0x00FF, 12, 34);
 }
 
 void loop()
@@ -55,7 +55,7 @@ void loop()
     // do a statistics report every one second
     if ((now - last_time_stat) >= 1000)
     {
-        Serial.printf("[%u]: pkt rate %u\r\n", now, radio.get_data_rate());
+        Serial.printf("[%u]: pkt rate %u\r\n", now, radio.stats_rate.drate);
         last_time_stat = now;
     }
 }
