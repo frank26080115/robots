@@ -16,7 +16,7 @@ enum
 class RoachPot
 {
     public:
-        RoachPot(int pin, roach_nvm_pot_t* c);
+        RoachPot(int pin, roach_nvm_pot_t* c, uint32_t g = SAADC_CH_CONFIG_GAIN_Gain1_6, uint32_t r = SAADC_CH_CONFIG_REFSEL_Internal);
         void begin(void);
         int16_t get(void);
         int16_t getAdcFiltered(void);
@@ -26,6 +26,7 @@ class RoachPot
         void calib_limits(void);
         void calib_stop(void);
         void simulate(int x);
+        void prep(void);
         bool has_new;
         bool calib_done;
         roach_nvm_pot_t* cfg;
@@ -38,6 +39,7 @@ class RoachPot
         int32_t last_adc_filter;
         int32_t calib_sum, calib_cnt;
         int32_t simulate_val;
+        uint32_t nrf_gain, nrf_ref;
 };
 
 void RoachPot_allTask(void);

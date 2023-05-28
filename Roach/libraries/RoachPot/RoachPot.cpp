@@ -8,13 +8,15 @@ static int pot_pin[POT_CNT_MAX];
 static int pot_task_idx = 0;
 static uint8_t adc_state_machine = ROACHPOT_SM_IDLE;
 
-RoachPot::RoachPot(int pin, roach_nvm_pot_t* c)
+RoachPot::RoachPot(int pin, roach_nvm_pot_t* c, uint32_t g, uint32_t r)
 {
     _pin = pin;
     cfg = c;
     pot_inst[pot_cnt] = this;
     pot_pin[pot_cnt] = _pin;
     pot_cnt++;
+    nrf_gain = g; // SAADC_CH_CONFIG_GAIN_Gain1_6;
+    nrf_ref = r; // SAADC_CH_CONFIG_REFSEL_Internal;
 }
 
 void RoachPot::begin(void)
@@ -34,6 +36,7 @@ int16_t RoachPot_task(int p)
     }
     if (adc_state_machine == ROACHPOT_SM_IDLE)
     {
+        pot_inst[pot_task_idx]->prep();
         adcStart(cur_pin);
         adc_state_machine = ROACHPOT_SM_CONVERTING;
     }
@@ -44,6 +47,7 @@ int16_t RoachPot_task(int p)
             int16_t x = adcEnd(cur_pin);
             ret = x;
             pot_task_idx = (pot_task_idx + 1) % pot_cnt;
+            pot_inst[pot_task_idx]->prep();
             adcStart(pot_pin[pot_task_idx]);
         }
     }
@@ -137,6 +141,11 @@ void RoachPot::task(void)
             last_val = roach_expo_curve32(last_val, cfg->expo);
         }
     }
+}
+
+void RoachPot::prep(void)
+{
+    adcSetNrfSaadc(nrf_gain, nrf_ref);
 }
 
 void RoachPot_allTask(void)

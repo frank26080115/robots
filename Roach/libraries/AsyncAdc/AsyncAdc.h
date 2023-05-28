@@ -20,6 +20,7 @@ extern uint16_t adcEnd(uint8_t pin);// __attribute__ ((weak, alias("__adcEnd")))
 #if defined(NRF52840_XXAA) || defined(NRF52) || defined(NRF52_SERIES)
 void adcSetReference(eAnalogReference ulMode);
 void adcSetReadResolution(int res);
+void adcSetNrfSaadc(uint32_t gain, uint32_t ref);
 #endif
 
 #ifdef __cplusplus

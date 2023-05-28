@@ -95,6 +95,12 @@ void adcSetReference(eAnalogReference ulMode)
   }
 }
 
+void adcSetNrfSaadc(uint32_t gain, uint32_t ref)
+{
+    saadcGain = gain;
+    saadcReference = ref;
+}
+
 void adcSetReadResolution(int res)
 {
   readResolution = res;
