@@ -67,7 +67,9 @@ static nRF52RcRadio* instance; // only one instance allowed for the callback
 
 extern uint32_t nrfrr_getCheckSum(uint32_t salt, uint8_t* data, uint8_t len);
 extern uint32_t nrfrr_rand(void);
-extern void     nrfrr_fakeCipher(uint8_t* buf, uint32_t x, uint32_t y);
+extern void     nrfrr_fakeCipher(uint8_t* buf, uint8_t len, uint32_t x);
+extern void     nrfrr_rand2seed(uint32_t x);
+extern uint32_t nrfrr_rand2(void);
 
 nRF52RcRadio::nRF52RcRadio(bool is_tx)
 {
@@ -284,7 +286,7 @@ void nRF52RcRadio::set_encryption(void)
         // TODO: maybe add a way to load a real key from flash file
         uint8_t tmp8[RH_NRF51_AES_CCM_CNF_SIZE];
         memset(tmp8, 0, RH_NRF51_AES_CCM_CNF_SIZE);
-        nrfrr_fakeCipher((uint8_t*)tmp8, _salt, _salt);
+        nrfrr_fakeCipher((uint8_t*)tmp8, RH_NRF51_AES_CCM_CNF_SIZE, _salt);
 
         int i, j;
         for (i = 0, j = 0; i < RH_NRF51_AES_CCM_CNF_SIZE; i++)
@@ -343,15 +345,12 @@ void nRF52RcRadio::gen_hop_table(void)
 
     if (_salt != 0)
     {
-        uint8_t tmp8[4 * 4];
-        memset(tmp8, 0, 4 * 4);
-        nrfrr_fakeCipher((uint8_t*)tmp8, _salt, _uid);
-
+        nrfrr_rand2seed(_salt);
         // shuffle the table according to our salt
         // this prevents jamming by following a known hop sequence
         for (i = 0; i < _hop_tbl_len; i++)
         {
-            j = tmp8[i] % _hop_tbl_len;
+            j = nrfrr_rand2() % _hop_tbl_len;
             uint8_t t = _hop_table[j];
             _hop_table[j] = _hop_table[i];
             _hop_table[i] = t;

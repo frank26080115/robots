@@ -43,11 +43,33 @@ uint32_t nrfrr_rand(void)
     }
 }
 
-void nrfrr_fakeCipher(uint8_t* buf, uint32_t x, uint32_t y)
+uint32_t nrfrr_rand_state = 0;
+
+uint32_t nrfrr_rand2(void)
 {
+    uint32_t val = nrfrr_rand_state;
+    val = ((nrfrr_rand_state * 1103515245) + 12345) & 0x7fffffff;
+    nrfrr_rand_state = val;
+    return val;
+}
+
+void nrfrr_rand2seed(uint32_t x)
+{
+    nrfrr_rand_state = x;
+}
+
+void nrfrr_fakeCipher(uint8_t* buf, uint8_t len, uint32_t x)
+{
+    nrfrr_rand2seed(x);
+    int i;
     uint32_t* tmp32 = (uint32_t*)buf;
-    tmp32[0] = x;
-    tmp32[1] = y != 0 ? y : x;
-    tmp32[2] = nrfrr_getCheckSum(0, (uint8_t*)tmp32, 8);
-    tmp32[3] = nrfrr_getCheckSum(0, (uint8_t*)&(tmp32[1]), 8);
+    for (i = 0; i < len; i += 4)
+    {
+        tmp32[i / 4] = nrfrr_rand2();
+    }
+    i -= 4;
+    for (; i < len; i++)
+    {
+        buf[i] = nrfrr_rand2();
+    }
 }

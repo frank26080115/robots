@@ -85,6 +85,7 @@ typedef struct
 {
     uint8_t  typecode;
     uint32_t addr;
+    uint8_t  len;
     uint8_t  data[NRFRR_PAYLOAD_SIZE2];
 }
 __attribute__ ((packed))

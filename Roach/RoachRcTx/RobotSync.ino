@@ -202,10 +202,11 @@ bool rosync_downloadStart(void)
 
 bool rosync_downloadDescChunk(char* str)
 {
-    if (str[0] == 'D' && str[1] == 'D')
+    radio_binpkt_t* ptr = (radio_binpkt_t*)str;
+    if (ptr->typecode == 'D')
     {
-        int i, slen = strlen(str);
-        if (slen <= 3)
+        int i, dlen = ptr->len;
+        if (dlen == 0)
         {
             rosync_descDlFile.close();
             if (rosync_loadDescFileId(telem_pkt.chksum_desc))
@@ -234,14 +235,9 @@ bool rosync_downloadDescChunk(char* str)
             return true;
         }
 
-        char tmphex[3];
-        tmphex[2] = 0;
-        for (i = 3; i < slen; i += 2)
+        for (i = 0; i < dlen; i++)
         {
-            tmphex[0] = str[i];
-            tmphex[1] = str[i + 1];
-            uint8_t x = (uint8_t)strtoul(tmphex, NULL, 16);
-            rosync_descDlFile.write(x);
+            rosync_descDlFile.write(ptr->data[i]);
             rosync_descDlFileSize += 1;
         }
         rosync_lastRxTime = millis();
@@ -260,23 +256,19 @@ bool rosync_downloadNvmChunk(char* str)
     bool ret = false;
     bool done = false;
 
-    if (str[0] == 'D' && str[1] == 'N')
+    radio_binpkt_t* ptr = (radio_binpkt_t*)str;
+
+    if (ptr->typecode == 'N')
     {
         ret = true;
-        int i, slen = strlen(str);
-        if (slen <= 3)
-        {
+        if (ptr->len == 0) {
             done = true;
         }
 
-        char tmphex[3];
-        tmphex[2] = 0;
-        for (i = 3; done == false && i < slen && rosync_nvm_wptr < rosync_nvm_sz; i += 2)
+        int i, dlen = ptr->len;
+        for (i = 0, rosync_nvm_wptr = ptr->addr; done == false && i < dlen && rosync_nvm_wptr < rosync_nvm_sz; i++)
         {
-            tmphex[0] = str[i];
-            tmphex[1] = str[i + 1];
-            uint8_t x = (uint8_t)strtoul(tmphex, NULL, 16);
-            rosync_nvm[rosync_nvm_wptr] = x;
+            rosync_nvm[rosync_nvm_wptr] = ptr->data[i];
             rosync_nvm_wptr += 1;
         }
         if (rosync_nvm_wptr >= rosync_nvm_sz) {
