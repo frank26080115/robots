@@ -97,6 +97,16 @@ roach_nvm_pid_t;
 
 typedef struct
 {
+    int32_t limit_rot;
+    int32_t limit_diff;
+    int32_t accel;
+    int32_t deccel;
+}
+PACK_STRUCT
+roach_nvm_virheading_t;
+
+typedef struct
+{
     int16_t center;
     int16_t deadzone;
     int16_t limit_max;
