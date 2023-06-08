@@ -22,9 +22,11 @@ class nRF52RcRadio
         void task     (void);                                  // periodic task, call from loop()
         bool state_machine_run(uint32_t t, bool is_isr);       // innards of task(), but can be called from ISR
         void start_new_session(void);                          // randomly generate new session ID
-        int  textAvail(void);                                  // check if text message is available
-        int  textRead (const char* buf);                       // read available text message
+        int  textAvail(void);                                  // check if text/bin message is available
+        int  textRead (void* buf);                             // read available text/bin message
         void textSend (const char* buf);                       // send text message
+        void textSendBin(radio_binpkt_t* pkt);                 // send binary message
+        void textSendByte(uint8_t x);                          // send binary message, but only single byte
         char* textReadPtr(bool clr);
         bool textIsDone(void);
         uint8_t* readPtr(void);
@@ -69,6 +71,8 @@ class nRF52RcRadio
         uint32_t _session_id;
         uint32_t _seq_num;
         uint32_t _seq_num_prev;
+        uint32_t _reply_seq;
+        uint32_t _txt_seq;
         uint8_t  _statemachine = NRFRR_SM_IDLE_WAIT;
         uint8_t  _statemachine_next;
         uint32_t _sm_time;

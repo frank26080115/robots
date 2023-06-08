@@ -29,6 +29,9 @@ typedef struct
     #ifdef NRFRR_ADAPTIVE_INTERVAL
     uint8_t  interval;  // transmission interval that the receiver can adapt the timeout
     #endif
+    #ifdef NRFRR_BIDIRECTIONAL
+    uint8_t  ack_seq;
+    #endif
 
     // payload
     uint8_t payload[NRFRR_PAYLOAD_SIZE];

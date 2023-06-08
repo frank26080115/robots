@@ -32,6 +32,14 @@ enum
     ROACH_FLIP_REV_LEFT,
 };
 
+enum
+{
+    ROACHCMD_TEXT = '!',
+    ROACHCMD_SYNC_DOWNLOAD_DESC = 'D',
+    ROACHCMD_SYNC_DOWNLOAD_CONF = 'd',
+    ROACHCMD_SYNC_UPLOAD_CONF   = 'C',
+};
+
 // try to keep this under 32 bytes
 typedef struct
 {

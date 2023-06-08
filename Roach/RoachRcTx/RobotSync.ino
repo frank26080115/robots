@@ -171,14 +171,14 @@ bool rosync_downloadDescFile(void)
         Serial.printf("ERR[%u]: unable to open or create \"%s\" to be written\r\n", millis(), fname);
         return false;
     }
-    radio.textSend("DLDESC");
+    radio.textSendByte(ROACHCMD_SYNC_DOWNLOAD_DESC);
     rosync_statemachine = ROSYNC_SM_DOWNLOADDESC;
     return true;
 }
 
 void rosync_downloadNvm(void)
 {
-    radio.textSend("DLNVM");
+    radio.textSendByte(ROACHCMD_SYNC_DOWNLOAD_CONF);
     rosync_nvm_wptr = 0;
     rosync_statemachine = ROSYNC_SM_DOWNLOADNVM;
 }
@@ -200,13 +200,12 @@ bool rosync_downloadStart(void)
     return false;
 }
 
-bool rosync_downloadDescChunk(char* str)
+bool rosync_downloadDescChunk(radio_binpkt_t* pkt)
 {
-    radio_binpkt_t* ptr = (radio_binpkt_t*)str;
-    if (ptr->typecode == 'D')
+    if (pkt->typecode == ROACHCMD_SYNC_DOWNLOAD_DESC)
     {
-        int i, dlen = ptr->len;
-        if (dlen == 0)
+        int i, dlen = pkt->len;
+        if (dlen == 0) // indicate end of transfer
         {
             rosync_descDlFile.close();
             if (rosync_loadDescFileId(telem_pkt.chksum_desc))
@@ -235,9 +234,11 @@ bool rosync_downloadDescChunk(char* str)
             return true;
         }
 
+        dlen = dlen > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : dlen;
+
         for (i = 0; i < dlen; i++)
         {
-            rosync_descDlFile.write(ptr->data[i]);
+            rosync_descDlFile.write(pkt->data[i]);
             rosync_descDlFileSize += 1;
         }
         rosync_lastRxTime = millis();
@@ -246,29 +247,36 @@ bool rosync_downloadDescChunk(char* str)
     return false;
 }
 
-bool rosync_downloadNvmChunk(char* str)
+bool rosync_downloadNvmChunk(radio_binpkt_t* pkt)
 {
     if (rosync_nvm == NULL)
     {
-        return false;
+        if (pkt->typecode == ROACHCMD_SYNC_DOWNLOAD_CONF && pkt->addr == 0 && pkt->len > 0)
+        {
+            rosync_nvm = (uint8_t*)malloc(pkt->len);
+            rosync_nvm_sz = pkt->len;
+        }
+        else
+        {
+            return false;
+        }
     }
 
     bool ret = false;
     bool done = false;
 
-    radio_binpkt_t* ptr = (radio_binpkt_t*)str;
-
-    if (ptr->typecode == 'N')
+    if (pkt->typecode == ROACHCMD_SYNC_DOWNLOAD_CONF)
     {
         ret = true;
-        if (ptr->len == 0) {
+        if (pkt->len == 0) {
             done = true;
         }
 
-        int i, dlen = ptr->len;
-        for (i = 0, rosync_nvm_wptr = ptr->addr; done == false && i < dlen && rosync_nvm_wptr < rosync_nvm_sz; i++)
+        int i, dlen = pkt->len;
+        dlen = dlen > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : dlen;
+        for (i = 0, rosync_nvm_wptr = pkt->addr; done == false && i < dlen && rosync_nvm_wptr < rosync_nvm_sz; i++)
         {
-            rosync_nvm[rosync_nvm_wptr] = ptr->data[i];
+            rosync_nvm[rosync_nvm_wptr] = pkt->data[i];
             rosync_nvm_wptr += 1;
         }
         if (rosync_nvm_wptr >= rosync_nvm_sz) {
@@ -361,7 +369,7 @@ bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
         roach_nvm_gui_desc_t* d = &rosync_desc_tbl[i];
         sum = d->byte_offset > sum ? d->byte_offset : sum;
     }
-    sum += 4;
+    sum += 4; // just in case
     rosync_nvm_sz = sum;
     rosync_nvm = (uint8_t*)malloc(sum);
 
@@ -419,23 +427,19 @@ void rosync_uploadStart(void)
 {
     rosync_statemachine = ROSYNC_SM_UPLOAD;
     rosync_uploadIdx = 0;
-    int i;
-    for (i = 0; ; i++) {
-        roach_nvm_gui_desc_t* desc = &rosync_desc_tbl[i];
-        if (desc->name[0] == 0) {
-            rosync_uploadTotal = i;
-            break;
-        }
-    }
+    rosync_uploadTotal = roachnvm_getDescCnt(rosync_desc_tbl);
 }
 
 void rosync_uploadChunk(roach_nvm_gui_desc_t* desc)
 {
-    static char rosync_uploadCache[NRFRR_PAYLOAD_SIZE];
+    radio_binpkt_t pkt;
+    pkt.typecode = ROACHCMD_SYNC_UPLOAD_CONF;
     char tmp[32];
     roachnvm_formatitem(tmp, (uint8_t*)rosync_nvm, desc);
-    sprintf((char*)rosync_uploadCache, "UL %s=%s\n", desc->name, tmp);
-    radio.textSend((const char*)rosync_uploadCache);
+    int i = sprintf((char*)(pkt.data), "%s=%s\n", desc->name, tmp);
+    pkt.addr = 0;
+    pkt.len = i;
+    radio.textSendBin(&pkt);
 }
 
 void rosync_uploadNextChunk(void)
