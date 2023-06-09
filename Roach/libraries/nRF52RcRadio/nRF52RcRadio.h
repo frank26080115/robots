@@ -23,8 +23,9 @@ class nRF52RcRadio
         bool state_machine_run(uint32_t t, bool is_isr);       // innards of task(), but can be called from ISR
         void start_new_session(void);                          // randomly generate new session ID
         int  textAvail(void);                                  // check if text/bin message is available
-        int  textRead (void* buf);                             // read available text/bin message
-        void textSend (const char* buf);                       // send text message
+        int  textRead(const char* buf, bool clr);              // read available text/bin message
+        int  textReadBin(radio_binpkt_t* buf, bool clr);       // read available text/bin message
+        void textSend(const char* buf);                        // send text message
         void textSendBin(radio_binpkt_t* pkt);                 // send binary message
         void textSendByte(uint8_t x);                          // send binary message, but only single byte
         char* textReadPtr(bool clr);

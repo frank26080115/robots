@@ -13,15 +13,17 @@ class RoachDriveMixer
         inline int32_t getLeft (void) { return _result_left;  };
         inline int32_t getRight(void) { return _result_right; };
         void setCrossMix(int32_t x) { _crossmix = x; };
-        roach_nvm_servo_t* cfg;
+        roach_nvm_servo_t* cfg_left;
+        roach_nvm_servo_t* cfg_right;
         inline void setFlip(uint8_t x) { _flip = x; };
 
     private:
         int32_t _result_left = 0, _result_right = 0;
+        int32_t _raw_left = 0, _raw_right = 0;
         uint8_t _flip;
         int32_t _crossmix = 0;
         int32_t _virtual_heading;
-        int32_t applyServoParams(int32_t);
+        int32_t applyServoParams(roach_nvm_servo_t* cfg, int32_t x);
         int32_t calcCrossMixThrottle(int32_t throttle, int32_t steering);
 };
 
@@ -32,6 +34,7 @@ class RoachVirtualHeading
         int32_t track(int32_t left, int32_t right);
         inline int32_t get(void) { return _heading; };
         roach_nvm_virheading_t* cfg = NULL;
+        void reset(void);
     private:
         uint32_t _last_time = 0;
         int32_t _accum = 0;

@@ -1325,7 +1325,7 @@ int nRF52RcRadio::textAvail(void)
     return txt_flag ? sizeof(radio_binpkt_t) : 0;
 }
 
-int nRF52RcRadio::textRead(const char* buf)
+int nRF52RcRadio::textRead(const char* buf, bool clr)
 {
     task();
     if (txt_flag) // has data
@@ -1338,7 +1338,9 @@ int nRF52RcRadio::textRead(const char* buf)
                 // copy to user buffer if available
                 memcpy((char*)buf, pkt->data, slen + 1);
             }
-            txt_flag = false; // mark as read
+            if (clr) {
+                txt_flag = false; // mark as read
+            }
             return slen; // report success
         }
         return -2; // report not text
@@ -1346,7 +1348,7 @@ int nRF52RcRadio::textRead(const char* buf)
     return -1; // report no data
 }
 
-int nRF52RcRadio::textReadBin(radio_binpkt_t* buf)
+int nRF52RcRadio::textReadBin(radio_binpkt_t* buf, bool clr)
 {
     task();
     if (txt_flag) // has data
@@ -1355,7 +1357,9 @@ int nRF52RcRadio::textReadBin(radio_binpkt_t* buf)
             // copy to user buffer if available
             memcpy((char*)buf, (const char*)txt_rx_buffer, sizeof(radio_binpkt_t));
         }
-        txt_flag = false; // mark as read
+        if (clr) {
+            txt_flag = false; // mark as read
+        }
         return sizeof(radio_binpkt_t); // report success
     }
     return -1; // report no data

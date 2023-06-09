@@ -1,28 +1,64 @@
 #include "RoachRobotNvm.h"
 
-static roach_nvm_gui_desc_t* robot_nvm_desc;
-static uint32_t robot_nvm_desc_chksum = 0;
+static uint8_t robotnvm_statemachine = RONVM_SM_IDLE;
+
+static roach_nvm_gui_desc_t* robotnvm_desc;
+uint32_t robotnvm_desc_chksum = 0;
 static uint32_t desc_size = 0;
 
-static void* robot_nvm_ptr;
-static uint32_t robot_nvm_sz;
-static uint32_t robot_nvm_chksum;
+static void* robotnvm_ptr;
+static uint32_t robotnvm_sz;
+uint32_t robotnvm_chksum;
+
+bool robotnvm_hasUpdate = false;
 
 bool robotnvm_init(roach_nvm_gui_desc_t* desc, void* nvm_ptr, uint32_t nvm_sz)
 {
-    robot_nvm_ptr = nvm_ptr;
-    robot_nvm_sz = nvm_sz;
-    robot_nvm_desc = desc;
+    robotnvm_ptr = nvm_ptr;
+    robotnvm_sz = nvm_sz;
+    robotnvm_desc = desc;
     desc_size = roachnvm_getDescCnt(desc);
 
-    robot_nvm_desc_chksum = roachnvm_getDescCrc(robot_nvm_desc);
-    robotnvm_genDescFile(RONVM_DEFAULT_DESC_FILENAME, robot_nvm_desc, false);
-    if (robotnvm_loadFromFile(RONVM_DEFAULT_CFG_FILENAME))
+    robotnvm_desc_chksum = roachnvm_getDescCrc(robotnvm_desc);
+    robotnvm_genDescFile(RONVM_DEFAULT_DESC_FILENAME, robotnvm_desc, false);
+    if (robotnvm_loadFromFile(RONVM_DEFAULT_CFG_FILENAME) == false)
     {
         robotnvm_setDefaults();
         robotnvm_saveToFile(RONVM_DEFAULT_CFG_FILENAME);
     }
-    robot_nvm_chksum = roachnvm_getConfCrc(robot_nvm_ptr, robot_nvm_sz);
+    //robotnvm_chksum = roachnvm_getConfCrc(robotnvm_ptr, robotnvm_sz); // already done by previous functions
+    robotnvm_hasUpdate = true;
+}
+
+bool robotnvm_task(nRF52RcRadio* radio)
+{
+    switch (robotnvm_statemachine)
+    {
+        case RONVM_SM_IDLE:
+            break;
+        case RONVM_SM_SENDINGDESC:
+            if (radio->textIsDone())
+            {
+                robotnvm_sendDescFileChunk(radio);
+            }
+            break;
+        case RONVM_SM_SENDINGCONF:
+            if (radio->textIsDone())
+            {
+                robotnvm_sendConfChunk(radio);
+            }
+            break;
+    }
+
+    if (radio->textAvail())
+    {
+        radio_binpkt_t pkt;
+        radio->textReadBin(&pkt, false);
+        bool suc = robotnvm_handlePkt(&pkt);
+        if (suc) {
+            radio->textReadBin(&pkt, true);
+        }
+    }
 }
 
 bool robotnvm_genDescFile(const char* fname, roach_nvm_gui_desc_t* desc_tbl, bool force)
@@ -49,7 +85,8 @@ bool robotnvm_genDescFile(const char* fname, roach_nvm_gui_desc_t* desc_tbl, boo
 
 void robotnvm_setDefaults(void)
 {
-    roachnvm_setdefaults((uint8_t*)robot_nvm_ptr, robot_nvm_desc);
+    roachnvm_setdefaults((uint8_t*)robotnvm_ptr, robotnvm_desc);
+    robotnvm_chksum = roachnvm_getConfCrc(robotnvm_ptr, robotnvm_sz);
 }
 
 bool robotnvm_saveToFile(const char* fname)
@@ -62,7 +99,7 @@ bool robotnvm_saveToFile(const char* fname)
         return false;
     }
     f.seek(0);
-    roachnvm_writetofile(&f, (uint8_t*)robot_nvm_ptr, robot_nvm_desc);
+    roachnvm_writetofile(&f, (uint8_t*)robotnvm_ptr, robotnvm_desc);
     f.close();
     return true;
 }
@@ -77,8 +114,9 @@ bool robotnvm_loadFromFile(const char* fname)
         return false;
     }
     f.seek(0);
-    roachnvm_readfromfile(&f, (uint8_t*)robot_nvm_ptr, robot_nvm_desc);
+    roachnvm_readfromfile(&f, (uint8_t*)robotnvm_ptr, robotnvm_desc);
     f.close();
+    robotnvm_chksum = roachnvm_getConfCrc(robotnvm_ptr, robotnvm_sz);
     return true;
 }
 
@@ -96,7 +134,7 @@ void robotnvm_sendDescFileChunk(nRF52RcRadio* radio)
     int32_t len = desc_size - send_idx;
     len = len > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : len;
     pkt.length = len;
-    uint8_t* ptr = (uint8_t*)robot_nvm_desc;
+    uint8_t* ptr = (uint8_t*)robotnvm_desc;
     memcpy(pkt.data, &ptr[send_idx], len);
     send_idx += len;
 
@@ -121,15 +159,15 @@ void robotnvm_sendConfChunk(nRF52RcRadio* radio)
     radio_binpkt_t pkt;
     pkt.typecode = ROACHCMD_SYNC_DOWNLOAD_CONF;
     pkt.addr = send_idx;
-    int32_t len = robot_nvm_sz - send_idx;
+    int32_t len = robotnvm_sz - send_idx;
     len = len > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : len;
     pkt.length = len;
-    uint8_t* ptr = (uint8_t*)robot_nvm_ptr;
+    uint8_t* ptr = (uint8_t*)robotnvm_ptr;
     memcpy(pkt.data, &ptr[send_idx], len);
     send_idx += len;
 
-    if (pkt.addr == 0 && robot_nvm_sz >= NRFRR_PAYLOAD_SIZE2) {
-        pkt.len = robot_nvm_sz;
+    if (pkt.addr == 0 && robotnvm_sz >= NRFRR_PAYLOAD_SIZE2) {
+        pkt.len = robotnvm_sz;
     }
 
     radio->textSendBin(&pkt);
@@ -149,8 +187,9 @@ bool robotnvm_handlePkt(radio_binpkt_t* pkt)
             robotnvm_sendConfStart();
             return true;
         case ROACHCMD_SYNC_UPLOAD_CONF:
-            if (roachnvm_parsecmd(robot_nvm_ptr, robot_nvm_desc, pkt->data)) {
-                robot_nvm_chksum = roachnvm_getConfCrc(robot_nvm_ptr, robot_nvm_sz);
+            if (roachnvm_parsecmd(robotnvm_ptr, robotnvm_desc, pkt->data)) {
+                robotnvm_chksum = roachnvm_getConfCrc(robotnvm_ptr, robotnvm_sz);
+                robotnvm_hasUpdate = true;
             }
             return true;
     }
