@@ -395,6 +395,7 @@ void nRF52RcRadio::prep_tx(void)
     gen_header();
     if (is_text) {
         ptr->flags ^= (1 << NRFRR_FLAG_TEXT);
+        _txt_seq = _seq_num;
     }
 
     uint8_t* src_buf = is_text ? (uint8_t*)txt_tx_buffer : (uint8_t*)tx_buffer;
@@ -516,6 +517,9 @@ void nRF52RcRadio::gen_header(void)
     ptr->interval   = _tx_interval ^ r;
     #endif
     ptr->flags      = 0;
+    #ifdef NRFRR_BIDIRECTIONAL
+    ptr->ack_seq    = _reply_seq;
+    #endif
 
     if (_is_pairing) {
         ptr->flags |= (1 << NRFRR_FLAG_PAIRING);
@@ -1192,7 +1196,8 @@ bool nRF52RcRadio::validate_rx(void)
         #endif
 
         #ifdef NRFRR_BIDIRECTIONAL
-        if ((rx_flags & (1 << NRFRR_FLAG_REPLYREQUEST)) != 0 || _text_send_timer > 0) {
+        _reply_seq = rx_seq;
+        if ((rx_flags & (1 << NRFRR_FLAG_REPLYREQUEST)) != 0 || (rx_flags & (1 << NRFRR_FLAG_TEXT)) != 0 || _text_send_timer > 0) {
             _reply_requested = true;
         }
         #endif
@@ -1231,6 +1236,14 @@ bool nRF52RcRadio::validate_rx(void)
         }
         _seq_num_prev = rx_seq;
     }
+
+    _reply_seq = rx_seq;
+    // check if the text packet has been acknowledged, prevent redundant transmissions to speed up wireless file transfers
+    if (_text_send_timer > 0 && parsed->ack_seq == _txt_seq)
+    {
+        _text_send_timer = 0;
+    }
+
     #endif
 
     // all checks pass
@@ -1312,7 +1325,30 @@ int nRF52RcRadio::textAvail(void)
     return txt_flag ? sizeof(radio_binpkt_t) : 0;
 }
 
-int nRF52RcRadio::textRead(const char* buf)
+int nRF52RcRadio::textRead(const char* buf, bool clr)
+{
+    task();
+    if (txt_flag) // has data
+    {
+        radio_binpkt_t* pkt = (radio_binpkt_t*)txt_rx_buffer;
+        if (pkt->typecode == ROACHCMD_TEXT)
+        {
+            int slen = strlen(pkt->data);
+            if (buf != NULL) {
+                // copy to user buffer if available
+                memcpy((char*)buf, pkt->data, slen + 1);
+            }
+            if (clr) {
+                txt_flag = false; // mark as read
+            }
+            return slen; // report success
+        }
+        return -2; // report not text
+    }
+    return -1; // report no data
+}
+
+int nRF52RcRadio::textReadBin(radio_binpkt_t* buf, bool clr)
 {
     task();
     if (txt_flag) // has data
@@ -1321,7 +1357,9 @@ int nRF52RcRadio::textRead(const char* buf)
             // copy to user buffer if available
             memcpy((char*)buf, (const char*)txt_rx_buffer, sizeof(radio_binpkt_t));
         }
-        txt_flag = false; // mark as read
+        if (clr) {
+            txt_flag = false; // mark as read
+        }
         return sizeof(radio_binpkt_t); // report success
     }
     return -1; // report no data
@@ -1329,7 +1367,17 @@ int nRF52RcRadio::textRead(const char* buf)
 
 void nRF52RcRadio::textSend(const char* buf)
 {
-    memcpy((char*)txt_tx_buffer, (const char*)buf, sizeof(radio_binpkt_t));
+    radio_binpkt_t pkt;
+    pkt.typecode = ROACHCMD_TEXT;
+    pkt.addr = 0;
+    pkt.len = strlen(buf) + 1;
+    strncpy(pkt.data, buf, NRFRR_PAYLOAD_SIZE2 - 1);
+    textSendBin(&pkt);
+}
+
+void nRF52RcRadio::textSendBin(radio_binpkt_t* pkt)
+{
+    memcpy((char*)txt_tx_buffer, (const char*)pkt, sizeof(radio_binpkt_t));
     _text_send_timer = _hop_tbl_len * NRFRR_TX_RETRANS_TXT; // makes sure the text is sent over all the channels a few times
     _seq_num++; // make sure the text is considered fresh
     if (_seq_num == 0) {
@@ -1339,7 +1387,7 @@ void nRF52RcRadio::textSend(const char* buf)
     }
 }
 
-char* nRF52RcRadio::textReadPtr(bool clr)
+radio_binpkt_t* nRF52RcRadio::textReadPtr(bool clr)
 {
     char* ret = (char*)txt_rx_buffer;
     if (clr) {

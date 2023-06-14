@@ -26,6 +26,9 @@ void RoachDriveMixer::mix(int32_t throttle, int32_t steering, int32_t gyro_corre
     int32_t right = roach_reduce_to_scale((v + w) / 2);
     int32_t left  = roach_reduce_to_scale((v - w) / 2);
 
+    _raw_left  = left;
+    _raw_right = right;
+
     if ((flip & ROACH_FLIP_LR) != 0) {
         int32_t temp = right;
         right = left;
@@ -38,14 +41,14 @@ void RoachDriveMixer::mix(int32_t throttle, int32_t steering, int32_t gyro_corre
         right *= -1;
     }
 
-    right = applyServoParams(right);
-    left  = applyServoParams(left);
+    right = applyServoParams(cfg_left, right);
+    left  = applyServoParams(cfg_right, left);
 
     _result_left  = left;
     _result_right = right;
 }
 
-int32_t RoachDriveMixer::applyServoParams(int32_t spd)
+int32_t RoachDriveMixer::applyServoParams(roach_nvm_servo_t* cfg, int32_t spd)
 {
     if (cfg == NULL) {
         return spd;
@@ -153,4 +156,11 @@ void RoachVirtualHeading::applyAccel(int32_t in, int32_t* outp)
         out = out > in ? in : out;
     }
     *outp = out;
+}
+
+void RoachVirtualHeading::reset(void)
+{
+    _accum = 0;
+    _heading = 0;
+    _last_time = 0;
 }

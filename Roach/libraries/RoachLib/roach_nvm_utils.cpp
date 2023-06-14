@@ -177,6 +177,73 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
     return ret;
 }
 
+bool roachnvm_parsecmd(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* str)
+{
+    int slen = strlen(str);
+
+    if (slen >= 256) {
+        return false;
+    }
+
+    int i, ii, start1 = -1, k = 0, start2 = -1, kk;
+    for (i = 0; i < slen; i++)
+    {
+        char c = str[i];
+
+        // trim head
+        if (start1 < 0 && c != ' ') {
+            start1 = i;
+        }
+
+        // find delimitor
+        if (c == '=' || c == ':')
+        {
+            k = i + 1;
+            // trim tail from delimiter, to the left
+            for (ii = i; ii >= 0; ii--)
+            {
+                char cc = str[ii];
+                if (cc == ' ' || cc == '=' || cc == ':') {
+                    str[ii] = 0; // null terminate early
+                }
+                else {
+                    break;
+                }
+            }
+        }
+
+        // trim head from delimiter to the right
+        if (start2 < 0 && k > 0 && c != ' ') {
+            start2 = i;
+        }
+
+        // find end of string
+        if ((c == '\r' || c == '\n' || c == '\0') && start2 > 0)
+        {
+            // trim tail of string
+            for (ii = i; ii >= jj; ii--)
+            {
+                char cc = str[ii];
+                if (cc == ' ' || cc == '\r' || cc == '\n' || cc == '\0') {
+                    str[ii] = 0; // null terminate early
+                }
+                else {
+                    break;
+                }
+            }
+
+            // all done
+            char* s1 = (char*)(str[start1]);
+            char* s2 = (char*)(str[start2]);
+            if (ii > start2) {
+                return roachnvm_parseitem(struct_ptr, desc_tbl, s1, s2);
+            }
+            break;
+        }
+    }
+    return false;
+}
+
 void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     char temp_buff[64];
@@ -352,7 +419,7 @@ void roachnvm_setdefaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
     }
 }
 
-uint32_t roachnvm_getChecksum(uint8_t* data, roach_nvm_gui_desc_t* desc_tbl)
+uint32_t roachnvm_getConfCrc(uint8_t* data, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
     roach_nvm_gui_desc_t* desc_itm;
@@ -371,4 +438,36 @@ uint32_t roachnvm_getChecksum(uint8_t* data, roach_nvm_gui_desc_t* desc_tbl)
         }
     }
     return crc;
+}
+
+uint16_t roachnvm_getDescCrc(roach_nvm_gui_desc_t* desc_tbl)
+{
+    uint8_t* data_ptr8 = (uint8_t*)desc_tbl;
+    uint32_t data_sz = roachnvm_getDescCnt(desc_tbl) * sizeof(roach_nvm_gui_desc_t);
+
+    uint16_t sum1 = 0;
+    uint16_t sum2 = 0;
+    int index;
+
+    for (index = 0; index < count; ++index)
+    {
+        sum1 = (sum1 + data_ptr8[index]) % 255;
+        sum2 = (sum2 + sum1) % 255;
+    }
+
+    return (sum2 << 8) | sum1;
+}
+
+uint32_t roachnvm_getDescCnt(roach_nvm_gui_desc_t* desc_tbl)
+{
+    int i;
+    for (i = 0; i < 0xFFFF; i++)
+    {
+        roach_nvm_gui_desc_t* p = &(desc_tbl[i]);
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+        {
+            break;
+        }
+    }
+    return i;
 }
