@@ -37,6 +37,9 @@
 // Uncomment to disable Adafruit splash logo
 #define SSD1306_NO_SPLASH
 
+// Shorter frame buffer transfers by comparing previous frame with current frame
+#define SSD1306_USE_DISPLAYASNEEDED
+
 #include <Adafruit_GFX.h>
 
 /// The following "raw" color names are kept for backwards client compatability
@@ -115,6 +118,9 @@ public:
 
   bool begin(uint8_t switchvcc = SSD1306_SWITCHCAPVCC, uint8_t i2caddr = 0, bool reset = true);
   void display(void);
+  #ifdef SSD1306_USE_DISPLAYASNEEDED
+  void displayAsNeeded(void);
+  #endif
   void clearDisplay(void);
   void invertDisplay(bool i);
   void dim(bool dim);
@@ -138,6 +144,9 @@ protected:
 
   uint8_t *buffer; ///< Buffer data used for display buffer. Allocated when
                    ///< begin method is called.
+  #ifdef SSD1306_USE_DISPLAYASNEEDED
+  uint8_t *buffer_prev; ///< contains previous frame, for comparison purposes
+  #endif
   int8_t i2caddr;  ///< I2C address initialized when begin method is called.
   int8_t vccstate; ///< VCC selection, set by begin method.
   int8_t page_end; ///< not used

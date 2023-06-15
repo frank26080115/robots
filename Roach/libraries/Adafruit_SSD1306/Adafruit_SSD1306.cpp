@@ -67,6 +67,8 @@
 #define TRANSACTION_START
 #define TRANSACTION_END
 
+#define SSD1306_BUFFER_SIZE() (WIDTH * ((HEIGHT + 7) / 8))
+
 // CONSTRUCTORS, DESTRUCTOR ------------------------------------------------
 
 /*!
@@ -200,8 +202,13 @@ void Adafruit_SSD1306::ssd1306_command(uint8_t c) {
 */
 bool Adafruit_SSD1306::begin(uint8_t vcs, uint8_t addr, bool reset) {
 
-  if ((!buffer) && !(buffer = (uint8_t *)malloc(WIDTH * ((HEIGHT + 7) / 8))))
+  if ((!buffer) && !(buffer = (uint8_t *)malloc(SSD1306_BUFFER_SIZE())))
     return false;
+
+  #ifdef SSD1306_USE_DISPLAYASNEEDED
+  if ((!buffer_prev) && !(buffer_prev = (uint8_t *)malloc(SSD1306_BUFFER_SIZE())))
+    return false;
+  #endif
 
   clearDisplay();
 
@@ -357,7 +364,7 @@ void Adafruit_SSD1306::drawPixel(int16_t x, int16_t y, uint16_t color) {
             commands as needed by one's own application.
 */
 void Adafruit_SSD1306::clearDisplay(void) {
-  memset(buffer, 0, WIDTH * ((HEIGHT + 7) / 8));
+  memset(buffer, 0, SSD1306_BUFFER_SIZE());
 }
 
 /*!
@@ -678,10 +685,55 @@ void Adafruit_SSD1306::display(void) {
       SSD1306_COLUMNADDR, 0}; // Column start address
   ssd1306_commandList(dlist1, sizeof(dlist1));
   ssd1306_command1(WIDTH - 1); // Column end address
-  uint16_t count = WIDTH * ((HEIGHT + 7) / 8);
+  uint16_t count = SSD1306_BUFFER_SIZE();
   uint8_t *ptr = buffer;
   nbtwi_writec(i2caddr, 0x40, ptr, count);
+  #ifdef SSD1306_USE_DISPLAYASNEEDED
+  memcpy(buffer_prev, buffer, SSD1306_BUFFER_SIZE());
+  #endif
 }
+
+#ifdef SSD1306_USE_DISPLAYASNEEDED
+void Adafruit_SSD1306::displayAsNeeded(void) {
+    TRANSACTION_START
+    uint8_t dlist1[] = {
+        SSD1306_PAGEADDR,
+        0,                      // Page start address
+        0xFF,                   // Page end (not really, but works here)
+        SSD1306_COLUMNADDR, 0}; // Column start address
+    
+    uint16_t count = SSD1306_BUFFER_SIZE();
+    int i, j, k;
+    for (i = 0; i < count; i++)
+    {
+        if (buffer[i] != buffer_prev[i])
+        {
+            break;
+        }
+    }
+    if (i >= count) {
+        return; // no changes detected, so do nothing
+    }
+    dlist1[1] = i >> 7;   // set starting page address
+    dlist1[4] = i & 0x7F; // set starting column address
+
+    for (j = count - 1; j >= i; j--)
+    {
+        if (buffer[j] != buffer_prev[j])
+        {
+            break;
+        }
+    }
+    k = j - i;
+    k += 1;
+
+    ssd1306_commandList(dlist1, sizeof(dlist1));
+    ssd1306_command1(WIDTH - 1); // Column end address
+    uint8_t *ptr = (uint8_t*)&(buffer[i]);
+    nbtwi_writec(i2caddr, 0x40, ptr, k);
+    memcpy(buffer_prev, buffer, SSD1306_BUFFER_SIZE());
+}
+#endif
 
 // SCROLLING FUNCTIONS -----------------------------------------------------
 
