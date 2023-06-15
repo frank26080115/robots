@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include <RoachLib.h>
 
+#define POT_CNT_MAX 8
+
 enum
 {
     ROACHPOT_SM_NORMAL,
@@ -44,5 +46,6 @@ class RoachPot
 
 void RoachPot_allTask(void);
 void RoachPot_allBegin(void);
+int16_t RoachPot_getRawAtIdx(int);
 
 #endif

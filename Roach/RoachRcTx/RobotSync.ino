@@ -62,7 +62,7 @@ void rosync_task(void)
                     if (rosync_loadDescFileId(telem_pkt.chksum_desc))
                     {
                         rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
-                        uint32_t c = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+                        uint32_t c = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
                         if (c == telem_pkt.chksum_nvm)
                         {
                             // in sync
@@ -105,7 +105,7 @@ void rosync_task(void)
                             rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
                         }
                         // at this point in the code, rosync_nvm is not null
-                        uint32_t c = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+                        uint32_t c = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
                         if (c == telem_pkt.chksum_nvm)
                         {
                             rosync_checksum_nvm = c;
@@ -126,7 +126,9 @@ void rosync_task(void)
         case ROSYNC_SM_DOWNLOADDESC:
             if (radio.textAvail())
             {
-                if (rosync_downloadDescChunk(radio.textReadPtr(false)))
+                radio_binpkt_t pkt;
+                radio.textReadBin(&pkt, false);
+                if (rosync_downloadDescChunk(&pkt))
                 {
                     radio.textReadPtr(true);
                 }
@@ -287,7 +289,7 @@ bool rosync_downloadNvmChunk(radio_binpkt_t* pkt)
 
     if (done)
     {
-        rosync_checksum_nvm = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+        rosync_checksum_nvm = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
         if (rosync_checksum_nvm == telem_pkt.chksum_nvm)
         {
             rosync_statemachine = ROSYNC_SM_ALLGOOD;
@@ -392,7 +394,7 @@ bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
 
     rosync_checksum_desc = chksum_desc;
     roachnvm_setdefaults(rosync_nvm, rosync_desc_tbl);
-    rosync_checksum_nvm = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+    rosync_checksum_nvm = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
     rosync_markOnlyFile();
     return true;
 }
@@ -419,7 +421,7 @@ bool rosync_loadNvmFile(const char* fname)
 
     f.close();
 
-    rosync_checksum_nvm = roachnvm_getChecksum(rosync_nvm, rosync_desc_tbl);
+    rosync_checksum_nvm = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
     return true;
 }
 

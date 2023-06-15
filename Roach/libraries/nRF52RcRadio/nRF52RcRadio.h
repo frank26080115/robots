@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#include <RoachLib.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -28,7 +30,7 @@ class nRF52RcRadio
         void textSend(const char* buf);                        // send text message
         void textSendBin(radio_binpkt_t* pkt);                 // send binary message
         void textSendByte(uint8_t x);                          // send binary message, but only single byte
-        char* textReadPtr(bool clr);
+        radio_binpkt_t* textReadPtr(bool clr);                 // read the message in-place
         bool textIsDone(void);
         uint8_t* readPtr(void);
 

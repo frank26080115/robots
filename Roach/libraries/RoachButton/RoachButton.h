@@ -25,7 +25,7 @@ class RoachButton
 
 void RoachButton_allBegin(void);
 void RoachButton_clearAll(void);
-bool RoachButton_hasAnyPressed(void);
-bool RoachButton_isAnyHeld(void);
+uint32_t RoachButton_hasAnyPressed(void);
+uint32_t RoachButton_isAnyHeld(void);
 
 #endif

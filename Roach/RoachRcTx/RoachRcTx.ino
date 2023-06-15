@@ -53,6 +53,7 @@ RoachButton btn_g6     = RoachButton(ROACHHW_PIN_BTN_G6);
 RoachButton btn_sw1    = RoachButton(ROACHHW_PIN_BTN_SW1);
 RoachButton btn_sw2    = RoachButton(ROACHHW_PIN_BTN_SW2);
 RoachButton btn_sw3    = RoachButton(ROACHHW_PIN_BTN_SW3);
+RoachButton btn_d7     = RoachButton(ROACHHW_PIN_BTN_D7);
 
 #ifdef ROACHHW_PIN_BTN_SW4
 // ran out of pins, switch 4 does not exist
@@ -79,6 +80,7 @@ bool pots_locked = false;
 
 void setup(void)
 {
+    hw_bringup();
     nrf5rand_init(NRF5RAND_BUFF_SIZE, true, false);
     Serial.begin(115200);
     RoachUsbMsd_begin();

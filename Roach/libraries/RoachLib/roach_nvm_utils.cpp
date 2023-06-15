@@ -221,7 +221,7 @@ bool roachnvm_parsecmd(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char
         if ((c == '\r' || c == '\n' || c == '\0') && start2 > 0)
         {
             // trim tail of string
-            for (ii = i; ii >= jj; ii--)
+            for (ii = i; ii >= start1; ii--)
             {
                 char cc = str[ii];
                 if (cc == ' ' || cc == '\r' || cc == '\n' || cc == '\0') {
@@ -445,11 +445,13 @@ uint16_t roachnvm_getDescCrc(roach_nvm_gui_desc_t* desc_tbl)
     uint8_t* data_ptr8 = (uint8_t*)desc_tbl;
     uint32_t data_sz = roachnvm_getDescCnt(desc_tbl) * sizeof(roach_nvm_gui_desc_t);
 
+    // from Wikipedia about Fletcher's Checksum
+
     uint16_t sum1 = 0;
     uint16_t sum2 = 0;
     int index;
 
-    for (index = 0; index < count; ++index)
+    for (index = 0; index < data_sz; index++)
     {
         sum1 = (sum1 + data_ptr8[index]) % 255;
         sum2 = (sum2 + sum1) % 255;
@@ -464,7 +466,7 @@ uint32_t roachnvm_getDescCnt(roach_nvm_gui_desc_t* desc_tbl)
     for (i = 0; i < 0xFFFF; i++)
     {
         roach_nvm_gui_desc_t* p = &(desc_tbl[i]);
-        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+        if (p->name == NULL || p->name[0] == 0)
         {
             break;
         }

@@ -11,6 +11,8 @@
 void IRAM_ATTR RoachEnc_task(void);
 #elif defined(ROACHENC_USE_QDEC)
 void RoachEnc_task(void);
+#else
+#define RoachEnc_task()
 #endif
 
 void RoachEnc_begin(int pin_a, int pin_b);

@@ -172,22 +172,22 @@ void RoachButton_allBegin(void)
     }
 }
 
-bool RoachButton_hasAnyPressed(void)
+uint32_t RoachButton_hasAnyPressed(void)
 {
-    bool x = false;
+    uint32_t x = 0;
     int i;
     for (i = 0; i < roachbtn_cnt; i++) {
-        x |= roachbtn_insttbl[i]->hasPressed(false);
+        x |= (roachbtn_insttbl[i]->hasPressed(false)) ? (1 << i) : 0;
     }
     return x;
 }
 
-bool RoachButton_isAnyHeld(void)
+uint32_t RoachButton_isAnyHeld(void)
 {
-    bool x = false;
+    uint32_t x = 0;
     int i;
     for (i = 0; i < roachbtn_cnt; i++) {
-        x |= roachbtn_insttbl[i]->isHeld() > 0;
+        x |= (roachbtn_insttbl[i]->isHeld() > 0) ? (1 << i) : 0;
     }
     return x;
 }

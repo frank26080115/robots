@@ -1,12 +1,13 @@
 #include "RoachPot.h"
 #include <AsyncAdc.h>
 
-#define POT_CNT_MAX 8
 static int pot_cnt = 0;
 static RoachPot* pot_inst[POT_CNT_MAX];
 static int pot_pin[POT_CNT_MAX];
 static int pot_task_idx = 0;
 static uint8_t adc_state_machine = ROACHPOT_SM_IDLE;
+
+static uint16_t pot_raw_val[POT_CNT_MAX];
 
 RoachPot::RoachPot(int pin, roach_nvm_pot_t* c, uint32_t g, uint32_t r)
 {
@@ -46,6 +47,7 @@ int16_t RoachPot_task(int p)
         {
             int16_t x = adcEnd(cur_pin);
             ret = x;
+            pot_raw_val[pot_task_idx] = x;
             pot_task_idx = (pot_task_idx + 1) % pot_cnt;
             pot_inst[pot_task_idx]->prep();
             adcStart(pot_pin[pot_task_idx]);
@@ -206,4 +208,12 @@ void RoachPot::calib_stop(void)
 void RoachPot::simulate(int x)
 {
     simulate_val = x;
+}
+
+int16_t RoachPot_getRawAtIdx(int idx)
+{
+    if (idx >= pot_cnt) {
+        return -1;
+    }
+    return pot_raw_val[idx];
 }

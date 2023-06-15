@@ -1333,7 +1333,7 @@ int nRF52RcRadio::textRead(const char* buf, bool clr)
         radio_binpkt_t* pkt = (radio_binpkt_t*)txt_rx_buffer;
         if (pkt->typecode == ROACHCMD_TEXT)
         {
-            int slen = strlen(pkt->data);
+            int slen = strlen((const char*)pkt->data);
             if (buf != NULL) {
                 // copy to user buffer if available
                 memcpy((char*)buf, pkt->data, slen + 1);
@@ -1371,7 +1371,17 @@ void nRF52RcRadio::textSend(const char* buf)
     pkt.typecode = ROACHCMD_TEXT;
     pkt.addr = 0;
     pkt.len = strlen(buf) + 1;
-    strncpy(pkt.data, buf, NRFRR_PAYLOAD_SIZE2 - 1);
+    strncpy((char*)pkt.data, buf, NRFRR_PAYLOAD_SIZE2 - 1);
+    textSendBin(&pkt);
+}
+
+void nRF52RcRadio::textSendByte(uint8_t x)
+{
+    radio_binpkt_t pkt;
+    pkt.typecode = x;
+    pkt.addr = 0;
+    pkt.len = 0;
+    pkt.data[0] = 0;
     textSendBin(&pkt);
 }
 
@@ -1393,7 +1403,7 @@ radio_binpkt_t* nRF52RcRadio::textReadPtr(bool clr)
     if (clr) {
         txt_flag = false;
     }
-    return ret;
+    return (radio_binpkt_t*)ret;
 }
 
 bool nRF52RcRadio::textIsDone(void)
