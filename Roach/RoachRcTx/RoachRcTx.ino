@@ -80,7 +80,14 @@ bool pots_locked = false;
 
 void setup(void)
 {
+    safeboot_check();
     hw_bringup();
+
+    pinMode(ROACHHW_PIN_LED_RED, OUTPUT);
+    pinMode(ROACHHW_PIN_LED_BLU, OUTPUT);
+    digitalWrite(ROACHHW_PIN_LED_RED, LOW);
+    digitalWrite(ROACHHW_PIN_LED_BLU, LOW);
+
     nrf5rand_init(NRF5RAND_BUFF_SIZE, true, false);
     Serial.begin(115200);
     RoachUsbMsd_begin();
@@ -133,6 +140,7 @@ void ctrler_tasks(void)
 {
     //uint32_t now = millis();
     PerfCnt_task();
+    RoachButton_allTask();
     RoachPot_allTask(); // polls ADCs non-blocking
     // TODO: buttons are using interrupts only, no tasks, but check reliability
     nbtwi_task(); // send any queued data to OLED

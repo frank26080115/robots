@@ -32,6 +32,10 @@
 #define ROACHHW_PIN_FEM_TX  2
 #define ROACHHW_PIN_FEM_RX  0
 
+#define ROACHHW_PIN_LED_RED  3
+#define ROACHHW_PIN_LED_BLU  4
+#define ROACHHW_PIN_LED_NEO  8
+
 #define SCREEN_ADDRESS 0x3C
 
 #endif

@@ -48,11 +48,30 @@ RoachButton::RoachButton(int pin, int rep, int db)
 void RoachButton::begin(void)
 {
     pinMode(_pin, INPUT_PULLUP);
-    attachInterrupt(_pin, _pin_irq_ptr[roachbtn_cnt], CHANGE);
     _pressed = false;
     _last_down_time = 0;
     _last_up_time = 0;
     _last_change_time = 0;
+    _init_high_cnt = 0;
+    _init_done = false;
+}
+
+void RoachButton::task(void)
+{
+    if (_init_done == false)
+    {
+        if (_init_high_cnt >= 10) {
+            attachInterrupt(_pin, _pin_irq_ptr[roachbtn_cnt], CHANGE);
+            _init_done = true;
+        }
+
+        if (digitalRead(_pin) == LOW) {
+            _init_high_cnt = 0;
+        }
+        else {
+            _init_high_cnt += 1;
+        }
+    }
 }
 
 static void _pin_irq(uint8_t id)
@@ -169,6 +188,14 @@ void RoachButton_allBegin(void)
     int i;
     for (i = 0; i < roachbtn_cnt; i++) {
         roachbtn_insttbl[i]->begin();
+    }
+}
+
+void RoachButton_allTask(void)
+{
+    int i;
+    for (i = 0; i < roachbtn_cnt; i++) {
+        roachbtn_insttbl[i]->task();
     }
 }
 

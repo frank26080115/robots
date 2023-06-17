@@ -1,5 +1,6 @@
 void hw_bringup(void)
 {
+    pinMode(ROACHHW_PIN_LED_RED, OUTPUT);
     Serial.begin(115200);
     RoachButton_allBegin();
     RoachPot_allBegin();
@@ -18,6 +19,7 @@ void hw_bringup(void)
             need_show = true;
         }
 
+        RoachButton_allTask();
         RoachPot_allTask();
         RoachEnc_task();
 
@@ -59,5 +61,7 @@ void hw_bringup(void)
             #endif
             Serial.printf("\r\n");
         }
+
+        digitalWrite(ROACHHW_PIN_LED_RED, ((now % 500) <= 100));
     }
 }

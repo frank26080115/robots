@@ -54,7 +54,7 @@ bool switches_alarm = false;
 uint8_t switches_getFlags(void)
 {
     static bool released = false;
-    uint8_t f;
+    uint8_t f = 0;
     f |= btn_sw1.isHeld() > 0 ? ROACHPKTFLAG_BTN1 : 0;
     f |= btn_sw2.isHeld() > 0 ? ROACHPKTFLAG_BTN2 : 0;
     f |= btn_sw3.isHeld() > 0 ? ROACHPKTFLAG_BTN3 : 0;
