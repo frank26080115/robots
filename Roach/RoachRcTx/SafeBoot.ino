@@ -43,6 +43,9 @@ void safeboot_check(void)
                     while (true)
                     {
                         now = millis();
+                        blynk = ((now % 200) <= 100);
+                        digitalWrite(ROACHHW_PIN_LED_RED, blynk ? HIGH : LOW );
+                        digitalWrite(ROACHHW_PIN_LED_BLU, blynk ? LOW  : HIGH);
                         if ((now - tstart) >= 1000)
                         {
                             tstart = now;
