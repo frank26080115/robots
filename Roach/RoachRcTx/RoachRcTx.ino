@@ -32,10 +32,6 @@
 #include <InternalFileSystem.h>
 #endif
 
-#include <RoachServo.h>
-
-RoachServo servo;
-
 Adafruit_SSD1306 oled;
 FatFile fatroot;
 FatFile fatfile;
@@ -44,7 +40,6 @@ extern RoachCmdLine cmdline;
 nRF52RcRadio radio = nRF52RcRadio(true);
 
 roach_rf_nvm_t nvm_rf;
-roach_rx_nvm_t nvm_rx;
 roach_tx_nvm_t nvm_tx;
 
 RoachButton btn_up     = RoachButton(ROACHHW_PIN_BTN_UP);
