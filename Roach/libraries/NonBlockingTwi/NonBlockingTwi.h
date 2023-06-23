@@ -8,6 +8,8 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
+extern uint32_t nbtwi_delay;
+
 void nbtwi_init(int pin_scl, int pin_sda, int bufsz);
 void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len, bool no_stop);
 void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len);

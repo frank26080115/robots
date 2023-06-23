@@ -1,7 +1,45 @@
 void hw_bringup(void)
 {
+    uint32_t now;
     pinMode(ROACHHW_PIN_LED_RED, OUTPUT);
     Serial.begin(115200);
+
+#if 0
+
+    pinMode(ROACHHW_PIN_BTN_UP, INPUT_PULLUP);
+    pinMode(ROACHHW_PIN_BTN_DOWN, INPUT_PULLUP);
+    pinMode(ROACHHW_PIN_BTN_LEFT, INPUT_PULLUP);
+    pinMode(ROACHHW_PIN_BTN_RIGHT, INPUT_PULLUP);
+    pinMode(ROACHHW_PIN_BTN_CENTER, INPUT_PULLUP);
+    pinMode(ROACHHW_PIN_BTN_G5, INPUT_PULLUP);
+    pinMode(ROACHHW_PIN_BTN_G6, INPUT_PULLUP);
+
+    uint8_t px = 0;
+    while (1)
+    {
+        static uint32_t lt = 0;
+        now = millis();
+        digitalWrite(ROACHHW_PIN_LED_RED, ((now % 500) <= 100));
+        //continue;
+        uint8_t x = 0;
+        x |= (digitalRead(ROACHHW_PIN_BTN_UP) == LOW ? 1 : 0) << 0;
+        x |= (digitalRead(ROACHHW_PIN_BTN_DOWN) == LOW ? 1 : 0) << 1;
+        x |= (digitalRead(ROACHHW_PIN_BTN_LEFT) == LOW ? 1 : 0) << 2;
+        x |= (digitalRead(ROACHHW_PIN_BTN_RIGHT) == LOW ? 1 : 0) << 3;
+        x |= (digitalRead(ROACHHW_PIN_BTN_CENTER) == LOW ? 1 : 0) << 4;
+        x |= (digitalRead(ROACHHW_PIN_BTN_G5) == LOW ? 1 : 0) << 5;
+        x |= (digitalRead(ROACHHW_PIN_BTN_G6) == LOW ? 1 : 0) << 6;
+        if (x != px && (now - lt) >= 100)
+        {
+            Serial.printf("[%u]: 0x%02X\r\n", millis(), x);
+            px = x;
+            lt = now;
+        }
+        yield();
+    }
+
+#endif
+
     RoachButton_allBegin();
     RoachPot_allBegin();
     RoachEnc_begin(ROACHHW_PIN_ENC_A, ROACHHW_PIN_ENC_B);
@@ -11,7 +49,7 @@ void hw_bringup(void)
     {
         static uint32_t lt = 0;
         static uint32_t pb = 0;
-        uint32_t now = millis();
+        now = millis();
 
         bool need_show = false;
         if ((now - lt) >= 200)
@@ -63,5 +101,6 @@ void hw_bringup(void)
         }
 
         digitalWrite(ROACHHW_PIN_LED_RED, ((now % 500) <= 100));
+        yield();
     }
 }

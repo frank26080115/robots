@@ -32,6 +32,10 @@
 #include <InternalFileSystem.h>
 #endif
 
+#include <RoachServo.h>
+
+RoachServo servo;
+
 Adafruit_SSD1306 oled;
 FatFile fatroot;
 FatFile fatfile;
@@ -80,12 +84,13 @@ bool pots_locked = false;
 
 void setup(void)
 {
+    //sd_softdevice_disable();
     safeboot_check();
-    hw_bringup();
+    //hw_bringup();
 
     pinMode(ROACHHW_PIN_LED_RED, OUTPUT);
     pinMode(ROACHHW_PIN_LED_BLU, OUTPUT);
-    digitalWrite(ROACHHW_PIN_LED_RED, LOW);
+    digitalWrite(ROACHHW_PIN_LED_RED, HIGH);
     digitalWrite(ROACHHW_PIN_LED_BLU, LOW);
 
     nrf5rand_init(NRF5RAND_BUFF_SIZE, true, false);
@@ -103,7 +108,7 @@ void setup(void)
     switches_getFlags(); // this call here will get the initial switch states and check if they are safe
 
     // seems like the OLED needs a bit more time to power up
-    while (millis() <= 500)
+    while (millis() <= 200)
     {
         ctrler_tasks();
     }

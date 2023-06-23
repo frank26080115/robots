@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+//#define NBTWI_ENABLE_DEBUG
+
 //#include "nrfx_twim.h"
 //#include "hal/nrf_twim.h"
 
@@ -22,6 +24,8 @@ static uint32_t pin_scl, pin_sda;
 static uint8_t* tx_buff = NULL;
 static uint32_t tx_buff_sz = 0;
 
+uint32_t nbtwi_delay = 0;
+
 static volatile uint8_t  nbtwi_statemachine = 0;
 static volatile bool     nbtwi_isTx = false;
 static volatile uint8_t  nbtwi_curFlags = 0;
@@ -30,6 +34,7 @@ static volatile uint32_t xfer_err = 0;
 static volatile uint32_t xfer_err_last = 0;
 static volatile uint32_t xfer_time = 0;
 static volatile uint32_t xfer_time_est = 0;
+static volatile uint32_t idle_timestamp = 0;
 static int err_cnt = 0;
 
 // implement a FIFO with a linked list
@@ -274,8 +279,11 @@ static void nbtwi_handleResult(void)
 static void nbtwi_checkTimeout(void)
 {
     uint32_t now = millis();
-    if ((now - xfer_time) >= xfer_time_est)
+    if (xfer_time_est != 0 && (now - xfer_time) >= xfer_time_est)
     {
+        #ifdef NBTWI_ENABLE_DEBUG
+        Serial.printf("nbtwi timeout %u\r\n", xfer_time_est);
+        #endif
         nbtwi_statemachine = NBTWI_SM_TIMEOUT;
     }
 }
@@ -362,6 +370,7 @@ static void nbtwi_runStateMachine(void)
             NRF_TWIM0->EVENTS_SUSPENDED = 0;
             nbtwi_statemachine = NBTWI_SM_IDLE;
             xfer_done = true;
+            idle_timestamp = millis();
         }
     }
     if (nbtwi_statemachine == NBTWI_SM_STOP || nbtwi_statemachine == NBTWI_SM_ERROR)
@@ -372,6 +381,7 @@ static void nbtwi_runStateMachine(void)
             nbtwi_statemachine = NBTWI_SM_IDLE;
             xfer_err_last = (nbtwi_statemachine == NBTWI_SM_ERROR) ? xfer_err : 0;
             xfer_done = true;
+            idle_timestamp = millis();
         }
     }
 }
@@ -392,6 +402,18 @@ void nbtwi_task(void)
     nbtwi_runStateMachine();
     if (xfer_done)
     {
+        if (nbtwi_delay != 0 && idle_timestamp != 0 && nbtwi_statemachine == NBTWI_SM_IDLE)
+        {
+            if ((millis() - idle_timestamp) < nbtwi_delay)
+            {
+                return;
+            }
+            else
+            {
+                idle_timestamp = 0;
+            }
+        }
+
         if (xfer_err != 0)
         {
             #ifdef NBTWI_ENABLE_BUS_RECOVER
@@ -441,7 +463,7 @@ void nbtwi_task(void)
             }
             xfer_time = millis();
             xfer_time_est = ((tx_head->len + 1) * 9 * 4) / 400;
-            xfer_time_est = (xfer_time_est < 5) ? 5 : 0;
+            xfer_time_est = (xfer_time_est < 5) ? 5 : xfer_time_est;
             nbtwi_statemachine = NBTWI_SM_STARTED;
 
             #ifdef NBTWI_ENABLE_DEBUG

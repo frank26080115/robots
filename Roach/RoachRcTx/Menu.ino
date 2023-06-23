@@ -9,6 +9,7 @@ extern const uint8_t icon_mismatched[];
 int printRfStats(int y)
 {
     oled.setCursor(0, y);
+
     if (radio.isConnected() == false)
     {
         oled.drawBitmap(0, 0, icon_disconnected, 16, 8, SSD1306_WHITE);
