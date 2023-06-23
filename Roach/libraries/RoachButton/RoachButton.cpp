@@ -36,8 +36,9 @@ static voidFuncPtr _pin_irq_ptr[ROACHBTN_CNT_MAX] =
     _pin_irqn_8, _pin_irqn_9, _pin_irqn_10, _pin_irqn_11
 };
 
-RoachButton::RoachButton(int pin, int rep, int db)
+RoachButton::RoachButton(int pin, bool intr_mode, int rep, int db)
 {
+    _intr_mode = intr_mode;
     _pin = pin;
     _rep = rep;
     _db = db;
@@ -49,6 +50,7 @@ void RoachButton::begin(void)
 {
     pinMode(_pin, INPUT_PULLUP);
     _pressed = false;
+    _last_poll = false;
     _last_down_time = 0;
     _last_up_time = 0;
     _last_change_time = 0;
@@ -58,7 +60,13 @@ void RoachButton::begin(void)
 
 void RoachButton::task(void)
 {
-    if (_init_done == false)
+    if (_intr_mode == false)
+    {
+        poll();
+        return;
+    }
+
+    if (_intr_mode && _init_done == false)
     {
         if (_init_high_cnt >= 10) {
             attachInterrupt(_pin, _pin_irq_ptr[roachbtn_cnt], CHANGE);
@@ -70,6 +78,26 @@ void RoachButton::task(void)
         }
         else {
             _init_high_cnt += 1;
+        }
+    }
+}
+
+void RoachButton::poll(void)
+{
+    if (_last_poll != false)
+    {
+        if (digitalRead(_pin) != LOW)
+        {
+            _last_poll = true;
+            handleIsr();
+        }
+    }
+    else
+    {
+        if (digitalRead(_pin) == LOW)
+        {
+            _last_poll = false;
+            handleIsr();
         }
     }
 }

@@ -6,9 +6,10 @@
 class RoachButton
 {
     public:
-        RoachButton(int pin, int rep = 500, int db = 50);
+        RoachButton(int pin, bool intr_mode = false, int rep = 500, int db = 50);
         void begin(void);
         void task(void);
+        void poll(void);
         bool hasPressed(bool clr);
         uint32_t isHeld(void);
         void disableUntilRelease(void);
@@ -18,9 +19,10 @@ class RoachButton
         inline int getPin(void) { return _pin; };
     private:
         int _pin;
+        bool _intr_mode;
         volatile uint32_t _last_down_time, _last_up_time, _last_change_time;
         unsigned int _rep, _db;
-        volatile bool _pressed;
+        volatile bool _pressed, _last_poll;
         bool _disabled = false;
         bool _faketoggle = false;
         int _init_high_cnt;
