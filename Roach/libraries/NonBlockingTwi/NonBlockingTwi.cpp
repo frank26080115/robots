@@ -6,6 +6,10 @@
 
 //#define NBTWI_ENABLE_DEBUG
 
+#ifdef NBTWI_ENABLE_DEBUG
+extern uint32_t getFreeRam(void);
+#endif
+
 //#include "nrfx_twim.h"
 //#include "hal/nrf_twim.h"
 
@@ -139,10 +143,6 @@ void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len, bool no_stop)
     }
 }
 
-#ifdef NBTWI_ENABLE_DEBUG
-extern uint32_t getFreeRam(void);
-#endif
-
 void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len)
 {
     #ifdef NBTWI_ENABLE_DEBUG
@@ -155,6 +155,9 @@ void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len)
     #endif
     nbtwi_node_t* n = (nbtwi_node_t*)malloc(sizeof(nbtwi_node_t));
     if (n == NULL) {
+        #ifdef NBTWI_ENABLE_DEBUG
+        Serial.printf(" err no mem node\r\n");
+        #endif
         return;
     }
     n->flags = NBTWI_FLAG_WRITE;
@@ -163,6 +166,9 @@ void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len)
     n->data = (uint8_t*)malloc(len + 1);
     if (n->data == NULL) {
         free(n);
+        #ifdef NBTWI_ENABLE_DEBUG
+        Serial.printf(" err no mem data\r\n");
+        #endif
         return;
     }
     n->data[0] = c;
@@ -250,6 +256,10 @@ bool nbtwi_readResult(uint8_t* data, int len, bool clr)
 
 static void nbtwi_handleResult(void)
 {
+    #ifdef NBTWI_ENABLE_DEBUG
+    Serial.printf("nbtwi_handleResult ");
+    #endif
+
     nbtwi_node_t* n = (nbtwi_node_t*)malloc(sizeof(nbtwi_node_t));
     if (n == NULL) {
         return;
@@ -261,17 +271,28 @@ static void nbtwi_handleResult(void)
     n->data = (uint8_t*)malloc(len);
     if (n->data == NULL) {
         free(n);
+        #ifdef NBTWI_ENABLE_DEBUG
+        Serial.printf("err no mem\r\n");
+        #endif
         return;
     }
     memcpy(n->data, tx_buff, len);
     n->len = len;
+    #ifdef NBTWI_ENABLE_DEBUG
+    int i;
+    for (i = 0; i < len; i++)
+    {
+        Serial.printf("0x%02X ", n->data[i]);
+    }
+    Serial.printf(">\r\n");
+    #endif
     if (rx_tail != NULL)
     {
         rx_tail->next = (void*)n;
         rx_tail = n;
     }
-    if (rx_tail == NULL) {
-        rx_tail = n;
+    if (rx_head == NULL) {
+        rx_head = n;
         rx_tail = n;
     }
 }
@@ -378,8 +399,8 @@ static void nbtwi_runStateMachine(void)
         if (NRF_TWIM0->EVENTS_STOPPED)
         {
             NRF_TWIM0->EVENTS_STOPPED = 0;
-            nbtwi_statemachine = NBTWI_SM_IDLE;
             xfer_err_last = (nbtwi_statemachine == NBTWI_SM_ERROR) ? xfer_err : 0;
+            nbtwi_statemachine = NBTWI_SM_IDLE;
             xfer_done = true;
             idle_timestamp = millis();
         }
@@ -441,7 +462,15 @@ void nbtwi_task(void)
             xfer_err = 0;
 
             #ifdef NBTWI_ENABLE_DEBUG
-            Serial.printf("nbtwi_task next packet 0x%02X %u ... ", tx_head->i2c_addr, tx_head->len);
+            Serial.printf("nbtwi_task next packet 0x%02X %u", tx_head->i2c_addr, tx_head->len);
+            if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE)
+            {
+                Serial.printf(" ...");
+            }
+            else
+            {
+                Serial.printf("\r\n");
+            }
             delay(20);
             #endif
 
@@ -467,11 +496,14 @@ void nbtwi_task(void)
             nbtwi_statemachine = NBTWI_SM_STARTED;
 
             #ifdef NBTWI_ENABLE_DEBUG
-            int i;
-            for (i = 0; i < (tx_head->len); i++) {
-                Serial.printf(" 0x%02X", tx_buff[i]);
+            if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE)
+            {
+                int i;
+                for (i = 0; i < (tx_head->len); i++) {
+                    Serial.printf(" 0x%02X", tx_buff[i]);
+                }
+                Serial.printf(" go\r\n");
             }
-            Serial.printf(" done\r\n");
             #endif
 
             if (tx_tail == tx_head)

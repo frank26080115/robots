@@ -11,6 +11,7 @@
 #include "nbe_i2c.h"
 #elif defined(NRF52840_XXAA)
 #include <NonBlockingTwi.h>
+#include <Adafruit_TinyUSB.h>
 #endif
 
 #define BNO08x_I2CADDR_DEFAULT 0x4A
@@ -72,9 +73,7 @@ class RoachIMU
                  int rd_interval     = 0,
                  int orientation     = 0,
                  int dev_addr        = BNO08x_I2CADDR_DEFAULT,
-                 int rst             = -1,
-                 int sda             = ROACHIMU_DEF_PIN_SDA,
-                 int scl             = ROACHIMU_DEF_PIN_SCL
+                 int rst             = -1
                 );
         void begin(void);
         void task(void);
@@ -86,7 +85,7 @@ class RoachIMU
         uint8_t install_orientation;
 
         void pause_service(void);
-        void do_math(void);
+        void doMath(void);
         void tare(void);
 
         bool i2c_write(uint8_t* buf, int len);

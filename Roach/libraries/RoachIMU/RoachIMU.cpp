@@ -3,6 +3,8 @@
 #include <string.h>
 #include <math.h>
 
+#define ROACHIMU_ENABLE_DEBUG
+
 static RoachIMU* instance = NULL;
 
 static int  i2chal_write (sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
@@ -22,24 +24,18 @@ static void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* y
 static void quaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees);
 static void quaternionToEulerGI(sh2_GyroIntegratedRV_t* rotational_vector, euler_t* ypr, bool degrees);
 
-RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int dev_addr, int rst, int sda, int scl)
+RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int dev_addr, int rst)
 {
     sample_interval = samp_interval;
     read_interval = rd_interval;
     install_orientation = orientation;
     i2c_addr = dev_addr;
     pin_rst = rst;
-    pin_sda = sda;
-    pin_scl = scl;
     instance = this;
 }
 
 void RoachIMU::begin(void)
 {
-    #if defined(ESP32)
-    nbe_i2c_init(&nbe_i2c, 0, (gpio_num_t)pin_sda, (gpio_num_t)pin_scl, 400000);
-    #elif defined(NRF52840_XXAA)
-    #endif
     hal.open = i2chal_open;
     hal.close = i2chal_close;
     hal.read = i2chal_read;
@@ -50,7 +46,10 @@ void RoachIMU::begin(void)
 
 void RoachIMU::task(void)
 {
-    if (reset_occured) {
+    nbtwi_task();
+
+    if (reset_occured && state_machine >= ROACHIMU_SM_SVC_GET_HEADER) {
+        Serial.printf("IMU reset_occured %u\r\n", millis());
         state_machine = ROACHIMU_SM_SETUP;
     }
 
@@ -66,11 +65,14 @@ void RoachIMU::task(void)
                 }
                 #elif defined(NRF52840_XXAA)
                 #endif
-                reset_occured = false;
                 int err_ret;
                 hal_hardwareReset();
+                #ifdef ROACHIMU_ENABLE_DEBUG
+                Serial.printf("IMU init calling sh2_open...\r\n");
+                #endif
                 err_ret = sh2_open(&hal, hal_callback, NULL);
                 if (err_ret != SH2_OK) {
+                    Serial.printf("IMU init err sh2_open 0x%02X\r\n", err_ret);
                     state_machine = ROACHIMU_SM_ERROR_WAIT;
                     error_time = millis();
                     break;
@@ -78,6 +80,7 @@ void RoachIMU::task(void)
                 memset(&prodIds, 0, sizeof(prodIds));
                 err_ret = sh2_getProdIds(&prodIds);
                 if (err_ret != SH2_OK) {
+                    Serial.printf("IMU init err sh2_getProdIds 0x%02X\r\n", err_ret);
                     state_machine = ROACHIMU_SM_ERROR_WAIT;
                     error_time = millis();
                     break;
@@ -95,14 +98,33 @@ void RoachIMU::task(void)
                 config.reportInterval_us = sample_interval;
                 err_ret = sh2_setSensorConfig(SH2_GYRO_INTEGRATED_RV, &config);
                 if (err_ret != SH2_OK) {
+                    Serial.printf("IMU init err sh2_setSensorConfig 0x%02X\r\n", err_ret);
                     state_machine = ROACHIMU_SM_ERROR_WAIT;
                     error_time = millis();
                     break;
                 }
+                #ifdef ROACHIMU_ENABLE_DEBUG
+                Serial.printf("IMU state machine started!\r\n");
+                #endif
+                reset_occured = false;
                 state_machine = ROACHIMU_SM_SVC_START;
             }
             break;
         case ROACHIMU_SM_SVC_START:
+            {
+                if (
+                #if defined(ESP32)
+                    nbe_i2c_is_busy(&nbe_i2c) == false
+                #elif defined(NRF52840_XXAA)
+                    nbtwi_isBusy() == false
+                #endif
+                )
+                {
+                    state_machine = ROACHIMU_SM_SVC_GET_HEADER;
+                    break;
+                }
+            }
+            break;
         case ROACHIMU_SM_SVC_GET_HEADER:
             {
                 int len = 4;
@@ -143,6 +165,7 @@ void RoachIMU::task(void)
                         #endif
                         )
                     {
+                        Serial.printf("IMU timeout header_wait [%u, %u, %u]\r\n", millis(), read_time, state_machine);
                         state_machine = ROACHIMU_SM_ERROR;
                         break;
                     }
@@ -153,7 +176,7 @@ void RoachIMU::task(void)
                     uint8_t* header = (uint8_t*)rx_buff_i2c;
                     
                     // Determine amount to read
-                    uint16_t packet_size = (uint16_t)header[0] | (uint16_t)header[1] << 8;
+                    uint16_t packet_size = (uint16_t)header[0] | ((uint16_t)header[1] << 8);
                     // Unset the "continue" bit
                     packet_size &= ~0x8000;
                     if (packet_size > SH2_HAL_MAX_TRANSFER_IN) {
@@ -224,6 +247,7 @@ void RoachIMU::task(void)
                         #endif
                         )
                     {
+                        Serial.printf("IMU timeout chunk_wait [%u, %u, %u]\r\n", millis(), read_time, state_machine);
                         state_machine = ROACHIMU_SM_ERROR;
                         break;
                     }
@@ -295,6 +319,9 @@ void RoachIMU::pause_service(void)
         task();
         yield();
     }
+    #ifdef ROACHIMU_ENABLE_DEBUG
+    //Serial.printf("IMU service paused %u\r\n", millis());
+    #endif
 }
 
 void RoachIMU::tare(void)
@@ -303,7 +330,7 @@ void RoachIMU::tare(void)
     sh2_setTareNow(0x07, (sh2_TareBasis_t)0x05); // tare all three axis, for gyro-integrated-RV
 }
 
-void RoachIMU::do_math(void)
+void RoachIMU::doMath(void)
 {
     if (has_new)
     {
@@ -316,7 +343,7 @@ void RoachIMU::do_math(void)
         switch (ori)
         {
             case ROACHIMU_ORIENTATION_XYZ:
-                memcpy((void*)&(eu), (void*)&(euler), sizeof(euler_t));
+                memcpy((void*)&(euler), (void*)&(eu), sizeof(euler_t));
                 break;
             case ROACHIMU_ORIENTATION_XZY:
                 euler.pitch = eu.yaw;
@@ -343,6 +370,9 @@ void RoachIMU::do_math(void)
                 euler.pitch = eu.pitch;
                 euler.yaw   = eu.roll;
                 break;
+            default:
+                memcpy((void*)&(euler), (void*)&(eu), sizeof(euler_t));
+                break;
         }
         if ((install_orientation & ROACHIMU_ORIENTATION_FLIP_ROLL) != 0) {
             euler.roll *= -1;
@@ -362,6 +392,10 @@ void RoachIMU::do_math(void)
 
 bool RoachIMU::i2c_write(uint8_t* buf, int len)
 {
+    #ifdef ROACHIMU_ENABLE_DEBUG
+    //Serial.printf("RoachIMU::i2c_write %u\r\n", len);
+    #endif
+
     pause_service();
 
     #if defined(ESP32)
@@ -391,6 +425,10 @@ bool RoachIMU::i2c_write(uint8_t* buf, int len)
 
 bool RoachIMU::i2c_read(uint8_t* buf, int len)
 {
+    #ifdef ROACHIMU_ENABLE_DEBUG
+    //Serial.printf("RoachIMU::i2c_read %u\r\n", len);
+    #endif
+
     pause_service();
 
     int i;
@@ -419,6 +457,7 @@ bool RoachIMU::i2c_read(uint8_t* buf, int len)
         nbtwi_readResult(rx_buff_i2c, len, true);
     }
     else {
+        Serial.printf("RoachIMU::i2c_read err no result\r\n");
         return false;
     }
     #endif
@@ -454,13 +493,18 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t
 {
     // uint8_t *pBufferOrig = pBuffer;
 
+    #ifdef ROACHIMU_ENABLE_DEBUG
+    Serial.printf("RoachIMU i2chal_read %u\r\n", len);
+    #endif
+
     uint8_t header[4];
     if (!instance->i2c_read(header, 4)) {
+        Serial.printf("i2chal_read err\r\n");
         return 0;
     }
 
     // Determine amount to read
-    uint16_t packet_size = (uint16_t)header[0] | (uint16_t)header[1] << 8;
+    uint16_t packet_size = (uint16_t)header[0] | ((uint16_t)header[1] << 8);
     // Unset the "continue" bit
     packet_size &= ~0x8000;
 
@@ -468,6 +512,7 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t
 
     if (packet_size > len) {
         // packet wouldn't fit in our buffer
+        Serial.printf("ERR[%u]: i2chal_read packet size too big %d\r\n", millis(), packet_size);
         return 0;
     }
     // the number of non-header bytes to read
@@ -515,6 +560,10 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t
 
 static int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len)
 {
+    #ifdef ROACHIMU_ENABLE_DEBUG
+    Serial.printf("RoachIMU i2chal_write %u\r\n", len);
+    #endif
+
     size_t i2c_buffer_max = ROACHIMU_BUFF_TX_SIZE;
 
     uint16_t write_size = min(i2c_buffer_max, len);
@@ -578,6 +627,7 @@ static void hal_callback(void *cookie, sh2_AsyncEvent_t *pEvent)
     // If we see a reset, set a flag so that sensors will be reconfigured.
     if (pEvent->eventId == SH2_RESET) {
         instance->reset_occured = true;
+        Serial.printf("IMU hal_callback SH2_RESET %u\r\n", millis());
     }
 }
 
