@@ -51,12 +51,14 @@ void RoachIMU::task(void)
     if (reset_occured && state_machine >= ROACHIMU_SM_SVC_GET_HEADER) {
         Serial.printf("IMU reset_occured %u\r\n", millis());
         state_machine = ROACHIMU_SM_SETUP;
+        err_occured = true;
     }
 
     switch (state_machine)
     {
         case ROACHIMU_SM_SETUP:
             {
+                err_cnt = 0;
                 #if defined(ESP32)
                 if (nbe_i2c_is_busy(&nbe_i2c)) {
                     state_machine = ROACHIMU_SM_ERROR_WAIT;
@@ -65,23 +67,102 @@ void RoachIMU::task(void)
                 }
                 #elif defined(NRF52840_XXAA)
                 #endif
-                int err_ret;
-                hal_hardwareReset();
+                if (pin_rst >= 0)
+                {
+                    #ifdef ROACHIMU_ENABLE_DEBUG
+                    Serial.printf("IMU init using HW RST\r\n");
+                    #endif
+                    pinMode(pin_rst, OUTPUT);
+                    digitalWrite(pin_rst, HIGH);
+                    state_machine = ROACHIMU_SM_SETUP_RST1;
+                    read_time = millis();
+                }
+                else
+                {
+                    state_machine = ROACHIMU_SM_SETUP_2;
+                }
+            }
+            break;
+        case ROACHIMU_SM_SETUP_RST1:
+            {
+                if ((millis() - read_time) >= 10)
+                {
+                    digitalWrite(pin_rst, LOW);
+                    state_machine = ROACHIMU_SM_SETUP_RST2;
+                    read_time = millis();
+                }
+            }
+            break;
+        case ROACHIMU_SM_SETUP_RST2:
+            {
+                if ((millis() - read_time) >= 10)
+                {
+                    digitalWrite(pin_rst, HIGH);
+                    state_machine = ROACHIMU_SM_SETUP_RST3;
+                    read_time = millis();
+                }
+            }
+            break;
+        case ROACHIMU_SM_SETUP_RST3:
+            {
+                if ((millis() - read_time) >= 10)
+                {
+                    state_machine = ROACHIMU_SM_SETUP_2;
+                    #ifdef ROACHIMU_ENABLE_DEBUG
+                    Serial.printf("IMU init fin using HW RST\r\n");
+                    #endif
+                }
+            }
+            break;
+        case ROACHIMU_SM_SETUP_2:
+            {
                 #ifdef ROACHIMU_ENABLE_DEBUG
-                Serial.printf("IMU init calling sh2_open...\r\n");
+                Serial.printf("IMU init calling sh2_open\r\n");
                 #endif
-                err_cnt = 0;
+                int err_ret;
                 err_ret = sh2_open(&hal, hal_callback, NULL);
-                if (err_ret != SH2_OK) {
+                if (err_ret == SH2_OK)
+                {
+                    read_time = millis();
+                    state_machine = ROACHIMU_SM_SETUP_3;
+                }
+                else
+                {
+                    error_time = millis();
                     Serial.printf("IMU init err sh2_open 0x%02X\r\n", err_ret);
                     if (fail_cnt < 64) {
                         fail_cnt++;
                     }
                     total_fails++;
-                    state_machine = ROACHIMU_SM_ERROR_WAIT;
-                    error_time = millis();
-                    break;
+                    err_cnt++;
+                    if (err_cnt > 5) {
+                        state_machine = ROACHIMU_SM_ERROR_WAIT;
+                    }
+                    else {
+                        state_machine = ROACHIMU_SM_SETUP_F;
+                    }
                 }
+            }
+            break;
+        case ROACHIMU_SM_SETUP_F:
+            {
+                if ((millis() - error_time) >= 30)
+                {
+                    state_machine = ROACHIMU_SM_SETUP_2;
+                }
+            }
+            break;
+        case ROACHIMU_SM_SETUP_3:
+            {
+                if ((millis() - read_time) >= 300)
+                {
+                    state_machine = ROACHIMU_SM_SETUP_4;
+                }
+            }
+            break;
+        case ROACHIMU_SM_SETUP_4:
+            {
+                int err_ret;
                 memset(&prodIds, 0, sizeof(prodIds));
                 err_ret = sh2_getProdIds(&prodIds);
                 if (err_ret != SH2_OK) {
@@ -310,6 +391,7 @@ void RoachIMU::task(void)
             if (err_cnt > 5) {
                 state_machine = ROACHIMU_SM_SETUP;
                 is_ready = false;
+                err_occured = true;
             }
             else {
                 state_machine = ROACHIMU_SM_SVC_START;
@@ -319,6 +401,7 @@ void RoachIMU::task(void)
             {
                 is_ready = false;
                 if ((millis() - error_time) >= 500) {
+                    err_occured = true;
                     state_machine = ROACHIMU_SM_SETUP;
                 }
             }
@@ -490,17 +573,9 @@ bool RoachIMU::i2c_read(uint8_t* buf, int len)
 static int i2chal_open(sh2_Hal_t *self)
 {
     uint8_t softreset_pkt[] = {5, 0, 1, 0, 1};
-    bool success = false;
-    for (uint8_t attempts = 0; attempts < 5; attempts++) {
-        if (instance->i2c_write(softreset_pkt, 5)) {
-            success = true;
-            break;
-        }
-        delay(30);
-    }
+    bool success = instance->i2c_write(softreset_pkt, 5);
     if (!success)
         return -1;
-    delay(300);
     return 0;
 }
 

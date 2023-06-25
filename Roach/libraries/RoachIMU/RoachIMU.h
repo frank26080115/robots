@@ -34,6 +34,13 @@ svc_state_t;
 enum
 {
     ROACHIMU_SM_SETUP,
+    ROACHIMU_SM_SETUP_RST1,
+    ROACHIMU_SM_SETUP_RST2,
+    ROACHIMU_SM_SETUP_RST3,
+    ROACHIMU_SM_SETUP_2,
+    ROACHIMU_SM_SETUP_3,
+    ROACHIMU_SM_SETUP_F,
+    ROACHIMU_SM_SETUP_4,
     ROACHIMU_SM_SVC_START,
     ROACHIMU_SM_SVC_GET_HEADER,
     ROACHIMU_SM_SVC_GET_HEADER_WAIT,
@@ -91,6 +98,7 @@ class RoachIMU
         inline bool hasFailed(void) { return fail_cnt > 3; };
         inline uint32_t totalFails(void) { return total_fails; };
         inline uint32_t getTotal(void) { return total_cnt; };
+        inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x; };
 
         bool i2c_write(uint8_t* buf, int len);
         bool i2c_read (uint8_t* buf, int len);
@@ -119,6 +127,7 @@ class RoachIMU
         uint32_t sample_time, read_time, error_time;
         int sample_interval, read_interval;
         int err_cnt, fail_cnt = 0, total_fails = 0;
+        bool err_occured = false;
 };
 
 #endif
