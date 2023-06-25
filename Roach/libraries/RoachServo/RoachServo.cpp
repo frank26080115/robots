@@ -19,6 +19,21 @@ RoachServo::RoachServo()
   this->pwm = NULL;
 }
 
+RoachServo::RoachServo(int pin) : RoachServo()
+{
+  _pin = pin;
+}
+
+uint8_t RoachServo::begin()
+{
+  if (_pin >= 0) {
+    return this->attach(_pin, MIN_PULSE_WIDTH, MAX_PULSE_WIDTH);
+  }
+  else {
+    return INVALID_SERVO;
+  }
+}
+
 uint8_t RoachServo::attach(int pin)
 {
   return this->attach(pin, MIN_PULSE_WIDTH, MAX_PULSE_WIDTH);
@@ -84,6 +99,8 @@ uint8_t RoachServo::attach(int pin, int min, int max)
 
     this->pwm->setMaxValue(MAXVALUE); // sets the period
     this->pwm->setClockDiv(CLOCKDIV); // sets the resolution
+
+    _pin = pin;
 
     return this->servoIndex;
   }
