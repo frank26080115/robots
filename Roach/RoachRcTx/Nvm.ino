@@ -62,9 +62,6 @@ void settings_factoryReset(void)
     memset(&nvm_tx, 0, sizeof(roach_tx_nvm_t));
     roachnvm_setdefaults((uint8_t*)&nvm_rf, cfggroup_rf);
     roachnvm_setdefaults((uint8_t*)&nvm_tx, cfggroup_ctrler);
-    roachnvm_setdefaults((uint8_t*)&nvm_rx, cfggroup_drive);
-    roachnvm_setdefaults((uint8_t*)&nvm_rx, cfggroup_weap);
-    roachnvm_setdefaults((uint8_t*)&nvm_rx, cfggroup_imu);
 }
 
 bool settings_save(void)

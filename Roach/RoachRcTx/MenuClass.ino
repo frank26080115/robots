@@ -226,21 +226,21 @@ void RoachMenuCfgItemEditor::onEnter(void)
 
 void RoachMenuCfgItemEditor::taskLP(void)
 {
-    if (cfg_last_change_time != 0 && (uint32_t)_struct == (uint32_t)&nvm_rx)
-    {
-        if ((millis() - cfg_last_change_time) >= 1000) {
-            rosync_uploadChunk(_desc);
-            cfg_last_change_time = 0;
-        }
-    }
+    //if (cfg_last_change_time != 0 && (uint32_t)_struct == (uint32_t)&nvm_rx)
+    //{
+    //    if ((millis() - cfg_last_change_time) >= 1000) {
+    //        rosync_uploadChunk(_desc);
+    //        cfg_last_change_time = 0;
+    //    }
+    //}
 }
 
 void RoachMenuCfgItemEditor::onExit(void)
 {
-    if ((uint32_t)_struct == (uint32_t)&nvm_rx && cfg_last_change_time != 0)
-    {
-        rosync_uploadChunk(_desc);
-    }
+    //if ((uint32_t)_struct == (uint32_t)&nvm_rx && cfg_last_change_time != 0)
+    //{
+    //    rosync_uploadChunk(_desc);
+    //}
     RoachMenu::onExit();
     encoder_mode = 0;
 }

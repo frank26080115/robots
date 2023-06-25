@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 
-#define ROACHIMU_ENABLE_DEBUG
+//#define ROACHIMU_ENABLE_DEBUG
 
 static RoachIMU* instance = NULL;
 

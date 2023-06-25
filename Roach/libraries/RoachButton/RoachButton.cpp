@@ -43,6 +43,7 @@ RoachButton::RoachButton(int pin, bool intr_mode, int rep, int db)
     _rep = rep;
     _db = db;
     roachbtn_insttbl[roachbtn_cnt] = this;
+    _pin_idx = roachbtn_cnt;
     roachbtn_cnt += 1;
 }
 
@@ -69,7 +70,7 @@ void RoachButton::task(void)
     if (_intr_mode && _init_done == false)
     {
         if (_init_high_cnt >= 10) {
-            attachInterrupt(_pin, _pin_irq_ptr[roachbtn_cnt], CHANGE);
+            attachInterrupt(_pin, _pin_irq_ptr[_pin_idx], CHANGE);
             _init_done = true;
         }
 
