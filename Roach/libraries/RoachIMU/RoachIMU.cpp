@@ -70,9 +70,14 @@ void RoachIMU::task(void)
                 #ifdef ROACHIMU_ENABLE_DEBUG
                 Serial.printf("IMU init calling sh2_open...\r\n");
                 #endif
+                err_cnt = 0;
                 err_ret = sh2_open(&hal, hal_callback, NULL);
                 if (err_ret != SH2_OK) {
                     Serial.printf("IMU init err sh2_open 0x%02X\r\n", err_ret);
+                    if (fail_cnt < 64) {
+                        fail_cnt++;
+                    }
+                    total_fails++;
                     state_machine = ROACHIMU_SM_ERROR_WAIT;
                     error_time = millis();
                     break;
@@ -285,6 +290,8 @@ void RoachIMU::task(void)
                     sh2_rxAssemble(sh2_getShtpInstance(), rx_buff_sh2, rx_buff_wptr, read_time * 1000); // this will call whatever callback was assigned
                     rx_buff_wptr = 0;
                     sample_time = read_time;
+                    err_cnt = 0;
+                    fail_cnt = 0;
                 }
                 state_machine = ROACHIMU_SM_SVC_READ_DONE_LOOP;
             }
@@ -298,8 +305,15 @@ void RoachIMU::task(void)
             }
             break;
         case ROACHIMU_SM_ERROR:
-            state_machine = ROACHIMU_SM_SETUP;
-            is_ready = false;
+            err_cnt++;
+            total_fails++;
+            if (err_cnt > 5) {
+                state_machine = ROACHIMU_SM_SETUP;
+                is_ready = false;
+            }
+            else {
+                state_machine = ROACHIMU_SM_SVC_START;
+            }
             break;
         case ROACHIMU_SM_ERROR_WAIT:
             {
@@ -340,15 +354,13 @@ void RoachIMU::doMath(void)
         has_new = false;
         // reorder the euler angles according to installation orientation
         uint8_t ori = install_orientation & 0x0F;
+        memcpy((void*)&(euler), (void*)&(eu), sizeof(euler_t));
         switch (ori)
         {
             case ROACHIMU_ORIENTATION_XYZ:
-                memcpy((void*)&(euler), (void*)&(eu), sizeof(euler_t));
                 break;
             case ROACHIMU_ORIENTATION_XZY:
-                euler.pitch = eu.yaw;
-                euler.roll  = eu.roll;
-                euler.yaw   = eu.pitch;
+                euler.roll -= 90;
                 break;
             case ROACHIMU_ORIENTATION_YXZ:
                 euler.roll  = eu.pitch;
@@ -356,37 +368,44 @@ void RoachIMU::doMath(void)
                 euler.yaw   = eu.yaw;
                 break;
             case ROACHIMU_ORIENTATION_YZX:
-                euler.roll  = eu.pitch;
-                euler.pitch = eu.yaw;
-                euler.yaw   = eu.roll;
+                euler.roll  -= 90;
+                euler.pitch -= 90;
                 break;
             case ROACHIMU_ORIENTATION_ZXY:
-                euler.roll  = eu.yaw;
-                euler.pitch = eu.roll;
-                euler.yaw   = eu.pitch;
+                euler.roll  += 90;
                 break;
             case ROACHIMU_ORIENTATION_ZYX:
-                euler.roll  = eu.yaw;
-                euler.pitch = eu.pitch;
-                euler.yaw   = eu.roll;
+                euler.pitch -= 90;
                 break;
             default:
                 memcpy((void*)&(euler), (void*)&(eu), sizeof(euler_t));
                 break;
         }
         if ((install_orientation & ROACHIMU_ORIENTATION_FLIP_ROLL) != 0) {
-            euler.roll *= -1;
+            euler.roll += 180;
         }
         if ((install_orientation & ROACHIMU_ORIENTATION_FLIP_PITCH) != 0) {
-            euler.pitch *= -1;
+            euler.pitch += 180;
         }
-        if ((install_orientation & ROACHIMU_ORIENTATION_FLIP_YAW) != 0) {
-            euler.yaw *= -1;
+        while (euler.pitch > 180) {
+            euler.pitch -= 360;
+        }
+        while (euler.roll > 180) {
+            euler.roll -= 360;
+        }
+        while (euler.pitch < -180) {
+            euler.pitch += 360;
+        }
+        while (euler.roll < -180) {
+            euler.roll += 360;
         }
         float invert_hysterisis = 2;
         invert_hysterisis *= is_inverted ? -1 : 1;
         is_inverted = (euler.roll > (90 + invert_hysterisis) || euler.roll < (-90 - invert_hysterisis)) || (euler.pitch > (90 + invert_hysterisis) || euler.pitch < (-90 - invert_hysterisis));
-        heading = euler.yaw * (is_inverted ? -1 : 1);
+        heading = euler.yaw;
+        //if (is_inverted) {
+        //    heading *= -1;
+        //}
     }
 }
 
@@ -645,5 +664,6 @@ static void sensorHandler(void *cookie, sh2_SensorEvent_t *event)
     {
         instance->is_ready = true;
         instance->has_new = true;
+        instance->total_cnt++;
     }
 }

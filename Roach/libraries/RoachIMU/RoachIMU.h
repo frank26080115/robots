@@ -56,7 +56,7 @@ enum
     ROACHIMU_ORIENTATION_ZYX,
     ROACHIMU_ORIENTATION_FLIP_ROLL  = 0x80,
     ROACHIMU_ORIENTATION_FLIP_PITCH = 0x40,
-    ROACHIMU_ORIENTATION_FLIP_YAW   = 0x20,
+    //ROACHIMU_ORIENTATION_FLIP_YAW   = 0x20,
 };
 
 typedef struct
@@ -69,7 +69,7 @@ typedef struct
 class RoachIMU
 {
     public:
-        RoachIMU(int samp_interval   = 10000,
+        RoachIMU(int samp_interval   = 5000,
                  int rd_interval     = 0,
                  int orientation     = 0,
                  int dev_addr        = BNO08x_I2CADDR_DEFAULT,
@@ -83,10 +83,14 @@ class RoachIMU
         bool is_inverted;
         float heading;
         uint8_t install_orientation;
+        int total_cnt = 0;
 
         void pause_service(void);
         void doMath(void);
         void tare(void);
+        inline bool hasFailed(void) { return fail_cnt > 3; };
+        inline uint32_t totalFails(void) { return total_fails; };
+        inline uint32_t getTotal(void) { return total_cnt; };
 
         bool i2c_write(uint8_t* buf, int len);
         bool i2c_read (uint8_t* buf, int len);
@@ -114,6 +118,7 @@ class RoachIMU
         int     rx_buff_wptr;                       // write pointer for rx_buff_sh2
         uint32_t sample_time, read_time, error_time;
         int sample_interval, read_interval;
+        int err_cnt, fail_cnt = 0, total_fails = 0;
 };
 
 #endif
