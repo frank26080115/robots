@@ -45,6 +45,8 @@ class nRF52RcRadio
         void pairingStart(void); // starts pairing mode
         void pairingStop(void);  // stops pairing mode
 
+        inline uint32_t getSessionId(void) { return _session_id; };
+
         inline void setReplyReqRate(uint16_t x) { _reply_request_rate = x; }; // sets how often the robot is asked to reply
         void setChanMap(uint32_t x);                                          // gives the radio a new channel map during runtime
         void setTxInterval(uint16_t x);                                       // sets new transmission interval while respecting the limits
@@ -71,7 +73,7 @@ class nRF52RcRadio
 
         bool     _is_pairing;          // whether pairing mode is active or not, pairing disables packet validation
 
-        uint32_t _session_id;
+        uint32_t _session_id = 0;
         uint32_t _seq_num;
         uint32_t _seq_num_prev;
         uint32_t _reply_seq;

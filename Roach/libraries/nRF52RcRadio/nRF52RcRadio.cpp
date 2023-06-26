@@ -1413,11 +1413,23 @@ bool nRF52RcRadio::textIsDone(void)
 
 void nRF52RcRadio::start_new_session(void)
 {
-    do {
-        _session_id = nrfrr_rand();
+    if (_session_id == 0)
+    {
+        // radio rebooted, randomly generate new session ID, giving it some room for increments
+        do {
+            _session_id = nrfrr_rand();
+            _session_id >>= 2;
+            _session_id &= 0xFFFFFFFC;
+        }
+        while (_session_id == 0); // uhhhh what luck... try again until we get something interesting
     }
-    while (_session_id == 0);
-    _seq_num = 0;
+    else
+    {
+        // the radio did not reboot, but we need a new session ID so that the RX can use a lower sequence number
+        // the session ID is incremented by only 1 to indicate that the data is still continuous
+        _session_id += 1;
+    }
+    _seq_num = 0; // sequence number must be zero now to give this new session the most amount of time to operate
 }
 
 void nRF52RcRadio::pairingStart(void)
