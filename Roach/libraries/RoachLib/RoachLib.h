@@ -53,8 +53,6 @@ uint32_t roach_crcCalc(uint8_t const * p_data, uint32_t size, uint32_t const * p
 uint32_t roachnvm_getConfCrc(uint8_t* data, roach_nvm_gui_desc_t* desc_tbl);
 uint16_t roachnvm_getDescCrc(roach_nvm_gui_desc_t* desc_tbl);
 
-void roach_drive_mix(int32_t throttle, int32_t steering, int32_t gyro_correction, uint8_t flip, int32_t* output_left, int32_t* output_right, roach_nvm_servo_t* cfg);
-int32_t roach_drive_applyServoParams(int32_t spd, roach_nvm_servo_t* cfg);
-int32_t roach_ctrl_cross_mix(int32_t throttle, int32_t steering, uint32_t mix);
+#define ROACH_WRAP_ANGLE(x, m) do { while ((x) > (180 * (m))) { (x) -= 360 * (m); } while ((x) < -(180 * (m))) { (x) += 360 * (m); } } while (0)
 
 #endif

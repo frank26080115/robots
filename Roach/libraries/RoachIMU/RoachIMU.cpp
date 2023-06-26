@@ -1,9 +1,11 @@
 #include "RoachIMU.h"
+#include <RoachLib.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
 //#define ROACHIMU_ENABLE_DEBUG
+//#define ROACHIMU_REJECT_OUTLIERS
 
 static RoachIMU* instance = NULL;
 
@@ -28,6 +30,7 @@ RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int dev_
 {
     sample_interval = samp_interval;
     read_interval = rd_interval;
+    calc_interval = read_interval == 0 ? (sample_interval / 1000) : read_interval;
     install_orientation = orientation;
     i2c_addr = dev_addr;
     pin_rst = rst;
@@ -59,6 +62,12 @@ void RoachIMU::task(void)
         case ROACHIMU_SM_SETUP:
             {
                 err_cnt = 0;
+
+                if (euler_filter != NULL) {
+                    free(euler_filter);
+                    euler_filter = NULL;
+                }
+
                 #if defined(ESP32)
                 if (nbe_i2c_is_busy(&nbe_i2c)) {
                     state_machine = ROACHIMU_SM_ERROR_WAIT;
@@ -371,8 +380,6 @@ void RoachIMU::task(void)
                     sh2_rxAssemble(sh2_getShtpInstance(), rx_buff_sh2, rx_buff_wptr, read_time * 1000); // this will call whatever callback was assigned
                     rx_buff_wptr = 0;
                     sample_time = read_time;
-                    err_cnt = 0;
-                    fail_cnt = 0;
                 }
                 state_machine = ROACHIMU_SM_SVC_READ_DONE_LOOP;
             }
@@ -400,8 +407,14 @@ void RoachIMU::task(void)
         case ROACHIMU_SM_ERROR_WAIT:
             {
                 is_ready = false;
-                if ((millis() - error_time) >= 500) {
-                    err_occured = true;
+                err_occured = true;
+                if ((millis() - error_time) >= 500 && 
+                    #if defined(ESP32)
+                        nbe_i2c_is_busy(&nbe_i2c) == false
+                    #elif defined(NRF52840_XXAA)
+                        nbtwi_isBusy() == false
+                    #endif
+                ) {
                     state_machine = ROACHIMU_SM_SETUP;
                 }
             }
@@ -431,10 +444,68 @@ void RoachIMU::doMath(void)
 {
     if (has_new)
     {
+        has_new = false;
+
         euler_t eu;
         memcpy((void*)&(girv), (void*)&(sensor_value.un.gyroIntegratedRV), sizeof(sh2_GyroIntegratedRV_t));
         quaternionToEulerGI(&(girv), &(eu), true);
-        has_new = false;
+
+        #ifdef ROACHIMU_REJECT_OUTLIERS
+        bool reject = false;
+        if (euler_filter == NULL) // filter has no data, so just set the first ever sample
+        {
+            euler_filter = (euler_t*)malloc(sizeof(euler_t));
+            memcpy((void*)euler_filter, (void*)&(eu), sizeof(euler_t));
+            rej_cnt = 0;
+        }
+        else
+        {
+            // track a low-pass filtered version of the euler angles
+            // in order to detect outlier packets
+            float *f = (float*)&(euler_filter->yaw), *eup = (float*)&(eu.yaw);
+            int i, bad_axis = 0;
+            for (i = 0; i < 3; i++)
+            {
+                if (f[i] < 0 && eup[i] >= 0) {
+                    f[i] += 360;
+                }
+                else if (f[i] >= 0 && eup[i] < 0) {
+                    f[i] -= 360;
+                }
+                float d = f[i] - eup[i];
+                const float alpha = 0.2;
+                f[i] = (f[i] * (1.0f - alpha)) + (eup[i] * alpha);
+                ROACH_WRAP_ANGLE(d, 1);
+                if (abs(d) > ((float)(360 * 20) / (float)(1000 / calc_interval))) {
+                    bad_axis++;
+                }
+                ROACH_WRAP_ANGLE(f[i], 1);
+            }
+            reject = (bad_axis >= 2);
+        }
+
+        if (reject)
+        {
+            if (rej_cnt > (1000 / calc_interval))
+            {
+                // too many rejected samples, the IMU is going nuts
+                // put it into a failure state so it can reboot
+                rej_cnt = 0;
+                error_time = millis();
+                fail_cnt++;
+                perm_fail++;
+                state_machine = ROACHIMU_SM_ERROR_WAIT;
+            }
+            else {
+                rej_cnt++;
+            }
+            return;
+        }
+        rej_cnt  = (rej_cnt > 0) ? (rej_cnt - 1) : 0;
+        #endif
+        err_cnt  = 0;
+        fail_cnt = 0;
+
         // reorder the euler angles according to installation orientation
         uint8_t ori = install_orientation & 0x0F;
         memcpy((void*)&(euler), (void*)&(eu), sizeof(euler_t));
@@ -470,18 +541,9 @@ void RoachIMU::doMath(void)
         if ((install_orientation & ROACHIMU_ORIENTATION_FLIP_PITCH) != 0) {
             euler.pitch += 180;
         }
-        while (euler.pitch > 180) {
-            euler.pitch -= 360;
-        }
-        while (euler.roll > 180) {
-            euler.roll -= 360;
-        }
-        while (euler.pitch < -180) {
-            euler.pitch += 360;
-        }
-        while (euler.roll < -180) {
-            euler.roll += 360;
-        }
+        ROACH_WRAP_ANGLE(euler.yaw  , 1);
+        ROACH_WRAP_ANGLE(euler.roll , 1);
+        ROACH_WRAP_ANGLE(euler.pitch, 1);
         float invert_hysterisis = 2;
         invert_hysterisis *= is_inverted ? -1 : 1;
         is_inverted = (euler.roll > (90 + invert_hysterisis) || euler.roll < (-90 - invert_hysterisis)) || (euler.pitch > (90 + invert_hysterisis) || euler.pitch < (-90 - invert_hysterisis));

@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#include <RoachLib.h>
+
 #include "sh2.h"
 #include "sh2_SensorValue.h"
 #include "sh2_err.h"
@@ -71,7 +73,9 @@ typedef struct
     float yaw;
     float pitch;
     float roll;
-} euler_t;
+}
+__attribute__ ((packed))
+euler_t;
 
 class RoachIMU
 {
@@ -95,9 +99,14 @@ class RoachIMU
         void pause_service(void);
         void doMath(void);
         void tare(void);
-        inline bool hasFailed(void) { return fail_cnt > 3; };
+
+        // hasFailed will indicate if the IMU is reliable, this should be permanent and not recoverable
+        inline bool hasFailed(void) { return fail_cnt > 3 || perm_fail > 3; };
+
         inline uint32_t totalFails(void) { return total_fails; };
         inline uint32_t getTotal(void) { return total_cnt; };
+
+        // error occured signals that the heading track reference needs to be reset
         inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x; };
 
         bool i2c_write(uint8_t* buf, int len);
@@ -125,9 +134,12 @@ class RoachIMU
         uint8_t rx_buff_sh2[ROACHIMU_BUFF_RX_SIZE]; // used by the sh2 library, assembled packets
         int     rx_buff_wptr;                       // write pointer for rx_buff_sh2
         uint32_t sample_time, read_time, error_time;
-        int sample_interval, read_interval;
-        int err_cnt, fail_cnt = 0, total_fails = 0;
+        int sample_interval, read_interval, calc_interval;
+        int err_cnt, fail_cnt = 0, total_fails = 0, rej_cnt = 0;
         bool err_occured = false;
+        int perm_fail = 0;
+
+        euler_t* euler_filter = NULL;
 };
 
 #endif
