@@ -24,6 +24,9 @@
 #define ROACHIMU_DEF_PIN_SDA 22
 #define ROACHIMU_DEF_PIN_SCL 23
 
+#define ROACHIMU_EXTRA_DATA
+#define ROACHIMU_AUTO_MATH
+
 typedef struct
 {
     int cargo_remaining;
@@ -107,16 +110,23 @@ class RoachIMU
         inline uint32_t getTotal(void) { return total_cnt; };
 
         // error occured signals that the heading track reference needs to be reset
-        inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x; };
+        inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x || hasFailed(); };
 
         bool i2c_write(uint8_t* buf, int len);
         bool i2c_read (uint8_t* buf, int len);
+        void sensorHandler(sh2_SensorEvent_t*);
 
         bool reset_occured;
-        sh2_SensorValue_t sensor_value;
         sh2_GyroIntegratedRV_t girv;
         euler_t euler;
         sh2_ProductIds_t prodIds;
+        #ifdef ROACHIMU_EXTRA_DATA
+        sh2_Accelerometer_t accelerometer;
+        sh2_Accelerometer_t accelerometerRaw;
+        sh2_Gyroscope_t gyroscope;
+        sh2_GyroscopeUncalibrated_t gyroscopeUncal;
+        sh2_RawGyroscope_t gyroscopeRaw;
+        #endif
 
         uint8_t state_machine;
         int pin_sda, pin_scl, pin_rst;
@@ -140,6 +150,7 @@ class RoachIMU
         int perm_fail = 0;
 
         euler_t* euler_filter = NULL;
+        sh2_SensorValue_t sensor_value;
 };
 
 #endif

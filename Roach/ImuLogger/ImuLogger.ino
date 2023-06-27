@@ -51,7 +51,9 @@ void setup()
     digitalWrite(ROACHHW_PIN_LED_BLU, LOW);
 
     RoachUsbMsd_begin();
-    RoachUsbMsd_presentUsbMsd();
+    if (RoachUsbMsd_hasVbus()) {
+        RoachUsbMsd_presentUsbMsd();
+    }
 
     #ifdef WAIT_SERIAL
     while (Serial.available() <= 0)
@@ -66,6 +68,7 @@ void setup()
     imu.begin();
     while (true)
     {
+        RoachUsbMsd_task();
         nbtwi_task();
         imu.task();
         if (imu.has_new)
@@ -103,12 +106,6 @@ void setup()
 
     Serial.printf("saving to %s\r\n", filename);
 
-    bool suc = fatfile.open(&filename[1], O_RDWR | O_CREAT);
-    if (suc == false)
-    {
-        error("cannot open file");
-    }
-
     #ifdef WAIT_BUTTON
     do
     {
@@ -135,6 +132,14 @@ void setup()
     while (true);
     #endif
 
+    RoachUsbMsd_unpresent();
+
+    bool suc = fatfile.open(&filename[1], O_RDWR | O_CREAT);
+    if (suc == false)
+    {
+        error("cannot open file");
+    }
+
     digitalWrite(ROACHHW_PIN_LED_RED, LOW);
     digitalWrite(ROACHHW_PIN_LED_BLU, HIGH);
 }
@@ -152,9 +157,11 @@ void log_task()
     imu.task();
     if (imu.has_new)
     {
-        cnt++;
+        #ifndef ROACHIMU_AUTO_MATH
         imu.doMath();
-
+        #endif
+        imu.has_new = false;
+        cnt++;
         if (digitalRead(ROACHHW_PIN_BTN_D7) == LOW) {
             fatfile.flush();
             return;
@@ -171,9 +178,22 @@ void log_task()
         #ifndef USE_ASCII
         uint8_t* dp = (uint8_t*)&d;
         fatfile.write(dp, sizeof(data_t));
+        #ifdef ROACHIMU_EXTRA_DATA
+        fatfile.write((uint8_t*)&(imu.accelerometer), sizeof(sh2_Accelerometer_t));
+        fatfile.write((uint8_t*)&(imu.gyroscope)    , sizeof(sh2_Gyroscope_t));
+        #endif
         #else
-        char str[512];
-        int len = sprintf(str, "%u, %d, %d, %d\r\n", d.timestamp, d.yaw, d.roll, d.pitch);
+        char str[2048];
+        int len = sprintf(str, "%u, %d, %d, %d"
+        #ifdef ROACHIMU_EXTRA_DATA
+        ", %0.2f, %0.2f, %0.2f, %0.2f, %0.2f, %0.2f"
+        #endif
+        "\r\n"
+        , d.timestamp, d.yaw, d.roll, d.pitch
+        #ifdef ROACHIMU_EXTRA_DATA
+        , imu.accelerometer.x, imu.accelerometer.y, imu.accelerometer.z, imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z
+        #endif
+        );
         fatfile.write(str, len);
         #endif
         if ((cnt % 200) == 0) {

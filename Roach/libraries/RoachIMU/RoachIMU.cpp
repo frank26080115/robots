@@ -15,7 +15,7 @@ static void i2chal_close (sh2_Hal_t *self);
 static int  i2chal_open  (sh2_Hal_t *self);
 static uint32_t hal_getTimeUs(sh2_Hal_t *self);
 static void hal_callback(void *cookie, sh2_AsyncEvent_t *pEvent);
-static void sensorHandler(void *cookie, sh2_SensorEvent_t *pEvent);
+static void hal_sensorHandler(void *cookie, sh2_SensorEvent_t *pEvent);
 static void hal_hardwareReset(void);
 
 #if defined(NRF52840_XXAA)
@@ -180,7 +180,7 @@ void RoachIMU::task(void)
                     error_time = millis();
                     break;
                 }
-                sh2_setSensorCallback(sensorHandler, NULL);
+                sh2_setSensorCallback(hal_sensorHandler, NULL);
                 static sh2_SensorConfig_t config;
                 // These sensor options are disabled or not used in most cases
                 config.changeSensitivityEnabled = false;
@@ -198,6 +198,22 @@ void RoachIMU::task(void)
                     error_time = millis();
                     break;
                 }
+                #ifdef ROACHIMU_EXTRA_DATA
+                err_ret = sh2_setSensorConfig(SH2_ACCELEROMETER, &config);
+                if (err_ret != SH2_OK) {
+                    Serial.printf("IMU init err sh2_setSensorConfig 0x%02X\r\n", err_ret);
+                    state_machine = ROACHIMU_SM_ERROR_WAIT;
+                    error_time = millis();
+                    break;
+                }
+                err_ret = sh2_setSensorConfig(SH2_GYROSCOPE_CALIBRATED, &config);
+                if (err_ret != SH2_OK) {
+                    Serial.printf("IMU init err sh2_setSensorConfig 0x%02X\r\n", err_ret);
+                    state_machine = ROACHIMU_SM_ERROR_WAIT;
+                    error_time = millis();
+                    break;
+                }
+                #endif
                 #ifdef ROACHIMU_ENABLE_DEBUG
                 Serial.printf("IMU state machine started!\r\n");
                 #endif
@@ -442,12 +458,15 @@ void RoachIMU::tare(void)
 
 void RoachIMU::doMath(void)
 {
+    #ifndef ROACHIMU_AUTO_MATH
     if (has_new)
+    #endif
     {
+        #ifndef ROACHIMU_AUTO_MATH
         has_new = false;
+        #endif
 
         euler_t eu;
-        memcpy((void*)&(girv), (void*)&(sensor_value.un.gyroIntegratedRV), sizeof(sh2_GyroIntegratedRV_t));
         quaternionToEulerGI(&(girv), &(eu), true);
 
         #ifdef ROACHIMU_REJECT_OUTLIERS
@@ -787,20 +806,54 @@ static void hal_callback(void *cookie, sh2_AsyncEvent_t *pEvent)
     }
 }
 
-static void sensorHandler(void *cookie, sh2_SensorEvent_t *event)
+static void hal_sensorHandler(void *cookie, sh2_SensorEvent_t *event)
+{
+    instance->sensorHandler(event);
+}
+
+void RoachIMU::sensorHandler(sh2_SensorEvent_t* event)
 {
     int rc;
-    rc = sh2_decodeSensorEvent(&(instance->sensor_value), event);
+    rc = sh2_decodeSensorEvent(&sensor_value, event);
 
     if (rc != SH2_OK) {
-        instance->sensor_value.timestamp = 0;
+        sensor_value.timestamp = 0;
         return;
     }
 
-    if (instance->sensor_value.sensorId == SH2_GYRO_INTEGRATED_RV)
+    if (sensor_value.sensorId == SH2_GYRO_INTEGRATED_RV)
     {
-        instance->is_ready = true;
-        instance->has_new = true;
-        instance->total_cnt++;
+        memcpy((void*)&(girv), (void*)&(sensor_value.un.gyroIntegratedRV), sizeof(sh2_GyroIntegratedRV_t));
+
+        is_ready = true;
+        has_new = true;
+        total_cnt++;
+
+        #ifdef ROACHIMU_AUTO_MATH
+        doMath();
+        #endif
     }
+
+    #ifdef ROACHIMU_EXTRA_DATA
+    if (sensor_value.sensorId == SH2_ACCELEROMETER)
+    {
+        memcpy((void*)&accelerometer, (void*)&(sensor_value.un.accelerometer), sizeof(sh2_Accelerometer_t));
+    }
+    if (sensor_value.sensorId == SH2_RAW_ACCELEROMETER)
+    {
+        memcpy((void*)&accelerometerRaw, (void*)&(sensor_value.un.rawAccelerometer), sizeof(sh2_Accelerometer_t));
+    }
+    if (sensor_value.sensorId == SH2_GYROSCOPE_CALIBRATED)
+    {
+        memcpy((void*)&gyroscope, (void*)&(sensor_value.un.gyroscope), sizeof(sh2_Gyroscope_t));
+    }
+    if (sensor_value.sensorId == SH2_GYROSCOPE_UNCALIBRATED)
+    {
+        memcpy((void*)&gyroscopeUncal, (void*)&(sensor_value.un.gyroscopeUncal), sizeof(sh2_GyroscopeUncalibrated_t));
+    }
+    if (sensor_value.sensorId == SH2_RAW_GYROSCOPE)
+    {
+        memcpy((void*)&gyroscopeRaw, (void*)&(sensor_value.un.rawGyroscope), sizeof(sh2_RawGyroscope_t));
+    }
+    #endif
 }
