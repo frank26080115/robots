@@ -18,6 +18,7 @@ class nRF52OneWireSerial : public Stream
     public:
         nRF52OneWireSerial(int pin, uint32_t baud, bool invert);
         void begin(void);
+        inline uint32_t lastTime(void) { return _last_time; };
 
         using Print::write;
 

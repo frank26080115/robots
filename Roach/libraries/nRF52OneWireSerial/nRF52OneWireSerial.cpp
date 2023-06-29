@@ -282,8 +282,3 @@ void nRF52OneWireSerial::flush(void)
     _rx_fifo_w = 0;
     __enable_irq();
 }
-
-uint32_t nRF52OneWireSerial::lastTime(void)
-{
-    return _last_time;
-}
