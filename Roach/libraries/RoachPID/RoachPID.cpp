@@ -93,8 +93,8 @@ void RoachPID::debug(void)
         "%d , "
         "%d , "
         "%d , "
-        "\r\n"
-        t,
+        "\r\n",
+        millis(),
         _last_cur,
         _last_tgt,
         _diff,

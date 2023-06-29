@@ -11,7 +11,7 @@ class RoachPID
 {
     public:
         RoachPID(void);
-        reset(void);
+        void reset(void);
         roach_nvm_pid_t* cfg;
         int32_t compute(int32_t x, int32_t tgt);
         void debug(void);
