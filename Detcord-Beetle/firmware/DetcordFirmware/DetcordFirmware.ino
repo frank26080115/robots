@@ -41,11 +41,13 @@ RoachHeadingManager heading_mgr((uint32_t*)&(nvm_robot.heading_timeout));
 
 void setup()
 {
+    settings_init();
     RoachUsbMsd_begin();
     if (RoachUsbMsd_hasVbus())
     {
         RoachUsbMsd_presentUsbMsd();
     }
+    cmdline_init();
 
     drive_left.begin();
     drive_right.begin();
@@ -69,4 +71,5 @@ void robot_task()
     nbtwi_task();
     imu.task();
     RoachUsbMsd_task();
+    cmdline_task();
 }
