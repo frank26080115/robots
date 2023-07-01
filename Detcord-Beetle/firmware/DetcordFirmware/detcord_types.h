@@ -23,7 +23,7 @@ typedef struct
     roach_nvm_pid_t pid_spindown;
     uint16_t spindown_limit;
 
-    uint16_t heading_timeout;
+    uint16_t heading_timeout; // when steering override is used, how long to timeout the heading-hold disabled mode
 
     uint32_t checksum;
 }
