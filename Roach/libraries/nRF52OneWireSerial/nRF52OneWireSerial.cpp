@@ -1,5 +1,32 @@
 #include "nRF52OneWireSerial.h"
+#include "wiring_private.h"
 
+#ifdef NRFOWS_USE_HW_SERIAL
+nRF52OneWireSerial::nRF52OneWireSerial(Uart* ser, NRF_UARTE_Type* uarte, int pin)
+{
+    _serial = ser;
+    _nrfUart = uarte;
+    _pin = pin;
+    _pin_hw = g_ADigitalPinMap[pin];
+}
+
+void nRF52OneWireSerial::task(void)
+{
+    int avail = _serial->available();
+    if (avail > _last_avail) {
+        _last_time = millis();
+    }
+    _last_avail = avail;
+}
+
+void nRF52OneWireSerial::begin(void)
+{
+    pinMode(_pin, INPUT_PULLUP);
+    _nrfUart->PSEL.TXD = 0xFFFFFFFF;
+    _nrfUart->PSEL.RXD = _pin_hw;
+}
+
+#else
 static nRF52OneWireSerial* active_obj = NULL; // need a static function to be able to call functions from this object
 
 nRF52OneWireSerial::nRF52OneWireSerial(int pin, uint32_t baud, bool invert)
@@ -40,9 +67,24 @@ void nRF52OneWireSerial::listen(void)
     pinMode(_pin, INPUT_PULLUP);
     _intmask = attachInterrupt(_pin, handle_interrupt, _invert ? RISING : FALLING);
 }
+#endif
 
 size_t nRF52OneWireSerial::write(uint8_t b)
 {
+    #ifdef NRFOWS_USE_HW_SERIAL
+    pinMode(_pin, OUTPUT);
+    _nrfUart->PSEL.RXD = 0xFFFFFFFF;
+    _nrfUart->PSEL.TXD = _pin_hw;
+
+    size_t res = _serial->write(b);
+    _serial->flush();
+
+    pinMode(_pin, INPUT_PULLUP);
+    _nrfUart->PSEL.TXD = 0xFFFFFFFF;
+    _nrfUart->PSEL.RXD = _pin_hw;
+
+    return res;
+    #else
     __disable_irq();
 
     detachInterrupt(_pin);
@@ -109,10 +151,25 @@ size_t nRF52OneWireSerial::write(uint8_t b)
     listen();
 
     return 1;
+    #endif
 }
 
 size_t nRF52OneWireSerial::write(const uint8_t *buffer, size_t size)
 {
+    #ifdef NRFOWS_USE_HW_SERIAL
+    pinMode(_pin, OUTPUT);
+    _nrfUart->PSEL.RXD = 0xFFFFFFFF;
+    _nrfUart->PSEL.TXD = _pin_hw;
+
+    size_t res = _serial->write(buffer, size);
+    _serial->flush();
+
+    pinMode(_pin, INPUT_PULLUP);
+    _nrfUart->PSEL.TXD = 0xFFFFFFFF;
+    _nrfUart->PSEL.RXD = _pin_hw;
+
+    return res;
+    #else
     detachInterrupt(_pin);
     digitalWrite(_pin, _invert ? LOW : HIGH);
     pinMode(_pin, OUTPUT);
@@ -182,7 +239,10 @@ size_t nRF52OneWireSerial::write(const uint8_t *buffer, size_t size)
     listen();
 
     return (size_t)j;
+    #endif
 }
+
+#ifndef NRFOWS_USE_HW_SERIAL
 
 #define NRFOWS_PIN_READ() ((*reg) & reg_mask)
 
@@ -244,13 +304,22 @@ inline void nRF52OneWireSerial::handle_interrupt()
     active_obj->recv();
 }
 
+#endif
+
 int nRF52OneWireSerial::available(void)
 {
+    #ifdef NRFOWS_USE_HW_SERIAL
+    return _serial->available();
+    #else
     return _rx_cnt;
+    #endif
 }
 
 int nRF52OneWireSerial::read(void)
 {
+    #ifdef NRFOWS_USE_HW_SERIAL
+    return _serial->read();
+    #else
     if (_rx_cnt == 0) {
         return -1;
     }
@@ -261,10 +330,14 @@ int nRF52OneWireSerial::read(void)
     _rx_fifo_r %= NRFOWS_RX_BUFF_SIZE;
     __enable_irq();
     return (int)x;
+    #endif
 }
 
 int nRF52OneWireSerial::peek(void)
 {
+    #ifdef NRFOWS_USE_HW_SERIAL
+    return _serial->peek();
+    #else
     if (_rx_cnt == 0) {
         return -1;
     }
@@ -272,13 +345,18 @@ int nRF52OneWireSerial::peek(void)
     uint8_t x = _rx_fifo[_rx_fifo_r];
     __enable_irq();
     return (int)x;
+    #endif
 }
 
 void nRF52OneWireSerial::flush(void)
 {
-    __disable_irq();
-    _rx_cnt = 0;
-    _rx_fifo_r = 0;
-    _rx_fifo_w = 0;
-    __enable_irq();
+    #ifdef NRFOWS_USE_HW_SERIAL
+    _serial->flush();
+    #else
+    //__disable_irq();
+    //_rx_cnt = 0;
+    //_rx_fifo_r = 0;
+    //_rx_fifo_w = 0;
+    //__enable_irq();
+    #endif
 }
