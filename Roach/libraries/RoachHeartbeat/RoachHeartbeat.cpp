@@ -20,21 +20,57 @@ void RoachWdt_feed(void)
     NRF_WDT->RR[0] = NRF_WDT_RR_VALUE;
 }
 
-RoachRgbLed::RoachRgbLed(NRF_SPIM_Type* p_spi, bool dotstar, int pind, int pinc)
+RoachRgbLed::RoachRgbLed(bool dotstar, int pind, int pinc, NRF_SPIM_Type* p_spi)
 {
     _spi = p_spi;
     _dotstar = dotstar;
     _pind = pind;
-    _pinc = pinc;
+    _pinc = _dotstar ? pinc : RHB_HW_PIN_NEOPIXEL_UNUSED;
+
+    _spim.p_reg = p_spi;
+
+    #if NRFX_SPIM0_ENABLED
+    if ( NRF_SPIM0 == p_spi ) {
+        _spim.drv_inst_idx = NRFX_SPIM0_INST_IDX;
+    }
+    #endif
+
+    #if NRFX_SPIM1_ENABLED
+    if ( NRF_SPIM1 == p_spi ) {
+        _spim.drv_inst_idx = NRFX_SPIM1_INST_IDX;
+    }
+    #endif
+
+    #if NRFX_SPIM2_ENABLED
+    if ( NRF_SPIM2 == p_spi ) {
+        _spim.drv_inst_idx = NRFX_SPIM2_INST_IDX;
+    }
+    #endif
+
+    #if NRFX_SPIM3_ENABLED
+    if ( NRF_SPIM3 == p_spi ) {
+        _spim.drv_inst_idx = NRFX_SPIM3_INST_IDX;
+    }
+    #endif
+
 }
 
 void RoachRgbLed::begin(void)
 {
     spiConfig();
-    set(0, 0, 0, 0, true, false);
 }
 
-void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force, bool wait)
+
+#ifndef ROACHRGBLED_BLOCKING
+static volatile bool spi_busy = false;
+static void spi_handler(nrfx_spim_evt_t const * p_event, void * p_context)
+{
+    // there's nothing to check, nrfx_spim_evt_type_t literally only has one "done" enumeration, no other events are possible
+    spi_busy = false;
+}
+#endif
+
+void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force)
 {
     if (r == _r && g == _g && b == _b && brite == _brite && force == false)
     {
@@ -42,17 +78,19 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
         return;
     }
 
-    if (wait)
-    {
-        // wait for previous transaction to complete
-        spiWait(true);
+    #ifndef ROACHRGBLED_BLOCKING
+    // if non-blocking mode, then we need to wait until previous transaction has finished
+    while (spi_busy) {
+        yield();
     }
-    _spi->EVENTS_ENDTX = 0;
+    #endif
 
     _r = r;
     _g = g;
     _b = b;
     _brite = brite;
+
+    int len;
 
     if (_dotstar)
     {
@@ -69,16 +107,21 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
         _buffer[ 9] = 0xFF;
         _buffer[10] = 0xFF;
         _buffer[11] = 0xFF;
-        // send out these bytes over SPI
-        _spi->TXD.MAXCNT = 12;
-        _spi->TXD.PTR = (uint32_t)_buffer;
-        _spi->TASKS_START = 1UL;
+        len = 12;
+        #ifdef ROACHRGBLED_DEBUG
+        Serial.printf("dotstar buff [%u]: ", len);
+        int k;
+        for (k = 0; k < len; k++) {
+            Serial.printf("%02X ", _buffer[k]);
+        }
+        Serial.printf("\r\n");
+        #endif
     }
     else
     {
         memset(_buffer, 0, ROACHRGBLED_BUFFER_SIZE);
-        uint8_t buf[3] = {g, r, b}; // define the byte order expected
-        int i, bit_idx = 0;
+        uint8_t buf[3] = { g, r, b, }; // define byte order the LED expects
+        int i, bit_idx = 2; // need two blank bits at the start
         for (i = 0; i < 3; i++) // for all three bytes
         {
             uint8_t data = buf[i];
@@ -86,7 +129,7 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
             for (cbit = 0; cbit < 8; cbit++) // for each bit in this byte
             {
                 int hi, j;
-                hi = ((b & (1 << (7 - cbit))) != 0) ? 6 : 3; // stuff in 3 bits for T0H, or 6 bits for T1H, MSB first
+                hi = ((data & (1 << (7 - cbit))) != 0) ? 6 : 3; // stuff in 3 bits for T0H, or 6 bits for T1H, MSB first
                 // each bit is 125 ns (assuming 8 MHz SPI clock)
                 // T0H is 400 ns, 3 bits is 375 ns
                 // T1H is 800 ns, 6 bits is 750 ns
@@ -104,75 +147,86 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
         while ((bit_idx % 8) != 0) {
             bit_idx++; // round up to nearest byte boundary
         }
-        int len = (bit_idx / 8) + 2; // total number of bytes to send
-        // send out SPI
-        _spi->TXD.MAXCNT = len;
-        _spi->TXD.PTR = (uint32_t)_buffer;
-        _spi->TASKS_START = 1UL;
-    }
-}
 
-void RoachRgbLed::spiWait(bool clr)
-{
-    // wait for previous transaction to complete
-    while (_spi->EVENTS_ENDTX == 0) {
-        yield();
+        len = (bit_idx / 8) + 2; // total number of bytes to send
+
+        #ifdef ROACHRGBLED_DEBUG
+        Serial.printf("neopixel buff [%u]: ", len);
+        int k;
+        for (k = 0; k < len; k++) {
+            Serial.printf("%02X", _buffer[k]);
+        }
+        Serial.printf("\r\n");
+        #endif
     }
-    if (clr) {
-        _spi->EVENTS_ENDTX = 0;
-    }
+
+    // do the SPI transfer
+    nrfx_spim_xfer_desc_t xfer_desc =
+    {
+      .p_tx_buffer = _buffer,
+      .tx_length   = len,
+      .p_rx_buffer = NULL,
+      .rx_length   = 0,
+    };
+    #ifndef ROACHRGBLED_BLOCKING
+    spi_busy = true;
+    #endif
+    nrfx_spim_xfer(&_spim, &xfer_desc, 0);
+    #ifdef ROACHRGBLED_DEBUG
+    Serial.printf("SPI xfer returned\r\n");
+    #endif
 }
 
 void RoachRgbLed::spiConfig(void)
 {
-    spiCache();
-    if (_dotstar)
+    nrfx_spim_config_t cfg =
     {
-        pinMode(_pinc, OUTPUT);
-        digitalWrite(_pinc, HIGH);
-        pinMode(_pind, OUTPUT);
-        _spi->PSELSCK   = g_ADigitalPinMap[_pinc];
-        _spi->PSELMOSI  = g_ADigitalPinMap[_pind];
-        _spi->FREQUENCY = SPI_FREQUENCY_FREQUENCY_K500; // max clock acceptable is 512 kHz
-        _spi->CONFIG    = 0; // MSB first, mode 0
-        _spi->ENABLE    = 7;
-    }
-    else
-    {
-        pinMode(_pind, OUTPUT);
-        digitalWrite(_pind, LOW);
-        _spi->PSELSCK    = 0xFFFFFFFF;
-        _spi->PSELMOSI   = g_ADigitalPinMap[_pind];
-        _spi->FREQUENCY  = SPI_FREQUENCY_FREQUENCY_M8; // each bit is 125 ns
-        _spi->CONFIG     = 0; // MSB first, mode 0
-        _spi->ENABLE     = 7;
-    }
-}
+      .sck_pin        = NRFX_SPIM_PIN_NOT_USED,
+      .mosi_pin       = NRFX_SPIM_PIN_NOT_USED,
+      .miso_pin       = NRFX_SPIM_PIN_NOT_USED,
+      .ss_pin         = NRFX_SPIM_PIN_NOT_USED,
+      .ss_active_high = false,
+      .irq_priority   = 3,
+      .orc            = 0xFF,
+      .frequency      = NRF_SPIM_FREQ_500K,
+      .mode           = NRF_SPIM_MODE_0,
+      .bit_order      = NRF_SPIM_BIT_ORDER_MSB_FIRST,
+    };
+    cfg.sck_pin  = _dotstar ? g_ADigitalPinMap[_pinc] : _pinc;
+    cfg.mosi_pin = g_ADigitalPinMap[_pind];
+    cfg.frequency = _dotstar ? NRF_SPIM_FREQ_500K : NRF_SPIM_FREQ_8M;
+    int ret = nrfx_spim_init(&_spim, &cfg, 
+        #if ROACHRGBLED_BLOCKING
+            NULL
+        #else
+            spi_handler
+        #endif
+        , NULL);
 
-void RoachRgbLed::spiCache(void)
-{
-    _spiCache_freq      = _spi->FREQUENCY ;
-    _spiCache_config    = _spi->CONFIG    ;
-    _spiCache_pinMosi   = _spi->PSELMOSI  ;
-    _spiCache_pinMiso   = _spi->PSELMISO  ;
-    _spiCache_pinSck    = _spi->PSELSCK   ;
-    _spiCache_txdPtr    = _spi->TXD.PTR   ;
-    _spiCache_txdMaxcnt = _spi->TXD.MAXCNT;
-    _spiCache_rxdPtr    = _spi->RXD.PTR   ;
-    _spiCache_rxdMaxcnt = _spi->RXD.MAXCNT;
-}
+    nrf_gpio_cfg(cfg.sck_pin,
+             NRF_GPIO_PIN_DIR_OUTPUT,
+             NRF_GPIO_PIN_INPUT_CONNECT,
+             NRF_GPIO_PIN_NOPULL,
+             NRF_GPIO_PIN_H0H1,
+             NRF_GPIO_PIN_NOSENSE);
 
-void RoachRgbLed::spiRestore(void)
-{
-    _spi->FREQUENCY  = _spiCache_freq     ;
-    _spi->CONFIG     = _spiCache_config   ;
-    _spi->PSELMOSI   = _spiCache_pinMosi  ;
-    _spi->PSELMISO   = _spiCache_pinMiso  ;
-    _spi->PSELSCK    = _spiCache_pinSck   ;
-    _spi->TXD.PTR    = _spiCache_txdPtr   ;
-    _spi->TXD.MAXCNT = _spiCache_txdMaxcnt;
-    _spi->RXD.PTR    = _spiCache_rxdPtr   ;
-    _spi->RXD.MAXCNT = _spiCache_rxdMaxcnt;
+    nrf_gpio_cfg(cfg.mosi_pin,
+             NRF_GPIO_PIN_DIR_OUTPUT,
+             NRF_GPIO_PIN_INPUT_DISCONNECT,
+             NRF_GPIO_PIN_NOPULL,
+             NRF_GPIO_PIN_H0H1,
+             NRF_GPIO_PIN_NOSENSE);
+
+    nrf_spim_enable(_spim.p_reg);
+
+    #ifdef ROACHRGBLED_DEBUG
+    if (ret == NRFX_SUCCESS) {
+        Serial.printf("RoachRgbLed initialized\r\n");
+    }
+    else {
+        Serial.printf("RoachRgbLed initialization error 0x%08X\r\n", ret);
+    }
+    #endif
 }
 
 RoachHeartbeat::RoachHeartbeat(int pin)
@@ -188,21 +242,37 @@ void RoachHeartbeat::begin(void)
     _last_time = millis();
 }
 
-void RoachHeartbeat::play(const uint8_t* ani)
+void RoachHeartbeat::play(const uint8_t* ani, bool wait)
 {
+    if (wait) {
+        this->queue(ani);
+        return;
+    }
+
+    // set NULL to stop animation
     if (_animation == NULL) {
         digitalWrite(_pin, LOW);
         _on = false;
     }
+
+    // start/restart
     _ani_idx = 0;
     _last_time = millis();
     _animation = (uint8_t*)ani;
+    _queued = NULL;
     if (_animation != NULL)
     {
+        // definitely start the animation
+        // assume first iteration will be ON
         digitalWrite(_pin, HIGH);
         _on = true;
         task();
     }
+}
+
+void RoachHeartbeat::queue(const uint8_t* ani)
+{
+    _queued = (uint8_t*)ani;
 }
 
 void RoachHeartbeat::task(void)
@@ -217,8 +287,8 @@ void RoachHeartbeat::task(void)
     uint32_t t;
     if (_on)
     {
-        x >>= 4;
-        if ((now - _last_time) >= (x * RHB_TIME_MULTI_ON))
+        x >>= 4; // upper 4 nibble indicates time span
+        if ((now - _last_time) >= (x * RHB_TIME_MULTI_ON)) // time to turn off
         {
             digitalWrite(_pin, LOW);
             _last_time = now;
@@ -227,20 +297,27 @@ void RoachHeartbeat::task(void)
     }
     else
     {
-        x &= 0x0F;
-        if ((now - _last_time) >= (x * RHB_TIME_MULTI_OFF))
+        x &= 0x0F; // lower 4 nibble indicates time span
+        if ((now - _last_time) >= (x * RHB_TIME_MULTI_OFF)) // time to turn on
         {
             _last_time = now;
             _ani_idx++;
 
             x = _animation[_ani_idx];
-            if (x == 0) {
-                _ani_idx = 0;
+            if (x == 0) { // animation has finished
+                _ani_idx = 0; // loop
+                if (_queued != NULL) { // if a queued animation exists, then swap over
+                    play((const uint8_t*)_queued);
+                    return;
+                }
             }
+
+            // do the next ON cycle
             x = _animation[_ani_idx];
-            x >>= 4;
-            if (x > 0)
+            x >>= 4; // upper 4 nibble indicates time span
+            if (x > 0) // next ON cycle is valid
             {
+                // turn ON
                 digitalWrite(_pin, HIGH);
                 _on = true;
             }
