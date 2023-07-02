@@ -52,7 +52,13 @@ RoachRgbLed::RoachRgbLed(bool dotstar, int pind, int pinc, NRF_SPIM_Type* p_spi)
         _spim.drv_inst_idx = NRFX_SPIM3_INST_IDX;
     }
     #endif
+}
 
+RoachNeoPixel::RoachNeoPixel(int pind, NRF_PWM_Type* p_pwm, int pwm_out)
+{
+    _pwm = p_pwm;
+    _pind = pind;
+    _pwmout = pwm_out;
 }
 
 void RoachRgbLed::begin(void)
@@ -60,6 +66,85 @@ void RoachRgbLed::begin(void)
     spiConfig();
 }
 
+void RoachNeoPixel::begin(void)
+{
+    if (_pwm == NULL)
+    {
+        // none specified, so look through all available PWM modules and see which one is free
+        NRF_PWM_Type *PWM[] = {
+            NRF_PWM0,
+            NRF_PWM1,
+            NRF_PWM2
+        #if defined(NRF_PWM3)
+            ,
+            NRF_PWM3
+        #endif
+          };
+        int i;
+        for (i = 0; i < (sizeof(PWM) / sizeof(PWM[0])); i++)
+        {
+            if ((PWM[i]->ENABLE == 0) &&
+                (PWM[i]->PSEL.OUT[0] & PWM_PSEL_OUT_CONNECT_Msk) &&
+                (PWM[i]->PSEL.OUT[1] & PWM_PSEL_OUT_CONNECT_Msk) &&
+                (PWM[i]->PSEL.OUT[2] & PWM_PSEL_OUT_CONNECT_Msk) &&
+                (PWM[i]->PSEL.OUT[3] & PWM_PSEL_OUT_CONNECT_Msk))
+            {
+                _pwm = PWM[i];
+                break;
+            }
+        }
+        #ifdef ROACHNEOPIX_DEBUG
+        if (_pwm != NULL) {
+            Serial.printf("neopix found PWM %u\r\n", i);
+        }
+        #endif
+    }
+    if (_pwmout < 0)
+    {
+        for (int i = 0; i <= 3; i++)
+        {
+            if (_pwm->PSEL.OUT[i] & PWM_PSEL_OUT_CONNECT_Msk) {
+                _pwmout = i;
+                break;
+            }
+        }
+        #ifdef ROACHNEOPIX_DEBUG
+        if (_pwmout >= 0) {
+            Serial.printf("neopix found PWM output idx %u\r\n", _pwmout);
+        }
+        #endif
+    }
+
+    if (_pwm == NULL || _pwmout < 0) {
+        Serial.println("RoachNeoPixel failed to init, no available PWM");
+        return;
+    }
+
+    _pwm->MODE       = (PWM_MODE_UPDOWN_Up << PWM_MODE_UPDOWN_Pos);                    // Set the wave mode to count UP
+    _pwm->PRESCALER  = (PWM_PRESCALER_PRESCALER_DIV_1 << PWM_PRESCALER_PRESCALER_Pos); // Set the PWM to use the 16MHz clock
+    _pwm->COUNTERTOP = (20UL << PWM_COUNTERTOP_COUNTERTOP_Pos);                        // Setting of the maximum count, 20 is 1.25us
+    _pwm->LOOP = (PWM_LOOP_CNT_Disabled << PWM_LOOP_CNT_Pos);                          // Disable loops, we want the sequence to repeat only once
+    // On the "Common" setting the PWM uses the same pattern for the
+    // for supported sequences. The pattern is stored on half-word
+    // of 16bits
+    _pwm->DECODER = (PWM_DECODER_LOAD_Common << PWM_DECODER_LOAD_Pos) | (PWM_DECODER_MODE_RefreshCount << PWM_DECODER_MODE_Pos);
+
+    _pwm->SEQ[_pwmout].PTR = (uint32_t)(_pattern) << PWM_SEQ_PTR_PTR_Pos;
+    _pwm->SEQ[_pwmout].CNT = (ROACHNEOPIX_BUFFER_SIZE8 / sizeof(uint16_t)) << PWM_SEQ_CNT_CNT_Pos;
+    _pwm->SEQ[_pwmout].REFRESH = 0;
+    _pwm->SEQ[_pwmout].ENDDELAY = 0;
+
+    pinMode(_pind, OUTPUT);
+    digitalWrite(_pind, LOW);
+    
+    #if defined(ARDUINO_ARCH_NRF52840)
+        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pind].name;
+    #else
+        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pind];
+    #endif
+
+    _pwm->ENABLE = 1;
+}
 
 #ifndef ROACHRGBLED_BLOCKING
 static volatile bool spi_busy = false;
@@ -90,7 +175,7 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
     _b = b;
     _brite = brite;
 
-    int len;
+    uint16_t len;
 
     if (_dotstar)
     {
@@ -174,6 +259,72 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
     nrfx_spim_xfer(&_spim, &xfer_desc, 0);
     #ifdef ROACHRGBLED_DEBUG
     Serial.printf("SPI xfer returned\r\n");
+    #endif
+}
+
+void RoachNeoPixel::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force)
+{
+    if (r == _r && g == _g && b == _b && brite == _brite && force == false)
+    {
+        // don't waste time setting the same colour
+        return;
+    }
+
+    #ifndef ROACHNEOPIX_BLOCKING
+    // if non-blocking mode, then we need to wait until previous sequence has finished
+    if (_busy)
+    {
+        while (!_pwm->EVENTS_SEQEND[_pwmout]) {
+            yield();
+        }
+    }
+    _busy = false;
+    #endif
+
+    _r = r;
+    _g = g;
+    _b = b;
+    _brite = brite;
+
+    uint8_t pixels[] = { g, r, b, }; // define byte order the LED expects
+    uint16_t pos = 0; // bit position
+
+    #ifdef ROACHNEOPIX_DEBUG
+    Serial.printf("neopixel buff [%u, ", ROACHNEOPIX_BUFFER_SIZE8);
+    #endif
+
+    for (uint8_t n = 0; n < 3; n++)
+    {
+        uint8_t pix = pixels[n];
+        for (uint8_t mask = 0x80; mask > 0; mask >>= 1)
+        {
+            _pattern[pos] = ((pix & mask) != 0 ? 13 : 6) | (0x8000);
+            pos++;
+        }
+    }
+
+    // Zero padding to indicate the end of que sequence
+    _pattern[pos++] = 0 | (0x8000); // Seq end
+    _pattern[pos++] = 0 | (0x8000); // Seq end
+
+    #ifdef ROACHNEOPIX_DEBUG
+    Serial.printf("%u]: ", pos);
+    int k;
+    for (k = 0; k < pos; k++) {
+        Serial.printf("%04X ", _pattern[k]);
+    }
+    Serial.printf("\r\n");
+    #endif
+
+    _pwm->EVENTS_SEQEND[_pwmout]  = 0UL;
+    _pwm->TASKS_SEQSTART[_pwmout] = 1UL;
+
+    #ifdef ROACHNEOPIX_BLOCKING
+    while (!_pwm->EVENTS_SEQEND[_pwmout]) {
+        yield();
+    }
+    #else
+    _busy = true;
     #endif
 }
 
