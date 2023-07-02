@@ -250,9 +250,15 @@ void RoachHeartbeat::play(const uint8_t* ani, bool wait)
     }
 
     // set NULL to stop animation
-    if (_animation == NULL) {
+    if (ani == NULL) {
         digitalWrite(_pin, LOW);
         _on = false;
+    }
+
+    // do not interrupt current animation if the same animation is playing
+    // to restart an animation, set it to null first
+    if (((uint32_t)ani) == ((uint32_t)_animation)) {
+        return;
     }
 
     // start/restart
@@ -272,6 +278,11 @@ void RoachHeartbeat::play(const uint8_t* ani, bool wait)
 
 void RoachHeartbeat::queue(const uint8_t* ani)
 {
+    // do not allow queueing of animation already playing
+    if (((uint32_t)ani) == ((uint32_t)_animation)) {
+        return;
+    }
+
     _queued = (uint8_t*)ani;
 }
 
