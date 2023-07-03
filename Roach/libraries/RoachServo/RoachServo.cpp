@@ -176,7 +176,7 @@ bool RoachServo::attached()
 void RoachServo::rampTask()
 {
     uint32_t now = millis();
-    if ((now - rampTimestamp) < 10 || rampTarget < 0) {
+    if ((now - rampTimestamp) < 10 || rampTarget < 0 || rampStepX100 < 0) {
         return;
     }
 
@@ -203,11 +203,12 @@ void RoachServo::rampTask()
 void RoachServo::ramp(int32_t tgt, int32_t stepX100)
 {
     uint32_t us = (currentUsX100 + 50) / 100;
-    if (tgt <= us)
+    if (tgt <= us || stepX100 <= 0)
     {
         // no need to ramp
         writeMicroseconds(tgt);
         rampTarget = -1;
+        rampStepX100 = -1;
         return;
     }
     rampTarget = tgt;
