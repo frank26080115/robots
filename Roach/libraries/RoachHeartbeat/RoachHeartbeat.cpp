@@ -1,4 +1,5 @@
 #include "RoachHeartbeat.h"
+#include "RoachHeartbeat.h"
 #include "nrf_wdt.h"
 #include "wiring_private.h"
 
@@ -80,7 +81,7 @@ void RoachNeoPixel::begin(void)
             NRF_PWM3
         #endif
           };
-        int i;
+        unsigned int i;
         for (i = 0; i < (sizeof(PWM) / sizeof(PWM[0])); i++)
         {
             if ((PWM[i]->ENABLE == 0) &&
@@ -118,6 +119,21 @@ void RoachNeoPixel::begin(void)
     if (_pwm == NULL || _pwmout < 0) {
         Serial.println("RoachNeoPixel failed to init, no available PWM");
         return;
+    }
+
+    // Arduino uses HardwarePWM class, we can mark an instance as being "owned" to prevent it from being taken over later (by PWM or Servo)
+    int pwmidx = -1;
+    switch ((uint32_t)_pwm)
+    {
+        case (uint32_t)NRF_PWM0_BASE: pwmidx = 0; break;
+        case (uint32_t)NRF_PWM1_BASE: pwmidx = 1; break;
+        case (uint32_t)NRF_PWM2_BASE: pwmidx = 2; break;
+        #ifdef NRF_PWM3
+        case (uint32_t)NRF_PWM3_BASE: pwmidx = 3; break;
+        #endif
+    }
+    if (pwmidx >= 0) {
+        HwPWMx[pwmidx]->takeOwnership(0xABCD1ED5);
     }
 
     _pwm->MODE       = (PWM_MODE_UPDOWN_Up << PWM_MODE_UPDOWN_Pos);                    // Set the wave mode to count UP
@@ -446,7 +462,6 @@ void RoachHeartbeat::task(void)
 
     uint32_t now = millis();
     uint8_t x = _animation[_ani_idx];
-    uint32_t t;
     if (_on)
     {
         x >>= 4; // upper 4 nibble indicates time span
