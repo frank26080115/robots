@@ -147,6 +147,7 @@ void RoachServo::writeMicroseconds(int value)
     if (this->pwm) {
         uint8_t pin = servos[this->servoIndex].Pin.nbr;
         this->pwm->writePin(pin, value/DUTY_CYCLE_RESOLUTION);
+        this->currentUsX100 = value * 100;
     }
 }
 
@@ -166,8 +167,50 @@ int RoachServo::readMicroseconds()
 
 bool RoachServo::attached()
 {
-  if (this->servoIndex == INVALID_SERVO) {
-    return false;
-  }
-  return servos[this->servoIndex].Pin.isActive;
+    if (this->servoIndex == INVALID_SERVO) {
+        return false;
+    }
+    return servos[this->servoIndex].Pin.isActive;
+}
+
+void RoachServo::rampTask()
+{
+    uint32_t now = millis();
+    if ((now - rampTimestamp) < 10 || rampTarget < 0) {
+        return;
+    }
+
+    uint32_t us = (currentUsX100 + 50) / 100;
+
+    if (rampTarget > currentUsX100)
+    {
+        currentUsX100 += rampStepX100;
+        us = (currentUsX100 + 50) / 100;
+        us = us >= rampTarget ? rampTarget : us;
+
+        // cannot use writeMicroseconds(x) for this, since that call will override currentUsX100
+        uint8_t pin = servos[this->servoIndex].Pin.nbr;
+        this->pwm->writePin(pin, us / DUTY_CYCLE_RESOLUTION);
+
+        rampTimestamp = now;
+        if (us >= rampTarget) {
+            rampTarget = -1;
+            currentUsX100 = us * 100;
+        }
+    }
+}
+
+void RoachServo::ramp(int32_t tgt, int32_t stepX100)
+{
+    uint32_t us = (currentUsX100 + 50) / 100;
+    if (tgt <= us)
+    {
+        // no need to ramp
+        writeMicroseconds(tgt);
+        rampTarget = -1;
+        return;
+    }
+    rampTarget = tgt;
+    rampStepX100 = stepX100;
+    rampTask();
 }

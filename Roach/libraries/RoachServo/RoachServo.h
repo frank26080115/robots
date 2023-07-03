@@ -17,13 +17,20 @@ class RoachServo
         int read();                                // returns current pulse width as an angle between 0 and 180 degrees
         int readMicroseconds();                    // returns current pulse width in microseconds for this servo (was read_us() in first release)
         bool attached();                           // return true if this servo is attached, otherwise false 
+
+        void rampTask();
+        void ramp(int32_t tgt, int32_t stepX100);
     private:
         int _pin = -1;
+        int32_t currentUsX100;
         uint8_t servoIndex;                        // index into the channel data for this servo
         int16_t min;                               // minimum pulse in µs
         int16_t max;                               // maximum pulse in µs
 
         HardwarePWM* pwm;
+
+        int32_t rampTarget, rampStepX100;
+        uint32_t rampTimestamp = 0;
 };
 
 #endif
