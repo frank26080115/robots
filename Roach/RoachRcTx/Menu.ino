@@ -25,6 +25,7 @@ int printRfStats(int y)
             oled.drawBitmap(0, 0, icon_mismatched, 16, 8, SSD1306_WHITE);
         }
         oled.setCursor(16, y);
+        
         oled.printf("%d %d %0.1f", radio.getRssi(), telem_pkt.rssi, ((float)telem_pkt.loss_rate) / 100.0);
     }
     return y;

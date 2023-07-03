@@ -1,6 +1,5 @@
 #include "RoachLib.h"
 
-extern roach_rx_nvm_t nvm_rx;
 extern roach_rf_nvm_t nvm_rf;
 
 roach_nvm_gui_desc_t cfggroup_rf[] = {
@@ -9,6 +8,8 @@ roach_nvm_gui_desc_t cfggroup_rf[] = {
     { ((uint32_t)(&(nvm_rf.chan_map)) - (uint32_t)(&nvm_rf)), "chan map", "hex", (int32_t)0x0FFFFFFF, 0, 0, 1, },
     ROACH_NVM_GUI_DESC_END,
 };
+
+#if 0
 
 roach_nvm_gui_desc_t cfggroup_drive[] = {
     { ((uint32_t)(&(nvm_rx.drive_left_flip        )) - (uint32_t)(&nvm_rx)), "L flip"    , "s8"     ,                      0,                                 0,                                 1, 1, },
@@ -66,20 +67,6 @@ roach_nvm_gui_desc_t cfggroup_imu[] = {
 roach_nvm_gui_desc_t** cfggroup_rxall = NULL;
 int cfggroup_rxall_cnt = 0;
 
-int roachnvm_cntgroup(roach_nvm_gui_desc_t* g)
-{
-    int cnt = 0;
-    while (true)
-    {
-        roach_nvm_gui_desc_t* x = &(g[cnt]);
-        if (x->name == NULL || x->name[0] == 0)
-        {
-            return cnt;
-        }
-        cnt += 1;
-    }
-}
-
 void roachnvm_buildrxcfggroup(void)
 {
     int cnt = 0;
@@ -117,4 +104,20 @@ int roachnvm_rx_getcnt(void)
 roach_nvm_gui_desc_t* roachnvm_rx_getAt(int idx)
 {
     return cfggroup_rxall[idx];
+}
+
+#endif
+
+int roachnvm_cntgroup(roach_nvm_gui_desc_t* g)
+{
+    int cnt = 0;
+    while (true)
+    {
+        roach_nvm_gui_desc_t* x = &(g[cnt]);
+        if (x->name == NULL || x->name[0] == 0)
+        {
+            return cnt;
+        }
+        cnt += 1;
+    }
 }

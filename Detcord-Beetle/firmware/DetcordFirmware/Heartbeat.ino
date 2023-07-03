@@ -15,12 +15,12 @@ void heartbeat_task()
 
     if (_radio_connected && prev_radio_connected == false)
     {
-        hb_rgb.(0, 255, 0);
+        hb_rgb.set(0, 255, 0);
         hb_red.play(_usb_connected ? hbani_triple_fast : hbani_double_fast);
     }
     else if (_radio_connected == false && prev_radio_connected != false)
     {
-        hb_rgb.(255, 0, 0);
+        hb_rgb.set(255, 0, 0);
         hb_red.play(_usb_connected ? hbani_single_slow : hbani_single_fast);
     }
 

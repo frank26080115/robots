@@ -7,6 +7,7 @@
 #include <RoachPerfCnt.h>
 #include <RoachServo.h>
 #include <RoachIMU.h>
+#include <RoachHeartbeat.h>
 #include <RoachHeadingManager.h>
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
@@ -39,7 +40,7 @@ detcord_nvm_t nvm_robot;
 
 RoachHeadingManager heading_mgr((uint32_t*)&(nvm_robot.heading_timeout));
 
-RoachHeartbeat hb_red = RoachHeartbeat(ROACHHW_PIN_LED_RED);
+RoachHeartbeat hb_red = RoachHeartbeat(DETCORDHW_PIN_LED);
 RoachRgbLed    hb_rgb = RoachRgbLed();
 
 void setup()
@@ -59,7 +60,7 @@ void setup()
     drive_right.begin();
     weapon.begin();
 
-    nbtwi_init(ROACHHW_PIN_I2C_SCL, ROACHHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
+    nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
     imu.begin();
 
     radio.begin();
