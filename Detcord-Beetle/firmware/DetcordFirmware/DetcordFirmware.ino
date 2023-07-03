@@ -39,8 +39,14 @@ detcord_nvm_t nvm_robot;
 
 RoachHeadingManager heading_mgr((uint32_t*)&(nvm_robot.heading_timeout));
 
+RoachHeartbeat hb_red = RoachHeartbeat(ROACHHW_PIN_LED_RED);
+RoachRgbLed    hb_rgb = RoachRgbLed();
+
 void setup()
 {
+    hb_red.begin();
+    hb_rgb.begin();
+
     settings_init();
     RoachUsbMsd_begin();
     if (RoachUsbMsd_hasVbus())
