@@ -220,6 +220,14 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
     }
     else
     {
+            // no real brightness control, except for OFF
+        if (brite <= 0)
+        {
+            r = 0;
+            g = 0;
+            b = 0;
+        }
+
         memset(_buffer, 0, ROACHRGBLED_BUFFER_SIZE);
         uint8_t buf[3] = { g, r, b, }; // define byte order the LED expects
         int i, bit_idx = 2; // need two blank bits at the start
@@ -302,6 +310,14 @@ void RoachNeoPixel::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool for
     _b = b;
     _brite = brite;
 
+    // no real brightness control, except for OFF
+    if (brite <= 0)
+    {
+        r = 0;
+        g = 0;
+        b = 0;
+    }
+
     uint8_t pixels[] = { g, r, b, }; // define byte order the LED expects
     uint16_t pos = 0; // bit position
 
@@ -342,6 +358,69 @@ void RoachNeoPixel::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool for
     #else
     _busy = true;
     #endif
+}
+
+void RoachRgbLed::set(uint32_t x, bool force)
+{
+    set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), x ? 0xFF : 0, force);
+}
+
+void RoachNeoPixel::set(uint32_t x, bool force)
+{
+    set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), x ? 0xFF : 0, force);
+}
+
+void RoachRgbLed::setHue(int16_t hue, bool force)
+{
+    set((uint32_t)RoachHeartbeat_getRgbFromHue(hue), force);
+}
+
+void RoachNeoPixel::setHue(int16_t hue, bool force)
+{
+    set((uint32_t)RoachHeartbeat_getRgbFromHue(hue), force);
+}
+
+uint32_t RoachHeartbeat_getRgbFromHue(int16_t h)
+{
+    uint8_t r, g, b;
+    int16_t hue = (h * 1530L + 32768) / 65536;
+    if (hue < 510) { // Red to Green-1
+        b = 0;
+        if (hue < 255) { //   Red to Yellow-1
+            r = 255;
+            g = hue;       //     g = 0 to 254
+        } else {         //   Yellow to Green-1
+            r = 510 - hue; //     r = 255 to 1
+            g = 255;
+        }
+    } else if (hue < 1020) { // Green to Blue-1
+        r = 0;
+        if (hue < 765) { //   Green to Cyan-1
+            g = 255;
+            b = hue - 510;  //     b = 0 to 254
+        } else {          //   Cyan to Blue-1
+            g = 1020 - hue; //     g = 255 to 1
+            b = 255;
+        }
+    } else if (hue < 1530) { // Blue to Red-1
+        g = 0;
+        if (hue < 1275) { //   Blue to Magenta-1
+            r = hue - 1020; //     r = 0 to 254
+            b = 255;
+        } else { //   Magenta to Red-1
+            r = 255;
+            b = 1530 - hue; //     b = 255 to 1
+        }
+    } else { // Last 0.5 Red (quicker than % operator)
+        r = 255;
+        g = b = 0;
+    }
+    uint32_t ret = r;
+    ret <<= 8;
+    ret |= g;
+    ret <<= 8;
+    ret |= b;
+    return ret;
 }
 
 void RoachRgbLed::spiConfig(void)
