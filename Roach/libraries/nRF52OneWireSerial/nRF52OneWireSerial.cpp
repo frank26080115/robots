@@ -26,6 +26,14 @@ void nRF52OneWireSerial::begin(void)
     _nrfUart->PSEL.RXD = _pin_hw;
 }
 
+void nRF52OneWireSerial::end(void)
+{
+    pinMode(_pin, INPUT);
+    _serial->end();
+    _nrfUart->PSEL.TXD = 0xFFFFFFFF;
+    _nrfUart->PSEL.RXD = 0xFFFFFFFF;
+}
+
 #else
 static nRF52OneWireSerial* active_obj = NULL; // need a static function to be able to call functions from this object
 
@@ -60,6 +68,12 @@ void nRF52OneWireSerial::begin(void)
     _pin_output_reg     = portOutputRegister(port);
 
     listen();
+}
+
+void nRF52OneWireSerial::end(void)
+{
+    detachInterrupt(_pin);
+    pinMode(_pin, INPUT);
 }
 
 void nRF52OneWireSerial::listen(void)
@@ -359,4 +373,71 @@ void nRF52OneWireSerial::flush(void)
     //_rx_fifo_w = 0;
     //__enable_irq();
     #endif
+}
+
+uint32_t nRF52OneWireSerial::echo(Stream* dest, bool flush)
+{
+    uint32_t ret = 0;
+    int i = dest->available();
+    if (i > 0)
+    {
+        ret += i;
+        uint8_t* tmpbuf = i >= 8 ? (uint8_t*)malloc(i) : NULL;
+        if (tmpbuf)
+        {
+            dest->readBytes(tmpbuf, (size_t)i);
+            this->write((const uint8_t*) tmpbuf, (size_t)i);
+            dest->write((const uint8_t*) tmpbuf, (size_t)i);
+        }
+        else
+        {
+            int j;
+            for (j = 0; j < i; j++)
+            {
+                uint8_t x = (uint8_t)dest->read();
+                this->write(x);
+                dest->write(x);
+            }
+        }
+        if (flush || tmpbuf)
+        {
+            dest->flush();
+            this->flush();
+        }
+        if (tmpbuf)
+        {
+            free(tmpbuf);
+        }
+    }
+
+    i = this->available();
+    if (i > 0)
+    {
+        ret += i;
+        uint8_t* tmpbuf = i >= 8 ? (uint8_t*)malloc(i) : NULL;
+        if (tmpbuf)
+        {
+            this->readBytes(tmpbuf, (size_t)i);
+            dest->write((const uint8_t*) tmpbuf, (size_t)i);
+        }
+        else
+        {
+            int j;
+            for (j = 0; j < i; j++)
+            {
+                uint8_t x = (uint8_t)this->read();
+                dest->write(x);
+            }
+        }
+        if (flush || tmpbuf)
+        {
+            dest->flush();
+            this->flush();
+        }
+        if (tmpbuf)
+        {
+            free(tmpbuf);
+        }
+    }
+    return ret;
 }

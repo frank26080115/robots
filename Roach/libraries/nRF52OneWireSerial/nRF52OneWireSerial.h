@@ -24,6 +24,7 @@ class nRF52OneWireSerial : public Stream
         nRF52OneWireSerial(int pin, uint32_t baud, bool invert);
         #endif
         void begin(void);
+        void end(void);
         inline uint32_t lastTime(void) { return _last_time; };
 
         using Print::write;
@@ -42,6 +43,9 @@ class nRF52OneWireSerial : public Stream
 
         uint32_t _tx_delay, _rx_delay_centering, _rx_delay_intrabit, _rx_delay_stopbit;
         #endif
+
+        uint32_t echo(Stream* dest, bool flush = false);
+        inline void echoForever(Stream* dest) { while (true) { yield(); echo(dest); } };
 
     private:
         int _pin;
