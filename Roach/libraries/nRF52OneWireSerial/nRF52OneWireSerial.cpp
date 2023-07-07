@@ -402,7 +402,6 @@ uint32_t nRF52OneWireSerial::echo(Stream* dest, bool flush)
         if (flush || tmpbuf)
         {
             dest->flush();
-            this->flush();
         }
         if (tmpbuf)
         {
@@ -432,7 +431,6 @@ uint32_t nRF52OneWireSerial::echo(Stream* dest, bool flush)
         if (flush || tmpbuf)
         {
             dest->flush();
-            this->flush();
         }
         if (tmpbuf)
         {
