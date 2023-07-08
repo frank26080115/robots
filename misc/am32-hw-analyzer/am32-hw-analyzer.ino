@@ -67,6 +67,10 @@ const uint32_t all_pins[] =
     END_OF_LIST,
 };
 
+//#define PINTRANSLATE(x) (x)
+//#define PINTRANSLATE(x) digitalPinToAnalogInput(x)
+#define PINTRANSLATE(x) analogPinTranslate(x)
+
 #define SERIAL_BAUD_RATE 19200
 
 // declare all potential input pins (note: setting RX = TX means half-duplex mode automatically enabled)
@@ -105,12 +109,12 @@ void setup()
 {
     SerialA2.begin(SERIAL_BAUD_RATE);
     SerialB4.begin(SERIAL_BAUD_RATE);
-    remaining_pins[0] = END_OF_LIST; // empty list
 
     // remove pins from the list, to make searching easier later
-    filter_out(all_pins                       , all_hin, (uint32_t*)remaining_pins);
-    filter_out((const uint32_t*)remaining_pins, all_lin, (uint32_t*)remaining_pins);
-    filter_out((const uint32_t*)remaining_pins, all_fb , (uint32_t*)remaining_pins);
+    memcpy(remaining_pins, all_pins, sizeof(all_pins));
+    filter_out((uint32_t*)remaining_pins, all_hin);
+    filter_out((uint32_t*)remaining_pins, all_lin);
+    filter_out((uint32_t*)remaining_pins, all_fb );
 
     // prepare the list of phase pin groups
     phase_groups_cnt = count_tbl(all_hin);
@@ -118,16 +122,20 @@ void setup()
     phase_groups = (phase_group_t*)malloc(phase_groups_sz);
     memset(phase_groups, END_OF_LIST, phase_groups_sz);
 
+    // according to AM32 source code, this is permanently a LED
     pinMode(PA15, OUTPUT);
     digitalWrite(PA15, LOW);
-    filter_out_one((const uint32_t*)remaining_pins, PA15, (uint32_t*)remaining_pins);
+    filter_out_one((uint32_t*)remaining_pins, PA15);
 }
 
 void loop()
 {
     static uint32_t tick = 0;      // state machine sub counter
     static uint32_t last_time = 0; // used to time state transitions
+    static uint32_t hftick = 0;    // used to toggle pins at high frequency
     uint32_t now = millis();
+
+    hftick++;
 
     if (state_machine == STATEMACH_WAITING_START)
     {
@@ -137,11 +145,17 @@ void loop()
 
             last_time = now;
             if ((tick % 2) == 0) {
-                SerialA2.println("rc input is PA2");
+                SerialA2.print("rc input is PA2; ");
+                //printer = &SerialA2;
+                //print_all_adc();
+                SerialA2.println();
                 SerialA2.listen();
             }
             else {
-                SerialB4.println("rc input is PB4");
+                SerialB4.print("rc input is PB4; ");
+                //printer = &SerialB4;
+                //print_all_adc();
+                SerialB4.println();
                 SerialB4.listen();
             }
             tick++;
@@ -177,7 +191,7 @@ void loop()
     else if (state_machine == STATEMACH_TEST_PHASE_START)
     {
         // remove the RC input pin from potential searched pins
-        filter_out_one((const uint32_t*)remaining_pins, rc_input, (uint32_t*)remaining_pins);
+        filter_out_one((uint32_t*)remaining_pins, rc_input);
         printer->print("pin list: ");
         print_all_pins(remaining_pins);
         // prep for testing, all pins output low
@@ -187,6 +201,7 @@ void loop()
         state_machine = STATEMACH_TEST_PHASE_A;
         tick = 0;
         printer->println("started to test HIN pins");
+
     }
     else if (state_machine == STATEMACH_TEST_PHASE_A)
     {
@@ -203,10 +218,12 @@ void loop()
         }
         uint16_t adc_res[32];
 
+        pulse_all_phases(10, 20);
+        set_all_pins(all_hin, OUTPUT, LOW);
         // pulse each HIN pin, see if ADC readings change
-        pulse_and_measure(p, HIGH, adc_res);
+        pulse_and_measure(p, 100, 200, adc_res);
         //print_adc_res(adc_res);
-        uint32_t fb = pick_different(adc_res);
+        uint32_t fb = pick_max(adc_res);
 
         phase_groups[tick].hin = p;
         phase_groups[tick].fb = fb;
@@ -227,10 +244,12 @@ void loop()
         }
         uint16_t adc_res[32];
 
-        // pulse each COM pin, see if ADC readings change
-        pulse_and_measure(p, HIGH, adc_res);
+        // pulse each LIN pin, see if ADC readings change
+        pulse_all_phases(10, 20);
+        set_all_pins(all_hin, OUTPUT, LOW);
+        pulse_and_measure(p, 2, 200, adc_res);
         //print_adc_res(adc_res);
-        uint32_t fb = pick_different(adc_res);
+        uint32_t fb = pick_min(adc_res);
 
         // match the FB pin with an existing group, so we can save the LIN pin in the correct group
         for (int i = 0; i < phase_groups_cnt; i++)
@@ -274,10 +293,11 @@ void loop()
     {
         if (printer->available() > 0)
         {
+            // handle command keys
             char c = printer->read();
             if (c == 'V' || c == 'v')
             {
-                printer->println("searching voltage pin, X to stop");
+                printer->println("searching voltage pin, X to quit");
                 printer->listen();
                 state_machine = STATEMACH_SEARCH_VOLTAGE;
                 tick = 0;
@@ -285,7 +305,7 @@ void loop()
             }
             else if (c == 'C' || c == 'c')
             {
-                printer->println("searching current sensor pin, X to stop");
+                printer->println("searching current sensor pin, X to quit");
                 printer->listen();
                 state_machine = STATEMACH_SEARCH_CURRENTSENSOR;
                 tick = 0;
@@ -293,7 +313,7 @@ void loop()
             }
             else if (c == 'L' || c == 'l')
             {
-                printer->println("searching LED pin, X to stop");
+                printer->println("searching LED pin, X to quit, P to pause, G to continue, < and > to scroll");
                 printer->listen();
                 state_machine = STATEMACH_SEARCH_LED;
                 tick = 0;
@@ -322,24 +342,13 @@ void loop()
         if ((now - last_time) >= 1000)
         {
             last_time = now;
-            for (uint8_t i = 0; ; i++)
-            {
-                uint32_t p = remaining_pins[i];
-                if (p == END_OF_LIST)
-                {
-                    break;
-                }
-                if (digitalpinIsAnalogInput(p))
-                {
-                    int16_t x = analogRead(digitalPinToAnalogInput(p));
-                    print_pin_name(p);
-                    printer->printf(" = %5d ; ", x);
-                }
-            }
+            print_all_adc();
             printer->println();
             printer->listen();
             tick++;
         }
+        set_all_pins(all_hin, OUTPUT, ((hftick % 2) == 0) ? HIGH : LOW);
+        set_all_pins(all_lin, OUTPUT, ((hftick % 2) == 0) ? LOW : HIGH);
     }
     else if (state_machine == STATEMACH_SEARCH_CURRENTSENSOR)
     {
@@ -348,11 +357,11 @@ void loop()
         if (check_search_exit()) {
             return;
         }
-        if ((now - last_time) >= 200)
+        if ((now - last_time) >= 100)
         {
             last_time = now;
 
-            uint8_t tm = tick % 8;
+            uint8_t tm = tick % 16;
             if (tm == 0)
             {
                 pinMode(phase_groups[0].hin, OUTPUT);
@@ -361,17 +370,17 @@ void loop()
                 pinMode(phase_groups[1].lin, OUTPUT);
                 // attempt to draw power
                 digitalWrite(phase_groups[0].hin, LOW);
-                digitalWrite(phase_groups[0].lin, HIGH);
-                digitalWrite(phase_groups[1].hin, HIGH);
+                analogWrite (phase_groups[0].lin, 200);
+                analogWrite (phase_groups[1].hin, 200);
                 digitalWrite(phase_groups[1].lin, LOW);
             }
             else if (tm == 2)
             {
                 // attempt to draw power
-                digitalWrite(phase_groups[0].hin, HIGH);
+                analogWrite (phase_groups[0].hin, 200);
                 digitalWrite(phase_groups[0].lin, LOW);
                 digitalWrite(phase_groups[1].hin, LOW);
-                digitalWrite(phase_groups[1].lin, HIGH);
+                analogWrite (phase_groups[1].lin, 200);
             }
             else if (tm == 4)
             {
@@ -381,23 +390,18 @@ void loop()
                 digitalWrite(phase_groups[1].hin, LOW);
                 digitalWrite(phase_groups[1].lin, LOW);
             }
+            else if (tm == 5)
+            {
+                // cool down, see if current drops
+                pinMode(phase_groups[0].hin, INPUT);
+                pinMode(phase_groups[0].lin, INPUT);
+                pinMode(phase_groups[1].hin, INPUT);
+                pinMode(phase_groups[1].lin, INPUT);
+            }
 
             if ((tm % 2) != 0)
             {
-                for (uint8_t i = 0; ; i++)
-                {
-                    uint32_t p = remaining_pins[i];
-                    if (p == END_OF_LIST)
-                    {
-                        break;
-                    }
-                    if (digitalpinIsAnalogInput(p))
-                    {
-                        int16_t x = analogRead(digitalPinToAnalogInput(p));
-                        print_pin_name(p);
-                        printer->printf(" = %5d ; ", x);
-                    }
-                }
+                print_all_adc();
                 printer->println();
                 printer->listen();
             }
@@ -406,10 +410,45 @@ void loop()
     }
     else if (state_machine == STATEMACH_SEARCH_LED)
     {
-        if (check_search_exit()) {
-            return;
+        static uint8_t led_continue = 1;
+        if (printer->available() > 0)
+        {
+            char c = printer->read();
+            if (c == 'X' || c == 'x')
+            {
+                printer->println("search exit");
+                printer->listen();
+                state_machine = STATEMACH_CMD_PROMPT;
+                return;
+            }
+            else if (c == 'P' || c == 'p')
+            {
+                // press 'P' to pause the advancement
+                led_continue = 0;
+            }
+            else if (c == 'G' || c == 'g')
+            {
+                // press 'P' to pause the advancement
+                led_continue = 1;
+            }
+            else if (c == '<')
+            {
+                // previous
+                tick = (tick == 0) ? 0 : (tick - 1);
+                led_continue = 0; // pause
+            }
+            else if (c == '>')
+            {
+                // next
+                tick++;
+                if (remaining_pins[tick / 2] == END_OF_LIST)
+                {
+                    tick = 0;
+                }
+                led_continue = 0; // pause
+            }
         }
-        if ((now - last_time) >= 2000)
+        if ((now - last_time) >= 3000)
         {
             // every two seconds, another pin will be blinked
             // the user needs to watch the LED and also watch the serial terminal for the text
@@ -425,7 +464,7 @@ void loop()
             led_pin = p;
             printer->print("LED pin ");
             print_pin_name(led_pin);
-            printer->println(" blink ");
+            printer->print(" blink ");
             if ((tick % 2) == 0) {
                 printer->println("HIGH");
             }
@@ -436,305 +475,18 @@ void loop()
             pinMode(led_pin, OUTPUT);
             digitalWrite(led_pin, (tick % 2) == 0 ? HIGH : LOW);
             delay(100); // short blink just in case we are driving something we shouldn't be
-            digitalWrite(led_pin, (tick % 2) == 0 ? LOW : HIGH);
             pinMode(led_pin, INPUT);
-            tick++;
-            return;
-        }
-    }
-}
-
-// check if the user wants to end a search mode
-// if returned true, then do a state transition
-bool check_search_exit()
-{
-    if (printer->available() > 0) {
-        if (printer->read() == 'X') {
-            printer->println("search exit");
-            printer->listen();
-            state_machine = STATEMACH_CMD_PROMPT;
-            return true;
-        }
-    }
-    return false;
-}
-
-// set all pins a certain way
-void set_all_pins(const uint32_t* lst, uint8_t mode, uint8_t pol)
-{
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = lst[i];
-        if (p == END_OF_LIST)
-        {
-            return;
-        }
-        pinMode(p, mode);
-        if (mode == OUTPUT) {
-            digitalWrite(p, pol);
-        }
-    }
-}
-
-// set all pins a certain way, except for one
-void set_all_pins_except(const uint32_t* lst, uint32_t not_me, uint8_t mode, uint8_t pol)
-{
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = lst[i];
-        if (p == END_OF_LIST)
-        {
-            return;
-        }
-        if (p == not_me) {
-            continue;
-        }
-        pinMode(p, mode);
-        if (mode == OUTPUT) {
-            digitalWrite(p, pol);
-        }
-    }
-}
-
-// pulse a pin, measure all FB pins ADC values after the pulse
-void pulse_and_measure(uint32_t outpin, uint8_t pol, uint16_t* res)
-{
-    digitalWrite(outpin, pol == LOW ? LOW : HIGH);
-    delay(100);
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = all_fb[i];
-        if (p == END_OF_LIST)
-        {
-            break;
-        }
-        int16_t x = analogRead(digitalPinToAnalogInput(p));
-        res[i] = x;
-    }
-    digitalWrite(outpin, pol == LOW ? HIGH : LOW);
-}
-
-// pick the FB pin that reported a value that's very different from the average
-uint32_t pick_different(const uint16_t* adc_buf)
-{
-    uint32_t x = PIN_NOT_EXIST;
-    uint16_t max_val = 0;
-    uint32_t avg_sum = 0;
-    uint32_t cnt = 0;
-
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = all_fb[i];
-        if (p == END_OF_LIST)
-        {
-            break;
-        }
-        uint16_t v = adc_buf[i];
-        avg_sum += v;
-        cnt += 1;
-    }
-    avg_sum /= cnt;
-
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = all_fb[i];
-        if (p == END_OF_LIST)
-        {
-            break;
-        }
-        uint16_t v = adc_buf[i];
-        uint16_t diff = (v > avg_sum) ? (v - avg_sum) : (avg_sum - v);
-        if (diff > max_val) {
-            max_val = diff;
-            x = p;
-        }
-    }
-    return x;
-}
-
-// pick the FB pin that reported a value that's higher than the rest
-uint32_t pick_max(const uint16_t* adc_buf)
-{
-    uint32_t x = PIN_NOT_EXIST;
-    uint16_t max_val = 0;
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = all_fb[i];
-        if (p == END_OF_LIST)
-        {
-            return x;
-        }
-        uint16_t v = adc_buf[i];
-        if (v > max_val)
-        {
-            x = p;
-            max_val = v;
-        }
-    }
-    return x;
-}
-
-// pick the FB pin that reported a value that's lower than the rest
-uint32_t pick_min(const uint16_t* adc_buf)
-{
-    uint32_t x = PIN_NOT_EXIST;
-    int16_t min_val = -1;
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = all_fb[i];
-        if (p == END_OF_LIST)
-        {
-            return x;
-        }
-        uint16_t v = adc_buf[i];
-        if (v < min_val || min_val < 0)
-        {
-            x = p;
-            min_val = v;
-        }
-    }
-    return x;
-}
-
-// count number of entries in a pin table
-uint16_t count_tbl(const uint32_t* input_list)
-{
-    for (int i = 0; ; i++)
-    {
-        uint32_t p = input_list[i];
-        if (p == END_OF_LIST)
-        {
-            return i;
-        }
-    }
-    return 0;
-}
-
-// remove entries from a list, based on a blacklist
-void filter_out(const uint32_t* input_list, const uint32_t* dont_want, uint32_t* output_list)
-{
-    int i, j, k;
-    k = 0;
-    for (i = 0; i < 999; i++)
-    {
-        uint32_t p = input_list[i];
-        if (p == END_OF_LIST)
-        {
-            break;
-        }
-        bool found = false;
-        for (j = 0; j < 999; j++)
-        {
-            uint32_t d = dont_want[j];
-            if (d == END_OF_LIST)
-            {
-                break;
+            digitalWrite(led_pin, (tick % 2) == 0 ? LOW : HIGH);
+            delay(100);
+            pinMode(led_pin, OUTPUT);
+            digitalWrite(led_pin, (tick % 2) == 0 ? HIGH : LOW);
+            delay(100);
+            pinMode(led_pin, INPUT);
+            digitalWrite(led_pin, (tick % 2) == 0 ? LOW : HIGH);
+            if (led_continue != 0) {
+                tick++;
             }
-            if (d == p)
-            {
-                found = true;
-                break;
-            }
-        }
-        if (found == false)
-        {
-            output_list[k] = p;
-            k += 1;
+            return;
         }
     }
-    output_list[k] = END_OF_LIST;
-}
-
-void filter_out_one(const uint32_t* input_list, uint32_t dont_want, uint32_t* output_list)
-{
-    uint32_t tmp[2] = {dont_want, END_OF_LIST};
-    filter_out(input_list, (const uint32_t*)tmp, output_list);
-}
-
-void print_pin_name(uint32_t p)
-{
-    switch (p)
-    {
-        case PA0:  printer->print("PA0" ); break;
-        case PA1:  printer->print("PA1" ); break;
-        case PA2:  printer->print("PA2" ); break;
-        case PA3:  printer->print("PA3" ); break;
-        case PA4:  printer->print("PA4" ); break;
-        case PA5:  printer->print("PA5" ); break;
-        case PA6:  printer->print("PA6" ); break;
-        case PA7:  printer->print("PA7" ); break;
-        case PA8:  printer->print("PA8" ); break;
-        case PA9:  printer->print("PA9" ); break;
-        case PA10: printer->print("PA10"); break;
-        case PA11: printer->print("PA11"); break;
-        case PA12: printer->print("PA12"); break;
-        case PA13: printer->print("PA13"); break;
-        case PA14: printer->print("PA14"); break;
-        case PA15: printer->print("PA15"); break;
-        case PB0:  printer->print("PB0" ); break;
-        case PB1:  printer->print("PB1" ); break;
-        case PB2:  printer->print("PB2" ); break;
-        case PB3:  printer->print("PB3" ); break;
-        case PB4:  printer->print("PB4" ); break;
-        case PB5:  printer->print("PB5" ); break;
-        case PB6:  printer->print("PB6" ); break;
-        case PB7:  printer->print("PB7" ); break;
-        case PB8:  printer->print("PB8" ); break;
-        //case PB9:  printer->print("PB9" ); break;
-        //case PB10: printer->print("PB10"); break;
-        //case PB11: printer->print("PB11"); break;
-        //case PB12: printer->print("PB12"); break;
-        //case PB13: printer->print("PB13"); break;
-        //case PB14: printer->print("PB14"); break;
-        //case PB15: printer->print("PB15"); break;
-        case PF0:  printer->print("PF0" ); break;
-        case PF1:  printer->print("PF1" ); break;
-        //case PF2:  printer->print("PF2" ); break;
-        //case PF3:  printer->print("PF3" ); break;
-        //case PF4:  printer->print("PF4" ); break;
-        //case PF5:  printer->print("PF5" ); break;
-        //case PF6:  printer->print("PF6" ); break;
-        //case PF7:  printer->print("PF7" ); break;
-        //case PF8:  printer->print("PF8" ); break;
-        //case PF9:  printer->print("PF9" ); break;
-        //case PF10: printer->print("PF10"); break;
-        //case PF11: printer->print("PF11"); break;
-        //case PF12: printer->print("PF12"); break;
-        //case PF13: printer->print("PF13"); break;
-        //case PF14: printer->print("PF14"); break;
-        //case PF15: printer->print("PF15"); break;
-        default: printer->print("P??"); break;
-    }
-}
-
-void print_adc_res(const uint16_t* adc_buf)
-{
-    printer->print("ADC res: ");
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = all_fb[i];
-        if (p == END_OF_LIST)
-        {
-            break;
-        }
-        uint16_t v = adc_buf[i];
-        print_pin_name(p);
-        printer->printf(" = %u ; ", v);
-    }
-    printer->println();
-}
-
-void print_all_pins(const uint32_t* lst)
-{
-    for (uint8_t i = 0; ; i++)
-    {
-        uint32_t p = lst[i];
-        if (p == END_OF_LIST)
-        {
-            break;
-        }
-        print_pin_name(p);
-        printer->print(" ");
-    }
-    printer->println("");
 }
