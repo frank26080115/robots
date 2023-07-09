@@ -22,6 +22,8 @@ Within this project, there are prebuilt `am32-hw-analyzer.xxx.hex` files, and th
 
 Connect the USB ESC link to the ESC, make sure everything has power. Open a connection to the serial port with any serial terminal software (such as Arduino, Putty, TeraTerm, RealTerm, etc) that can send things to the serial port. Use 19200 baud rate.
 
+(at this point, make sure the motor is disconnected from the ESC)
+
 On the screen you should periodically see the text:
 
 > RC input is XXX - send \n (or ENTER key) to continue
@@ -35,7 +37,12 @@ Now send the `\n` or press the `ENTER` key. The analysis will begin. The results
 
 These results can be checked against [this file](https://github.com/AlkaMotors/AM32-MultiRotor-ESC-firmware/blob/master/Inc/targets.h) to figure out either which AM32 firmware to download, or how to configure AM32 firmware's build to compile a new firmware.
 
-There are other things this tool can do, and the serial terminal will display the instructions.
+There are other things this tool can do:
+ * monitor analog input voltages, to assist in finding the voltage sensing pin and current sensing pin
+ * to find the current sensing pin, there is a mode that drives the motor winding to draw current, connect the motor if this mode is used
+ * find pins for LEDs, by cycling through all pins and causing a blink, the user can pause the automatic cycling and manually cycle through the pins with commands
+
+The serial terminal will display the instructions.
 
 More Detailed Instructions
 --------------------------
