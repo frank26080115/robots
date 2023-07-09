@@ -19,8 +19,7 @@ void nRF52Dshot::begin(void)
             NRF_PWM1,
             NRF_PWM2
         #if defined(NRF_PWM3)
-            ,
-            NRF_PWM3
+            , NRF_PWM3
         #endif
           };
         unsigned int i;
@@ -59,7 +58,9 @@ void nRF52Dshot::begin(void)
     }
 
     if (_pwm == NULL || _pwmout < 0) {
+        #ifdef NRFDSHOT_SERIAL_ENABLE
         Serial.println("nRF52Dshot failed to init, no available PWM");
+        #endif
         return;
     }
 
@@ -75,7 +76,7 @@ void nRF52Dshot::begin(void)
         #endif
     }
     if (pwmidx >= 0) {
-        HwPWMx[pwmidx]->takeOwnership(0xABCD1ED5);
+        HwPWMx[pwmidx]->takeOwnership(0xABCD5101);
     }
 
     if (_speed == DSHOT_SPEED_150)
@@ -96,36 +97,49 @@ void nRF52Dshot::begin(void)
         _period = 27;
         _t0 = 10;
     }
+    #ifdef NRFDSHOT_SUPPORT_SPEED_1200
     else if (_speed == DSHOT_SPEED_1200)
     {
         // period is 0.83 us, t0 is 0.3125 us
         _period = 13;
         _t0 = 5;
     }
+    #endif
+    else
+    {
+        #ifdef NRFDSHOT_SERIAL_ENABLE
+        Serial.printf("nRF52Dshot failed to init, unknown speed setting %u\r\n", _speed);
+        #endif
+    }
 
     pwmConfig();
 
-    pinMode(_pind, OUTPUT);
-    digitalWrite(_pind, LOW);
+    pinMode(_pin, OUTPUT);
+    digitalWrite(_pin, LOW);
 
     #if defined(ARDUINO_ARCH_NRF52840)
-        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pind].name;
+        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pin].name;
     #else
-        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pind];
+        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pin];
     #endif
 
     _pwm->ENABLE = 1;
     _active = true;
 }
 
-void nRF52Dshot::end(void)
+void nRF52Dshot::end(bool prep_bootload)
 {
     #if defined(ARDUINO_ARCH_NRF52840)
-        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pind].name;
+        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pin].name;
     #else
-        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pind];
+        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pin];
     #endif
-    pinMode(_pind, INPUT);
+    pinMode(_pin, INPUT);
+    if (prep_bootload) {
+        // AM32 will check if the pin is driven high when it reboots
+        pinMode(_pin, OUTPUT);
+        digitalWrite(_pin, HIGH);
+    }
     _active = false;
 }
 
@@ -134,21 +148,21 @@ void nRF52Dshot::pwmConfig(void)
     _pwm->MODE       = (PWM_MODE_UPDOWN_Up << PWM_MODE_UPDOWN_Pos);                    // Set the wave mode to count UP
     _pwm->PRESCALER  = (PWM_PRESCALER_PRESCALER_DIV_1 << PWM_PRESCALER_PRESCALER_Pos); // Set the PWM to use the 16MHz clock
     _pwm->COUNTERTOP = (_period << PWM_COUNTERTOP_COUNTERTOP_Pos);                     // Setting of the maximum count, 20 is 1.25us
-    _pwm->LOOP = (PWM_LOOP_CNT_Disabled << PWM_LOOP_CNT_Pos);                          // Disable loops, we want the sequence to repeat only once
+    _pwm->LOOP       = (PWM_LOOP_CNT_Disabled << PWM_LOOP_CNT_Pos);                    // Disable loops, we want the sequence to repeat only once
     // On the "Common" setting the PWM uses the same pattern for the
     // for supported sequences. The pattern is stored on half-word
     // of 16bits
     _pwm->DECODER = (PWM_DECODER_LOAD_Common << PWM_DECODER_LOAD_Pos) | (PWM_DECODER_MODE_RefreshCount << PWM_DECODER_MODE_Pos);
 
     _pwm->SEQ[_pwmout].PTR = (uint32_t)(_buffer) << PWM_SEQ_PTR_PTR_Pos;
-    _pwm->SEQ[_pwmout].CNT = ((NRFDSHOT_NUM_PULSES + 2) / sizeof(uint16_t)) << PWM_SEQ_CNT_CNT_Pos;
+    _pwm->SEQ[_pwmout].CNT = (NRFDSHOT_NUM_PULSES + NRFDSHOT_ZEROPAD) << PWM_SEQ_CNT_CNT_Pos;
     _pwm->SEQ[_pwmout].REFRESH = 0;
     _pwm->SEQ[_pwmout].ENDDELAY = 0;
 }
 
 void nRF52Dshot::setThrottle(uint16_t t, bool sync)
 {
-    _throttle = nrfdshot_createPacket(t);
+    _throttle = nrfdshot_createPacket(t + 48);
     if (sync)
     {
         _cmdcnt = 0;
@@ -186,10 +200,6 @@ void nRF52Dshot::sendNow(void)
     }
     _busy = false;
 
-    _last_time = millis();
-    #ifdef NRFDSHOT_ALWAYS_RECONFIG
-    pwmConfig();
-    #endif
     uint16_t data;
     if (_cmdcnt > 0)
     {
@@ -200,21 +210,74 @@ void nRF52Dshot::sendNow(void)
     {
         data = _throttle;
     }
-    uint8_t i;
-    for (i = 0; i < 16; i++)
+    uint16_t mask, i;
+    for (mask = 0x8000, i = 0; i < 16; mask >>= 1, i++)
     {
-        _buffer[i] = (_t0 * (((data & (1 << (16 - i - 1))) != 0) ? 2 : 1)) | (0x8000);
+        _buffer[i] = (_t0 * (((data & mask) != 0) ? 2 : 1)) | (0x8000);
     }
-    buffer[i]     = 0 | (0x8000); // zero pad to end
-    buffer[i + 1] = 0 | (0x8000); // zero pad to end
+    #if defined(NRFDSHOT_ZEROPAD) && (NRFDSHOT_ZEROPAD >= 1)
+    _buffer[i]     = 0 | (0x8000); // zero pad to end
+    #endif
+    #if defined(NRFDSHOT_ZEROPAD) && (NRFDSHOT_ZEROPAD >= 2)
+    _buffer[i + 1] = 0 | (0x8000); // zero pad to end
+    #endif
 
-    #ifdef ROACHNEOPIX_ALWAYS_RECONFIG
+    #ifdef NRFDSHOT_ALWAYS_RECONFIG
     pwmConfig();
     #endif
 
     _pwm->EVENTS_SEQEND[_pwmout]  = 0UL;
     _pwm->TASKS_SEQSTART[_pwmout] = 1UL;
+    _last_time = millis();
+    #ifdef NRFDSHOT_BLOCKING
+    while (!_pwm->EVENTS_SEQEND[_pwmout]) {
+        yield();
+    }
+    #else
     _busy = true;
+    #endif
+}
+
+#define NRFDSHOT_CONV_THROTTLE(ppm) \
+    const int32_t in_min  = 1000;   \
+    const int32_t in_max  = 2000;   \
+    const int32_t out_min = 0;      \
+    int32_t a = (ppm)   - in_min;   \
+    int32_t b = out_max - out_min;  \
+    int32_t c = in_max  - in_min;   \
+    int32_t d = a * b;              \
+                                    \
+    d += c / 2;                     \
+    int32_t y = d / c;              \
+                                    \
+    y += out_min;                   \
+                                    \
+    if (y > out_max) {              \
+        y = out_max;                \
+    }                               \
+    else if (y < out_min) {         \
+        y = out_min;                \
+    }                               \
+    return y;                       \
+
+uint16_t nRF52Dshot::convertPpm(uint16_t ppm)
+{
+    #ifndef NRFDSHOT_SUPPORT_SPEED_1200
+    const
+    #endif
+    int32_t out_max =
+    #ifdef NRFDSHOT_SUPPORT_SPEED_1200
+        (_speed == DSHOT_SPEED_1200) ? 4095 :
+    #endif
+        2047;
+    NRFDSHOT_CONV_THROTTLE(ppm);
+}
+
+uint16_t nrfdshot_convertPpm(uint16_t ppm)
+{
+    const int32_t out_max = 2047;
+
+    NRFDSHOT_CONV_THROTTLE(ppm);
 }
 
 // calculates the checksum required
