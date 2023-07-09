@@ -136,6 +136,22 @@ void RoachNeoPixel::begin(void)
         HwPWMx[pwmidx]->takeOwnership(0xABCD1ED5);
     }
 
+    pwmConfig();
+
+    pinMode(_pind, OUTPUT);
+    digitalWrite(_pind, LOW);
+
+    #if defined(ARDUINO_ARCH_NRF52840)
+        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pind].name;
+    #else
+        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pind];
+    #endif
+
+    _pwm->ENABLE = 1;
+}
+
+void RoachNeoPixel::pwmConfig(void)
+{
     _pwm->MODE       = (PWM_MODE_UPDOWN_Up << PWM_MODE_UPDOWN_Pos);                    // Set the wave mode to count UP
     _pwm->PRESCALER  = (PWM_PRESCALER_PRESCALER_DIV_1 << PWM_PRESCALER_PRESCALER_Pos); // Set the PWM to use the 16MHz clock
     _pwm->COUNTERTOP = (20UL << PWM_COUNTERTOP_COUNTERTOP_Pos);                        // Setting of the maximum count, 20 is 1.25us
@@ -149,17 +165,6 @@ void RoachNeoPixel::begin(void)
     _pwm->SEQ[_pwmout].CNT = (ROACHNEOPIX_BUFFER_SIZE8 / sizeof(uint16_t)) << PWM_SEQ_CNT_CNT_Pos;
     _pwm->SEQ[_pwmout].REFRESH = 0;
     _pwm->SEQ[_pwmout].ENDDELAY = 0;
-
-    pinMode(_pind, OUTPUT);
-    digitalWrite(_pind, LOW);
-    
-    #if defined(ARDUINO_ARCH_NRF52840)
-        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pind].name;
-    #else
-        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pind];
-    #endif
-
-    _pwm->ENABLE = 1;
 }
 
 #ifndef ROACHRGBLED_BLOCKING
@@ -346,6 +351,10 @@ void RoachNeoPixel::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool for
         Serial.printf("%04X ", _pattern[k]);
     }
     Serial.printf("\r\n");
+    #endif
+
+    #ifdef ROACHNEOPIX_ALWAYS_RECONFIG
+    pwmConfig();
     #endif
 
     _pwm->EVENTS_SEQEND[_pwmout]  = 0UL;

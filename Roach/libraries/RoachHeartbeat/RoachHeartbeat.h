@@ -22,6 +22,7 @@
 //#define ROACHNEOPIX_DEBUG
 //#define ROACHRGBLED_BLOCKING
 //#define ROACHNEOPIX_BLOCKING
+//#define ROACHNEOPIX_ALWAYS_RECONFIG // enable if PWM module must be shared with something else like DSHOT
 
 class RoachHeartbeat
 {
@@ -68,6 +69,7 @@ class RoachNeoPixel
         void set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite = 0xFF, bool force = false);
         void set(uint32_t x, bool force = false);
         void setHue(int16_t hue, bool force = false);
+        void pwmConfig(void);
     private:
         int _pind, _pwmout;
         NRF_PWM_Type* _pwm;
