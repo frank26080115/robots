@@ -77,8 +77,7 @@ void RoachNeoPixel::begin(void)
             NRF_PWM1,
             NRF_PWM2
         #if defined(NRF_PWM3)
-            ,
-            NRF_PWM3
+            , NRF_PWM3
         #endif
           };
         unsigned int i;
@@ -117,7 +116,9 @@ void RoachNeoPixel::begin(void)
     }
 
     if (_pwm == NULL || _pwmout < 0) {
+        #ifdef RHB_SERIAL_ENABLE
         Serial.println("RoachNeoPixel failed to init, no available PWM");
+        #endif
         return;
     }
 
@@ -155,7 +156,7 @@ void RoachNeoPixel::pwmConfig(void)
     _pwm->MODE       = (PWM_MODE_UPDOWN_Up << PWM_MODE_UPDOWN_Pos);                    // Set the wave mode to count UP
     _pwm->PRESCALER  = (PWM_PRESCALER_PRESCALER_DIV_1 << PWM_PRESCALER_PRESCALER_Pos); // Set the PWM to use the 16MHz clock
     _pwm->COUNTERTOP = (20UL << PWM_COUNTERTOP_COUNTERTOP_Pos);                        // Setting of the maximum count, 20 is 1.25us
-    _pwm->LOOP = (PWM_LOOP_CNT_Disabled << PWM_LOOP_CNT_Pos);                          // Disable loops, we want the sequence to repeat only once
+    _pwm->LOOP       = (PWM_LOOP_CNT_Disabled << PWM_LOOP_CNT_Pos);                    // Disable loops, we want the sequence to repeat only once
     // On the "Common" setting the PWM uses the same pattern for the
     // for supported sequences. The pattern is stored on half-word
     // of 16bits

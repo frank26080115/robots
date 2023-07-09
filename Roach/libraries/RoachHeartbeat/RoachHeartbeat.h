@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include "nrfx_spim.h"
 
+//#define RHB_SERIAL_ENABLE
+
 #define RHB_TIME_MULTI_ON   50
 #define RHB_TIME_MULTI_OFF 125
 
@@ -75,8 +77,8 @@ class RoachNeoPixel
         RoachNeoPixel(int pind = RHB_HW_PIN_NEOPIXEL, NRF_PWM_Type* p_pwm = NULL, int pwm_out = -1);
         void begin(void);
         void set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite = 0xFF, bool force = false);
-        void setRgb(uint32_t x, uint8_t brite = 0xFF, bool force = false);
-        void setHue(int32_t hue, uint8_t brite = 0xFF, bool force = false);
+        void setRgb(uint32_t   x, uint8_t brite = 0xFF, bool force = false);
+        void setHue( int32_t hue, uint8_t brite = 0xFF, bool force = false);
         void pwmConfig(void);
     private:
         int _pind, _pwmout;
