@@ -195,7 +195,7 @@ void filter_out(uint32_t* list, const uint32_t* dont_want)
 {
     int i, j, k;
     k = 0;
-    for (i = 0; i < 999; i++)
+    for (i = 0; ; i++)
     {
         uint32_t p = list[i];
         if (p == END_OF_LIST)
@@ -203,7 +203,7 @@ void filter_out(uint32_t* list, const uint32_t* dont_want)
             break;
         }
         bool found = false;
-        for (j = 0; j < 999; j++)
+        for (j = 0; ; j++)
         {
             uint32_t d = dont_want[j];
             if (d == END_OF_LIST) {
@@ -235,60 +235,37 @@ void filter_out_one(uint32_t* list, uint32_t dont_want)
     filter_out(list, (const uint32_t*)tmp);
 }
 
-void print_pin_name(uint32_t p)
+void filter_only_adcs(uint32_t* list)
 {
-    switch (p)
+    for (uint8_t i = 0; ; i++)
     {
-        case PA0:  printer->print("PA0" ); break;
-        case PA1:  printer->print("PA1" ); break;
-        case PA2:  printer->print("PA2" ); break;
-        case PA3:  printer->print("PA3" ); break;
-        case PA4:  printer->print("PA4" ); break;
-        case PA5:  printer->print("PA5" ); break;
-        case PA6:  printer->print("PA6" ); break;
-        case PA7:  printer->print("PA7" ); break;
-        case PA8:  printer->print("PA8" ); break;
-        case PA9:  printer->print("PA9" ); break;
-        case PA10: printer->print("PA10"); break;
-        case PA11: printer->print("PA11"); break;
-        case PA12: printer->print("PA12"); break;
-        case PA13: printer->print("PA13"); break;
-        case PA14: printer->print("PA14"); break;
-        case PA15: printer->print("PA15"); break;
-        case PB0:  printer->print("PB0" ); break;
-        case PB1:  printer->print("PB1" ); break;
-        case PB2:  printer->print("PB2" ); break;
-        case PB3:  printer->print("PB3" ); break;
-        case PB4:  printer->print("PB4" ); break;
-        case PB5:  printer->print("PB5" ); break;
-        case PB6:  printer->print("PB6" ); break;
-        case PB7:  printer->print("PB7" ); break;
-        case PB8:  printer->print("PB8" ); break;
-        //case PB9:  printer->print("PB9" ); break;
-        //case PB10: printer->print("PB10"); break;
-        //case PB11: printer->print("PB11"); break;
-        //case PB12: printer->print("PB12"); break;
-        //case PB13: printer->print("PB13"); break;
-        //case PB14: printer->print("PB14"); break;
-        //case PB15: printer->print("PB15"); break;
-        case PF0:  printer->print("PF0" ); break;
-        case PF1:  printer->print("PF1" ); break;
-        //case PF2:  printer->print("PF2" ); break;
-        //case PF3:  printer->print("PF3" ); break;
-        //case PF4:  printer->print("PF4" ); break;
-        //case PF5:  printer->print("PF5" ); break;
-        //case PF6:  printer->print("PF6" ); break;
-        //case PF7:  printer->print("PF7" ); break;
-        //case PF8:  printer->print("PF8" ); break;
-        //case PF9:  printer->print("PF9" ); break;
-        //case PF10: printer->print("PF10"); break;
-        //case PF11: printer->print("PF11"); break;
-        //case PF12: printer->print("PF12"); break;
-        //case PF13: printer->print("PF13"); break;
-        //case PF14: printer->print("PF14"); break;
-        //case PF15: printer->print("PF15"); break;
-        default: printer->print("P??"); break;
+        uint32_t p = list[i];
+        if (p == END_OF_LIST)
+        {
+            break;
+        }
+        if (digitalpinIsAnalogInput(p) == false) {
+            filter_out_one(list, p);
+            i--;
+        }
     }
+}
+
+bool pin_is_in_list(uint32_t pin, const uint32_t* list)
+{
+    for (uint8_t i = 0; ; i++)
+    {
+        uint32_t p = list[i];
+        if (p == END_OF_LIST)
+        {
+            return false;
+        }
+        if (p == pin)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void print_adc_res(const uint16_t* adc_buf)
@@ -332,10 +309,10 @@ void print_all_adc()
         {
             break;
         }
-        if (p == PA2 && printer == &SerialA2) {
+        if (p == rc_input) {
             continue;
         }
-        if (p == PB4 && printer == &SerialB4) {
+        if (p == printer_pin) {
             continue;
         }
         if (digitalpinIsAnalogInput(p))
@@ -347,20 +324,80 @@ void print_all_adc()
     }
 }
 
-uint32_t analogPinTranslate(uint32_t p)
+bool test_for_motor_windings_hin(uint16_t* adc_res)
 {
-    switch (p)
+    int16_t max_val =  0;
+    int16_t min_val = -1;
+    for (uint8_t i = 0; ; i++)
     {
-        case PA0:  return A0;
-        case PA1:  return A1;
-        case PA2:  return A2;
-        case PA3:  return A3;
-        case PA4:  return A4;
-        case PA5:  return A5;
-        case PA6:  return A6;
-        case PA7:  return A7;
-        case PB0:  return A8;
-        case PB1:  return A9;
+        uint32_t p = all_fb[i];
+        if (p == END_OF_LIST)
+        {
+            break;
+        }
+        uint16_t r = adc_res[i];
+        if (r > max_val) {
+            max_val = r;
+        }
+        if (r < min_val || min_val < 0) {
+            min_val = r;
+        }
     }
-    return PIN_NOT_EXIST;
+    return (max_val - min_val) < 16;
+}
+
+bool test_for_motor_windings_lin(uint16_t* adc_res)
+{
+    int16_t max_val =  0;
+    int16_t min_val = -1;
+    for (uint8_t i = 0; ; i++)
+    {
+        uint32_t p = all_fb[i];
+        if (p == END_OF_LIST)
+        {
+            break;
+        }
+        uint16_t r = adc_res[i];
+        if (r > max_val) {
+            max_val = r;
+        }
+        if (r < min_val || min_val < 0) {
+            min_val = r;
+        }
+    }
+    return (max_val - min_val) == 0;
+}
+
+void test_for_analog_pins()
+{
+    #ifdef ASSUME_ADC_PINS
+    memcpy(remaining_adcs, remaining_pins, sizeof(remaining_adcs));
+    filter_only_adcs(remaining_adcs);
+    if (pin_is_in_list(assumed_adcs[0], remaining_adcs) && pin_is_in_list(assumed_adcs[1], remaining_adcs))
+    {
+        uint16_t x = analogRead(PINTRANSLATE(assumed_adcs[0]));
+        uint16_t y = analogRead(PINTRANSLATE(assumed_adcs[1]));
+        if (x < 8 && y > x &&  y >= 32)
+        {
+            printer->print("it is likely that ");
+            print_pin_name(assumed_adcs[0]);
+            printer->print(" is the current sensing pin, and ");
+            print_pin_name(assumed_adcs[1]);
+            printer->print(" is the voltage sensing pin");
+        }
+        else if (y < 8 && x > y && x >= 32)
+        {
+            printer->print("it is likely that ");
+            print_pin_name(assumed_adcs[1]);
+            printer->print(" is the current sensing pin, and ");
+            print_pin_name(assumed_adcs[0]);
+            printer->print(" is the voltage sensing pin");
+        }
+        else
+        {
+            printer->print("unable to automatically detect the analog sensing pins");
+        }
+        printer->println(" ");
+    }
+    #endif
 }

@@ -1,114 +1,41 @@
+#include "config.h"
+#include "defs.h"
+
 #include <SoftwareSerial.h>
 
-#define PIN_NOT_EXIST 0xFFFFFFFF
-#define END_OF_LIST   0xFFFFFFFF
+#include "master_pin_list.h"
+#include "hw_pin_lists.h"
 
-typedef struct
-{
-    // every phase has a HIN pin, a LIN pin, and a FB pin
-    uint32_t hin;
-    uint32_t lin;
-    uint32_t fb;
-}
-phase_group_t;
+SoftwareSerial** ser_list  = NULL;  // contains a list of SoftwareSerial instances
+SoftwareSerial*  printer   = NULL;  // this will point to one of the serial ports that's actually working
+uint32_t rc_input = PIN_NOT_EXIST;  // which pin is RC input
+uint16_t rc_pin_cnt = 0;            // number of potential RC input pins
+uint32_t printer_pin;               // used to prevent ADC reading of a serial pin
 
-// list the potential candidates for pins
-
-const uint32_t all_hin[] = {
-    PA10,
-    PA9,
-    PA8,
-    END_OF_LIST,
-};
-
-const uint32_t all_lin[] = {
-    PB1,
-    PB0,
-    PA7,
-    END_OF_LIST,
-};
-
-const uint32_t all_fb[] = {
-    PA5,
-    PA0,
-    PA4,
-    END_OF_LIST,
-};
-
-// master list of all pins
-// canditates will be removed from this list to make searching for other pins faster
-const uint32_t all_pins[] =
-{
-    PA0,
-    PA1,
-    PA2,
-    PA3,
-    PA4,
-    PA5,
-    PA6,
-    PA7,
-    PB0,
-    PB1,
-    PB2,
-    PA8,
-    PA9,
-    PA10,
-    PA11,
-    PA12,
-    //PA15,
-    PB3,
-    PB4,
-    PB5,
-    PB6,
-    PB7,
-    PB8,
-    PF0,
-    PF1,
-    END_OF_LIST,
-};
-
-//#define PINTRANSLATE(x) (x)
-//#define PINTRANSLATE(x) digitalPinToAnalogInput(x)
-#define PINTRANSLATE(x) analogPinTranslate(x)
-
-#define SERIAL_BAUD_RATE 19200
-
-// declare all potential input pins (note: setting RX = TX means half-duplex mode automatically enabled)
-SoftwareSerial SerialA2 = SoftwareSerial(PA2, PA2);
-SoftwareSerial SerialB4 = SoftwareSerial(PB4, PB4);
-
-SoftwareSerial* printer = NULL; // this will point to one of the serial ports that's actually working
-uint32_t rc_input = PIN_NOT_EXIST; // which pin is RC input
-
-uint32_t remaining_pins[32]; // all pins except the ones used for the phases
+uint32_t remaining_pins[32];        // all pins except the ones used for the phases
+uint32_t remaining_adcs[32];        // all pins remaining that are ADC capable
 
 phase_group_t* phase_groups = NULL; // will list all phase pin groups
-uint16_t phase_groups_cnt = 0;      // number of potential groups
-uint32_t phase_groups_sz = 0;       // size of list in bytes, used for memset
-
-uint32_t led_pin; // used to store which LED pin is currently being blinked
-
-// state machine state names
-enum
-{
-    STATEMACH_WAITING_START,      // output text on serial port, wait for user to respond
-    STATEMACH_TEST_PHASE_START,   // start checking phase pins
-    STATEMACH_TEST_PHASE_A,       // checking all HIN and FB pins
-    STATEMACH_TEST_PHASE_B,       // checking all LIN pins
-    STATEMACH_TEST_REPORT_PHASES, // print out the result of the test
-    STATEMACH_CMD_PROMPT,         // ask the user to input a command
-    STATEMACH_CMD_WAIT,           // wait for user to give a command
-    STATEMACH_SEARCH_VOLTAGE,        // simply print out ADC readings
-    STATEMACH_SEARCH_CURRENTSENSOR,  // make the motor draw current, and see if any ADC readings change
-    STATEMACH_SEARCH_LED,            // blink LED pins until user sees it blinking
-};
+uint16_t phase_groups_cnt   = 0;    // number of potential groups
+uint32_t phase_groups_sz    = 0;    // size of list in bytes, used for memset
+uint8_t  results_invalid    = 0;    // marks the test as invalid if something goes wrong
 
 uint16_t state_machine = STATEMACH_WAITING_START;
 
 void setup()
 {
-    SerialA2.begin(SERIAL_BAUD_RATE);
-    SerialB4.begin(SERIAL_BAUD_RATE);
+    rc_pin_cnt = count_tbl(all_rc);
+    ser_list = (SoftwareSerial**)malloc(sizeof(SoftwareSerial*) * rc_pin_cnt);
+    for (uint8_t i = 0; i < rc_pin_cnt; i++)
+    {
+        uint32_t p = all_rc[i];
+        if (p == END_OF_LIST)
+        {
+            break;
+        }
+        ser_list[i] = new SoftwareSerial(p, p);
+        ser_list[i]->begin(SERIAL_BAUD_RATE);
+    }
 
     // remove pins from the list, to make searching easier later
     memcpy(remaining_pins, all_pins, sizeof(all_pins));
@@ -122,10 +49,12 @@ void setup()
     phase_groups = (phase_group_t*)malloc(phase_groups_sz);
     memset(phase_groups, END_OF_LIST, phase_groups_sz);
 
+    #ifdef ASSUME_PA15_LED
     // according to AM32 source code, this is permanently a LED
     pinMode(PA15, OUTPUT);
     digitalWrite(PA15, LOW);
     filter_out_one((uint32_t*)remaining_pins, PA15);
+    #endif
 }
 
 void loop()
@@ -139,59 +68,55 @@ void loop()
 
     if (state_machine == STATEMACH_WAITING_START)
     {
-        if ((now - last_time) >= 500)
+        if ((now - last_time) >= 1000)
         {
-            // have to swap between PA2 and PB4 because only one SoftwareSerial instance can be listening at a time
+            // have to swap between different pins because only one SoftwareSerial instance can be listening at a time
 
             last_time = now;
-            if ((tick % 2) == 0) {
-                SerialA2.print("rc input is PA2; ");
-                //printer = &SerialA2;
-                //print_all_adc();
-                SerialA2.println();
-                SerialA2.listen();
-            }
-            else {
-                SerialB4.print("rc input is PB4; ");
-                //printer = &SerialB4;
-                //print_all_adc();
-                SerialB4.println();
-                SerialB4.listen();
-            }
+
+            printer = ser_list[tick];
+            printer_pin = all_rc[tick];
+            ser_list[tick]->print("RC input is ");
+            print_pin_name(all_rc[tick]);
+            ser_list[tick]->println(" - send \\n (or ENTER key) to continue");
+            ser_list[tick]->listen(); // this is only listening for 1 second
             tick++;
+            if (tick >= rc_pin_cnt) { // end of list
+                tick = 0;
+            }
         }
 
         // which ever one gets the enter key (Arduino IDE, press SEND button with newline enabled)
         // will be the one that's valid
-
-        uint8_t c = 0;
-        if (SerialA2.available() > 0)
+        for (uint8_t i = 0; i < rc_pin_cnt; i++)
         {
-            c = SerialA2.read();
-            if (c == '\n')
+            if (ser_list[i]->available() > 0)
             {
-                rc_input = PA2;
-                SerialB4.end();
-                printer = &SerialA2;
-                state_machine = STATEMACH_TEST_PHASE_START;
-            }
-        }
-        if (SerialB4.available() > 0)
-        {
-            c = SerialB4.read();
-            if (c == '\n')
-            {
-                rc_input = PB4;
-                SerialA2.end();
-                printer = &SerialB4;
-                state_machine = STATEMACH_TEST_PHASE_START;
+                char c = ser_list[i]->read();
+                if (c == '\n') // if enter key (or sent \n)
+                {
+                    rc_input = all_rc[i];
+                    printer_pin = rc_input;
+                    filter_out_one((uint32_t*)remaining_pins, rc_input); // remove the RC input pin from potential searched pins
+                    printer = ser_list[i];
+                    state_machine = STATEMACH_TEST_PHASE_START;
+                    // deactivate all other SoftwareSerial instances
+                    for (uint8_t j = 0; j < rc_pin_cnt; j++)
+                    {
+                        if (i != j) {
+                            ser_list[j]->end();
+                            delete ser_list[j];
+                        }
+                    }
+                    free(ser_list);
+                    break;
+                }
             }
         }
     }
     else if (state_machine == STATEMACH_TEST_PHASE_START)
     {
-        // remove the RC input pin from potential searched pins
-        filter_out_one((uint32_t*)remaining_pins, rc_input);
+        printer->println("test continuing");
         printer->print("pin list: ");
         print_all_pins(remaining_pins);
         // prep for testing, all pins output low
@@ -218,11 +143,19 @@ void loop()
         }
         uint16_t adc_res[32];
 
-        pulse_all_phases(10, 20);
+        pulse_all_phases(10, 20); // for charge pump
         set_all_pins(all_hin, OUTPUT, LOW);
+
         // pulse each HIN pin, see if ADC readings change
         pulse_and_measure(p, 100, 200, adc_res);
         //print_adc_res(adc_res);
+
+        if (test_for_motor_windings_hin(adc_res) && results_invalid == 0)
+        {
+            printer->println("WARNING: readings make no sense, is the motor connected? please make sure the motor is disconnected.");
+            results_invalid = 1;
+        }
+
         uint32_t fb = pick_max(adc_res);
 
         phase_groups[tick].hin = p;
@@ -244,11 +177,19 @@ void loop()
         }
         uint16_t adc_res[32];
 
-        // pulse each LIN pin, see if ADC readings change
-        pulse_all_phases(10, 20);
+        pulse_all_phases(10, 20); // for charge pump
         set_all_pins(all_hin, OUTPUT, LOW);
+
+        // pulse each LIN pin, see if ADC readings change
         pulse_and_measure(p, 2, 200, adc_res);
         //print_adc_res(adc_res);
+
+        if (test_for_motor_windings_lin(adc_res) && results_invalid <= 1)
+        {
+            printer->println("WARNING: readings make no sense, is the motor connected? please make sure the motor is disconnected.");
+            results_invalid = 2;
+        }
+
         uint32_t fb = pick_min(adc_res);
 
         // match the FB pin with an existing group, so we can save the LIN pin in the correct group
@@ -266,13 +207,10 @@ void loop()
     else if (state_machine == STATEMACH_TEST_REPORT_PHASES)
     {
         printer->println("phase pin matching results:");
-        int i;
-        for (i = 0; i < phase_groups_cnt; i++)
+        for (uint8_t i = 0; i < phase_groups_cnt; i++)
         {
             phase_group_t* pg = &(phase_groups[i]);
-            printer->print("\t");
-            printer->print(i + 1, DEC);
-            printer->print(": HIN->");
+            printer->printf("\t%d : HIN->", (i + 1));
             print_pin_name(pg->hin);
             printer->print(" , LIN->");
             print_pin_name(pg->lin);
@@ -281,11 +219,22 @@ void loop()
             printer->println();
         }
         printer->println("end of list");
+
+        if (results_invalid)
+        {
+            printer->println("WARNING: these results may not be valid!!!");
+        }
+
+        #ifdef ASSUME_ADC_PINS
+        test_for_analog_pins();
+        #endif
+
         state_machine = STATEMACH_CMD_PROMPT;
     }
     else if (state_machine == STATEMACH_CMD_PROMPT)
     {
-        printer->println("enter command key, one of: V (voltage pin search), C (current sensor search), L (LED search)");
+        while (printer->available() > 0) { printer->read(); } // clear input buffer
+        printer->println("enter command key, one of: V (voltage monitor), C (current sensor monitor), L (LED search)");
         printer->listen();
         state_machine = STATEMACH_CMD_WAIT;
     }
@@ -297,7 +246,7 @@ void loop()
             char c = printer->read();
             if (c == 'V' || c == 'v')
             {
-                printer->println("searching voltage pin, X to quit");
+                printer->println("monitoring ADCs, X to quit");
                 printer->listen();
                 state_machine = STATEMACH_SEARCH_VOLTAGE;
                 tick = 0;
@@ -305,7 +254,7 @@ void loop()
             }
             else if (c == 'C' || c == 'c')
             {
-                printer->println("searching current sensor pin, X to quit");
+                printer->println("monitoring ADCs while attempting to draw current, please connect motor, X to quit");
                 printer->listen();
                 state_machine = STATEMACH_SEARCH_CURRENTSENSOR;
                 tick = 0;
@@ -313,7 +262,8 @@ void loop()
             }
             else if (c == 'L' || c == 'l')
             {
-                printer->println("searching LED pin, X to quit, P to pause, G to continue, < and > to scroll");
+                printer->println("searching LED pin, X to quit, P to pause, G to continue, < and > to nav");
+                printer->println("if you see the LED actually blink, then press 'P', and use '<' or '>' if you missed it");
                 printer->listen();
                 state_machine = STATEMACH_SEARCH_LED;
                 tick = 0;
@@ -347,8 +297,9 @@ void loop()
             printer->listen();
             tick++;
         }
-        set_all_pins(all_hin, OUTPUT, ((hftick % 2) == 0) ? HIGH : LOW);
-        set_all_pins(all_lin, OUTPUT, ((hftick % 2) == 0) ? LOW : HIGH);
+
+        //set_all_pins(all_hin, OUTPUT, ((hftick % 2) == 0) ? HIGH : LOW);
+        //set_all_pins(all_lin, OUTPUT, ((hftick % 2) == 0) ? LOW : HIGH);
     }
     else if (state_machine == STATEMACH_SEARCH_CURRENTSENSOR)
     {
@@ -448,7 +399,7 @@ void loop()
                 led_continue = 0; // pause
             }
         }
-        if ((now - last_time) >= 3000)
+        if ((now - last_time) >= 2000)
         {
             // every two seconds, another pin will be blinked
             // the user needs to watch the LED and also watch the serial terminal for the text
@@ -461,9 +412,8 @@ void loop()
                 tick = 0;
                 return;
             }
-            led_pin = p;
             printer->print("LED pin ");
-            print_pin_name(led_pin);
+            print_pin_name(p);
             printer->print(" blink ");
             if ((tick % 2) == 0) {
                 printer->println("HIGH");
@@ -472,17 +422,11 @@ void loop()
                 printer->println("LOW");
             }
             printer->listen();
-            pinMode(led_pin, OUTPUT);
-            digitalWrite(led_pin, (tick % 2) == 0 ? HIGH : LOW);
+            pinMode(p, OUTPUT);
+            digitalWrite(p, (tick % 2) == 0 ? HIGH : LOW);
             delay(100); // short blink just in case we are driving something we shouldn't be
-            pinMode(led_pin, INPUT);
-            digitalWrite(led_pin, (tick % 2) == 0 ? LOW : HIGH);
-            delay(100);
-            pinMode(led_pin, OUTPUT);
-            digitalWrite(led_pin, (tick % 2) == 0 ? HIGH : LOW);
-            delay(100);
-            pinMode(led_pin, INPUT);
-            digitalWrite(led_pin, (tick % 2) == 0 ? LOW : HIGH);
+            pinMode(p, INPUT);
+            digitalWrite(p, (tick % 2) == 0 ? LOW : HIGH);
             if (led_continue != 0) {
                 tick++;
             }
