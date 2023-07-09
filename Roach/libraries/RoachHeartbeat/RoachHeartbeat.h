@@ -23,6 +23,14 @@
 //#define ROACHRGBLED_BLOCKING
 //#define ROACHNEOPIX_BLOCKING
 //#define ROACHNEOPIX_ALWAYS_RECONFIG // enable if PWM module must be shared with something else like DSHOT
+#define RHB_HUE_DEG(x)    ((x) * 182)
+#define RHB_HUE_RED       0
+#define RHB_HUE_ORANGE    RHB_HUE_DEG(39)
+#define RHB_HUE_YELLOW    RHB_HUE_DEG(60)
+#define RHB_HUE_GREEN     RHB_HUE_DEG(120)
+#define RHB_HUE_CYAN      RHB_HUE_DEG(180)
+#define RHB_HUE_BLUE      RHB_HUE_DEG(240)
+#define RHB_HUE_PURPLE    RHB_HUE_DEG(277)
 
 class RoachHeartbeat
 {
@@ -48,8 +56,8 @@ class RoachRgbLed
         RoachRgbLed(bool dotstar = true, int pind = RHB_HW_PIN_DOTSTAR_DAT, int pinc = RHB_HW_PIN_DOTSTAR_CLK, NRF_SPIM_Type* p_spi = NRF_SPIM2);
         void begin(void);
         void set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite = 0xFF, bool force = false);
-        void set(uint32_t x, bool force = false);
-        void setHue(int16_t hue, bool force = false);
+        void setRgb(uint32_t x, uint8_t brite = 0xFF, bool force = false);
+        void setHue(int32_t hue, uint8_t brite = 0xFF, bool force = false);
         void spiConfig();
     private:
         bool _dotstar;
@@ -67,8 +75,8 @@ class RoachNeoPixel
         RoachNeoPixel(int pind = RHB_HW_PIN_NEOPIXEL, NRF_PWM_Type* p_pwm = NULL, int pwm_out = -1);
         void begin(void);
         void set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite = 0xFF, bool force = false);
-        void set(uint32_t x, bool force = false);
-        void setHue(int16_t hue, bool force = false);
+        void setRgb(uint32_t x, uint8_t brite = 0xFF, bool force = false);
+        void setHue(int32_t hue, uint8_t brite = 0xFF, bool force = false);
         void pwmConfig(void);
     private:
         int _pind, _pwmout;
@@ -81,7 +89,7 @@ class RoachNeoPixel
         uint16_t _pattern[ROACHNEOPIX_BUFFER_SIZE8 / 2];
 };
 
-uint32_t RoachHeartbeat_getRgbFromHue(int16_t h);
+uint32_t RoachHeartbeat_getRgbFromHue(int32_t h);
 
 void RoachWdt_init(uint32_t tmr_ms);
 void RoachWdt_feed(void);

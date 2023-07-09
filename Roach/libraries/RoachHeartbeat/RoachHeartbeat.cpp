@@ -232,6 +232,16 @@ void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force
             g = 0;
             b = 0;
         }
+        else if (brite < 255)
+        {
+            uint32_t r32 = r, g32 = g, b32 = b;
+            r32 *= brite;
+            g32 *= brite;
+            b32 *= brite;
+            r32 >>= 8; r = r32;
+            g32 >>= 8; g = g32;
+            b32 >>= 8; b = b32;
+        }
 
         memset(_buffer, 0, ROACHRGBLED_BUFFER_SIZE);
         uint8_t buf[3] = { g, r, b, }; // define byte order the LED expects
@@ -322,6 +332,16 @@ void RoachNeoPixel::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool for
         g = 0;
         b = 0;
     }
+    else if (brite < 255)
+    {
+        uint32_t r32 = r, g32 = g, b32 = b;
+        r32 *= brite;
+        g32 *= brite;
+        b32 *= brite;
+        r32 >>= 8; r = r32;
+        g32 >>= 8; g = g32;
+        b32 >>= 8; b = b32;
+    }
 
     uint8_t pixels[] = { g, r, b, }; // define byte order the LED expects
     uint16_t pos = 0; // bit position
@@ -369,27 +389,27 @@ void RoachNeoPixel::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool for
     #endif
 }
 
-void RoachRgbLed::set(uint32_t x, bool force)
+void RoachRgbLed::setRgb(uint32_t x, uint8_t brite, bool force)
 {
-    set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), x ? 0xFF : 0, force);
+    set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), brite, force);
 }
 
-void RoachNeoPixel::set(uint32_t x, bool force)
+void RoachNeoPixel::setRgb(uint32_t x, uint8_t brite, bool force)
 {
-    set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), x ? 0xFF : 0, force);
+    set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), brite, force);
 }
 
-void RoachRgbLed::setHue(int16_t hue, bool force)
+void RoachRgbLed::setHue(int32_t hue, uint8_t brite, bool force)
 {
-    set((uint32_t)RoachHeartbeat_getRgbFromHue(hue), force);
+    setRgb((uint32_t)RoachHeartbeat_getRgbFromHue(hue), brite, force);
 }
 
-void RoachNeoPixel::setHue(int16_t hue, bool force)
+void RoachNeoPixel::setHue(int32_t hue, uint8_t brite, bool force)
 {
-    set((uint32_t)RoachHeartbeat_getRgbFromHue(hue), force);
+    setRgb((uint32_t)RoachHeartbeat_getRgbFromHue(hue), brite, force);
 }
 
-uint32_t RoachHeartbeat_getRgbFromHue(int16_t h)
+uint32_t RoachHeartbeat_getRgbFromHue(int32_t h)
 {
     uint8_t r, g, b;
     int16_t hue = (h * 1530L + 32768) / 65536;
