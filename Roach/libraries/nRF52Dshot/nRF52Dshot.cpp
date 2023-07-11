@@ -127,7 +127,7 @@ void nRF52Dshot::begin(void)
     _active = true;
 }
 
-void nRF52Dshot::end(bool prep_bootload)
+void nRF52Dshot::detach(void)
 {
     #if defined(ARDUINO_ARCH_NRF52840)
         _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pin].name;
@@ -135,11 +135,6 @@ void nRF52Dshot::end(bool prep_bootload)
         _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pin];
     #endif
     pinMode(_pin, INPUT);
-    if (prep_bootload) {
-        // AM32 will check if the pin is driven high when it reboots
-        pinMode(_pin, OUTPUT);
-        digitalWrite(_pin, HIGH);
-    }
     _active = false;
 }
 
@@ -235,6 +230,15 @@ void nRF52Dshot::sendNow(void)
     }
     #else
     _busy = true;
+    #endif
+}
+
+void nRF52Dshot::writeMicroseconds(uint16_t us)
+{
+    #ifdef NRFDSHOT_SUPPORT_SPEED_1200
+    setThrottle(convertPpm(us));
+    #else
+    setThrottle(nrfdshot_convertPpm(us));
     #endif
 }
 

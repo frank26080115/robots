@@ -6,9 +6,11 @@
 #include <RoachUsbMsd.h>
 #include <RoachPerfCnt.h>
 #include <RoachServo.h>
+#include <nRF52Dshot.h>
 #include <RoachIMU.h>
 #include <RoachHeartbeat.h>
 #include <RoachHeadingManager.h>
+#include <nRF52OneWireSerial.h>
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
 #include <SPI.h>
@@ -30,7 +32,12 @@ roach_telem_pkt_t telem_pkt = {0};
 
 RoachServo drive_left(DETCORDHW_PIN_SERVO_DRV_L);
 RoachServo drive_right(DETCORDHW_PIN_SERVO_DRV_R);
-RoachServo weapon(DETCORDHW_PIN_SERVO_WEAP);
+#ifdef USE_DSHOT
+    nRF52Dshot
+#else
+    RoachServo
+#endif
+    weapon(DETCORDHW_PIN_SERVO_WEAP);
 
 RoachIMU imu(5000, 0, 0, BNO08x_I2CADDR_DEFAULT, -1);
 
@@ -42,6 +49,8 @@ RoachHeadingManager heading_mgr((uint32_t*)&(nvm_robot.heading_timeout));
 
 RoachHeartbeat hb_red = RoachHeartbeat(DETCORDHW_PIN_LED);
 RoachRgbLed    hb_rgb = RoachRgbLed();
+
+nRF52OneWireSerial esc_link = nRF52OneWireSerial(&Serial1, NRF_UARTE0, DETCORDHW_PIN_SERVO_WEAP);
 
 void setup()
 {
