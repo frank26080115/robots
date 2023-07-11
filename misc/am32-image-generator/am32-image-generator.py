@@ -66,7 +66,10 @@ def main():
     if fw_ihex.minaddr() - 1 <= bl_ihex.maxaddr():
         raise Exception("error: firmware overlaps with bootloader")
 
-    bl_ihex.merge(fw_ihex)
+    bl_ihex.merge(fw_ihex, overlap='ignore')
+
+    if args.verbose:
+        print("merged data from 0x%08X to 0x%08X" % (bl_ihex.minaddr(), bl_ihex.maxaddr()))
 
     eep_justname = None
     if "0x" in args.eepromaddr.lower():
@@ -87,6 +90,7 @@ def main():
             print("eeprom:")
             print("\t" + eep_fullpath)
             print("\t%s (%s)" % (eep_basename, eep_ext))
+        eep_justname = eep_justname.replace(".eepromdump", "")
 
         if eep_ext != ".bin":
             raise Exception("unknown eeprom file type, must be *.bin")
@@ -95,7 +99,9 @@ def main():
         eep_ihex.loadbin(eep_fullpath, offset = base_address + eep_addr)
         if args.verbose:
             print("eeprom from 0x%08X to 0x%08X" % (eep_ihex.minaddr(), eep_ihex.maxaddr()))
-        bl_ihex.merge(eep_ihex)
+        if eep_ihex.minaddr() - 1 <= bl_ihex.maxaddr():
+            raise Exception("error: eeprom overlaps with firmware")
+        bl_ihex.merge(eep_ihex, overlap='replace')
 
     if args.outpath is None:
         outpath = os.path.abspath(".")
