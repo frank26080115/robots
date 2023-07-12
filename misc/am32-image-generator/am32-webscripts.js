@@ -250,7 +250,7 @@ function toHexString(x)
     while ((hex.length % 2) != 0) {
         hex = "0" + hex;
     }
-    return "0x" + hex;
+    return "0x" + hex.toUpperCase();
 }
 
 function serport_btnRead()
@@ -258,7 +258,7 @@ function serport_btnRead()
     debug_textbox.value = "";
     serport_readBinary(function(barr) {
         readBin(barr);
-        debug_textbox.value += "EEPROM data read from\r\n";
+        debug_textbox.value += "EEPROM data read from ESC\r\n";
     });
 }
 

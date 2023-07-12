@@ -7,6 +7,7 @@ const ack_byte = 0x30;
 
 var serport_fifo = null;
 var serport_echocnt = 0;
+var serport_hasQuery = false;
 
 async function serport_connect()
 {
@@ -30,6 +31,7 @@ async function serport_connect()
         document.getElementById("span_serport").innerHTML = "(connected)";
         document.getElementById("btn_serread" ).disabled  = false;
         document.getElementById("btn_serwrite").disabled  = false;
+        serport_hasQuery = false;
 
         port.addEventListener("connect", (event) => {
             console.log("port on connect");
@@ -39,6 +41,7 @@ async function serport_connect()
             document.getElementById("span_serport").innerHTML = "(connected)";
             document.getElementById("btn_serread" ).disabled  = false;
             document.getElementById("btn_serwrite").disabled  = false;
+            serport_hasQuery = false;
         });
 
         port.addEventListener("disconnect", (event) => {
@@ -50,6 +53,7 @@ async function serport_connect()
             document.getElementById("span_serport").innerHTML = "";
             document.getElementById("btn_serread" ).disabled = true;
             document.getElementById("btn_serwrite").disabled = true;
+            serport_hasQuery = false;
         });
     }
 }
@@ -69,6 +73,7 @@ async function serport_disconnect()
     document.getElementById("span_serport").innerHTML = "";
     document.getElementById("btn_serread" ).disabled = true;
     document.getElementById("btn_serwrite").disabled = true;
+    serport_hasQuery = false;
 }
 
 function serport_fifoPush(x)
@@ -87,6 +92,7 @@ function serport_fifoPush(x)
         for (var i = 0, j = serport_fifo.length; i < x.length && j < mergedArray.length; i++, j++) {
             mergedArray[j] = x[i];
         }
+        serport_fifo = mergedArray; 
     }
 }
 
@@ -98,6 +104,11 @@ function serport_fifoPopBlindCnt(cnt)
     else {
         serport_fifo = new Uint8Array([]);
     }
+}
+
+async function serport_resetReader()
+{
+    serport_fifo = null;
 }
 
 async function serport_tx(data, cb)
@@ -117,37 +128,47 @@ async function serport_tx(data, cb)
             debug_textbox.value += "error: serial port is null\r\n";
             return;
         }
-        if (serport.readable) {
+        var r = 0;
+        
+        while (serport.readable)
+        {
             let { value, done } = await Promise.race([
-                serport_reader.read(),
-                new Promise((_, reject) => setTimeout(function() {
-                    debug_textbox.value += "error: serial port timed out reading reply\r\n";
-                }, pkt_time))
-            ]);
-            console.log("serport replied");
-            console.log(value);
-            if (value.length > 0) {
-                if (value.length >= buffer8.length)
+                    serport_reader.read(),
+                    new Promise((_, reject) => setTimeout(reject, pkt_time, new Error("serport_tx read timeout")))
+                    ]);
+            if (value != null)
+            {
+                console.log("serport replied");
+                console.log(value);
+                if (value.length > 0)
+                {
+                    r += value.length;
+                    serport_fifoPush(value);
+                    console.log(serport_fifo);
+                    done = (r >= buffer8.length);
+                }
+            }
+            if (done)
+            {
+                if (serport_fifo.length >= buffer8.length)
                 {
                     for (var i = 0; i < buffer8.length; i++) {
-                        if (value[i] != buffer8[i]) {
+                        if (serport_fifo[i] != buffer8[i]) {
                             debug_textbox.value += "warning: echo content does not match sent data\r\n";
                             break;
                         }
                     }
                 }
-                else {
-                    debug_textbox.value += "warning: echo length less than sent length\r\n";
+                if (serport_echocnt > 0) {
+                    serport_fifoPopBlindCnt(serport_echocnt);
+                    serport_echocnt = 0;
+                    console.log(serport_fifo);
                 }
-                value = value.slice(serport_echocnt);
-                serport_echocnt = 0;
-                serport_fifoPush(value);
+                break;
             }
         }
-        else {
-            debug_textbox.value += "error: serial port is not readable\r\n";
-        }
         if (cb) {
+            console.log("serport tx calling cb");
             cb();
         }
     }, pkt_time);
@@ -159,6 +180,21 @@ async function serport_readToEnd()
         debug_textbox.value += "error: serial port is null\r\n";
         return;
     }
+
+    if (serport_fifo != null)
+    {
+        if (serport_fifo.length > 0)
+        {
+            if (serport_echocnt > 0) {
+                serport_fifoPopBlindCnt(serport_echocnt);
+                serport_echocnt = 0;
+            }
+            console.log("serport readtoend early");
+            console.log(serport_fifo);
+            return serport_fifo;
+        }
+    }
+
     if (serport.readable)
     {
         try
@@ -166,10 +202,12 @@ async function serport_readToEnd()
             let { value, done } = await Promise.race([
                 serport_reader.read(),
                 new Promise((_, reject) => setTimeout(function() {
+                    console.log("serport_readToEnd timeout");
                     if (serport_fifo == null || serport_fifo.length <= 0) {
                         debug_textbox.value += "error: serial port timed out reading\r\n";
                     }
-                    return { [], true};
+                    var empty = [];
+                    return [ empty, true ];
                 }, pkt_time))
             ]);
             serport_fifoPush(value);
@@ -177,6 +215,8 @@ async function serport_readToEnd()
                 serport_fifoPopBlindCnt(serport_echocnt);
                 serport_echocnt = 0;
             }
+            console.log("serport_readToEnd returning");
+            console.log(serport_fifo);
         }
         catch
         {
@@ -191,92 +231,113 @@ async function serport_readToEnd()
     return serport_fifo;
 }
 
+async function serport_readBinaryInner(proc_cb)
+{
+    await serport_resetReader();
+    await serport_tx(serport_genSetAddressCmd(0x7C00)
+        // [0xFF, 0x00, 0x7C, 0x00, 0x10, 0xD4]
+        , async function () { // sent set address
+
+        var tmp = await serport_readToEnd();
+        if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
+            debug_textbox.value += "ESC failed to ack address set command\r\n";
+            return;
+        }
+
+        await serport_resetReader();
+        await serport_tx(serport_genReadCmd(0x30)
+            //[0x03, 0x30, 0x00, 0xE4]
+            , async function () { // sent read
+
+            var data1 = await serport_readToEnd();
+            if (data1 == null || data1.length < 0x30) {
+                debug_textbox.value += "ESC failed to reply first data packet\r\n";
+                return;
+            }
+
+            await serport_resetReader();
+            await serport_tx(serport_genSetAddressCmd(0x7C30)
+                // [0xFF, 0x00, 0x7C, 0x30, 0x10, 0xC0]
+                , async function () { // sent read
+
+                var tmp = await serport_readToEnd();
+                if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
+                    debug_textbox.value += "ESC failed to ack 2nd address set command\r\n";
+                    return;
+                }
+
+                await serport_resetReader();
+                await serport_tx(serport_genReadCmd(0x80)
+                    // [0x03, 0x80, 0x01, 0x50]
+                    , async function () {
+
+                    var data2 = await serport_readToEnd();
+                    if (data2 == null || data2.length < 0x80) {
+                        debug_textbox.value += "ESC failed to reply with second data packet\n";
+                        return;
+                    }
+
+                    var buffer = new ArrayBuffer(176);
+                    var buffer8 = new Uint8Array(buffer);
+                    for (var i = 0; i < buffer8.length; i++)
+                    {
+                        if (i < 0x30)
+                        {
+                            buffer8[i] = data1[i];
+                        }
+                        else if (i >= 0x30 && i <= (0x30 + 0x80))
+                        {
+                            buffer8[i] = data2[i - 0x30];
+                        }
+                        else
+                        {
+                            buffer8[i] = 0xFF;
+                        }
+                    }
+                    proc_cb(buffer8);
+                }); // sent read
+            }); // sent set address
+        }); // sent read
+    }); // sent set address
+}
+
 async function serport_readBinary(proc_cb)
 {
     if (serport == null) {
         return;
     }
-    serport_tx(serport_genInitQuery(), async function () { // sent query
-
-        var tmp = await serport_readToEnd();
-        if (tmp == null || tmp.length < 9) {
-            debug_textbox.value += "ESC failed to reply to initial query\r\n";
-            return;
-        }
-
-        debug_textbox.value += "ESC query reply: ";
-        for (var i = 0; i < serport_fifo.length; i++) {
-            debug_textbox.value += toHexString(serport_fifo[i]) + " ";
-        }
-        debug_textbox.value += "\r\n";
-        serport_fifo = null;
-
-        serport_tx(serport_genSetAddressCmd(0x7C00)
-            // [0xFF, 0x00, 0x7C, 0x00, 0x10, 0xD4]
-            , async function () { // sent set address
+    await serport_resetReader();
+    if (serport_hasQuery == false)
+    {
+        await serport_tx(serport_genInitQuery(), async function () { // sent query
 
             var tmp = await serport_readToEnd();
-            if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
-                debug_textbox.value += "ESC failed to ack address set command\r\n";
+            if (tmp == null || tmp.length < 9) {
+                debug_textbox.value += "ESC failed to reply to initial query\r\n";
+                if (tmp != null && tmp.length > 0) {
+                    debug_textbox.value += "reply: ";
+                    for (var i = 0; i < tmp.length; i++) {
+                        debug_textbox.value += toHexString(tmp[i]) + " ";
+                    }
+                    debug_textbox.value += "\r\n";
+                }
                 return;
             }
 
-            serport_fifo = null;
-            serport_tx(serport_genReadCmd(0x30)
-                //[0x03, 0x30, 0x00, 0xE4]
-                , async function () { // sent read
+            debug_textbox.value += "ESC query reply: ";
+            for (var i = 0; i < serport_fifo.length; i++) {
+                debug_textbox.value += toHexString(serport_fifo[i]) + " ";
+            }
+            debug_textbox.value += "\r\n";
+            serport_hasQuery = true;
 
-                var data1 = await serport_readToEnd();
-                if (data1 == null || data1.length < 0x30) {
-                    debug_textbox.value += "ESC failed to reply first data packet\r\n";
-                    return;
-                }
-
-                serport_fifo = null;
-                serport_tx(serport_genSetAddressCmd(0x7C30)
-                    // [0xFF, 0x00, 0x7C, 0x30, 0x10, 0xC0]
-                    , async function () { // sent read
-
-                    var tmp = await serport_readToEnd();
-                    if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
-                        debug_textbox.value += "ESC failed to ack 2nd address set command\r\n";
-                        return;
-                    }
-
-                    serport_fifo = null;
-                    serport_tx(serport_genReadCmd(0x80)
-                        // [0x03, 0x80, 0x01, 0x50]
-                        , async function () {
-
-                        var data2 = await serport_readToEnd();
-                        if (data2 == null || data2.length < 0x80) {
-                            debug_textbox.value += "ESC failed to reply with second data packet\n";
-                            return;
-                        }
-
-                        var buffer = new ArrayBuffer(176);
-                        var buffer8 = new Uint8Array(buffer);
-                        for (var i = 0; i < buffer8.length; i++)
-                        {
-                            if (i < 0x30)
-                            {
-                                buffer8[i] = data1[i];
-                            }
-                            else if (i >= 0x30 && i <= (0x30 + 0x80))
-                            {
-                                buffer8[i] = data2[i - 0x30];
-                            }
-                            else
-                            {
-                                buffer8[i] = 0xFF;
-                            }
-                        }
-                        proc_cb(buffer8);
-                    }); // sent read
-                }); // sent set address
-            }); // sent read
-        }); // sent set address
-    }); // sent query
+            await serport_readBinaryInner(proc_cb);
+        }); // sent query
+    }
+    else
+    {
+        await serport_readBinaryInner(proc_cb);
+    }
 }
 
 function serport_genSetAddressCmd(adr)
@@ -318,10 +379,13 @@ function serport_genInitQuery()
         'e' .charCodeAt(0),
         'l' .charCodeAt(0),
         'i' .charCodeAt(0)];
-    var crc = serport_genCrc(x);
-    x.push((crc & 0x00FF) >> 0);
-    x.push((crc & 0xFF00) >> 8);
+    // I don't think this packet uses the same CRC calculation
+    //var crc = serport_genCrc(x);
+    //x.push((crc & 0x00FF) >> 0);
+    //x.push((crc & 0xFF00) >> 8);
     // CRC should be 0xF4, 0x7D
+    x.push(0xF4);
+    x.push(0x7D);
     return x;
 }
 
@@ -332,6 +396,15 @@ function serport_genPayload(bin, start, len)
     {
         x.push(bin[start + i]);
     }
+    var crc = serport_genCrc(x);
+    x.push((crc & 0x00FF) >> 0);
+    x.push((crc & 0xFF00) >> 8);
+    return x;
+}
+
+function serport_genFlashCmd()
+{
+    var x = [0x01, 0x01];
     var crc = serport_genCrc(x);
     x.push((crc & 0x00FF) >> 0);
     x.push((crc & 0xFF00) >> 8);
@@ -375,69 +448,92 @@ function serport_crcSelfTest()
     console.log(serport_verifyCrc([0xFF, 0x00, 0x7C, 0x00, 0x10, 0xD3]));
 }
 
+async function serport_writeBinaryInner(payload, len, cb)
+{
+    await serport_resetReader();
+    await serport_tx(serport_genSetAddressCmd(0x7C00)
+        // [0xFF, 0x00, 0x7C, 0x00, 0x10, 0xD4]
+        , async function () { // sent set address
+
+        var tmp = await serport_readToEnd();
+        if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
+            debug_textbox.value += "ESC failed to ack address set command\r\n";
+            return;
+        }
+
+        await serport_resetReader();
+        await serport_tx(serport_genSetBufferCmd(0x00, len)
+            // [0xFE, 0x00, 0x00, 0x30, 0x31, 0xFC]
+            , async function () { // sent set buffer
+            // ESC does not reply to this
+
+            await serport_resetReader();
+            // expected to send (0x30 + 2) bytes
+            await serport_tx(serport_genPayload(payload, 0x00, len)
+                , async function () { // sent payload
+
+                var tmp = await serport_readToEnd();
+                if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
+                    debug_textbox.value += "ESC failed to ack payload\r\n";
+                    return;
+                }
+
+                await serport_resetReader();
+                await serport_tx(serport_genFlashCmd()
+                    , async function () { // sent flash command
+
+                    var tmp = await serport_readToEnd();
+                    if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
+                        debug_textbox.value += "ESC failed to ack flash command\r\n";
+                        return;
+                    }
+
+                    if (cb) {
+                        cb();
+                    }
+
+                }); // sent flash command
+            }); // sent payload
+        }); // sent set buffer
+    }); // sent set address
+}
+
 async function serport_writeBinary(payload, len, cb)
 {
     if (serport == null) {
         return;
     }
-    serport_tx(serport_genInitQuery(), async function () { // sent query
-
-        var tmp = await serport_readToEnd();
-        if (tmp == null || tmp.length < 9) {
-            debug_textbox.value += "ESC failed to reply to initial query\r\n";
-            return;
-        }
-
-        debug_textbox.value += "ESC query reply: ";
-        for (var i = 0; i < serport_fifo.length; i++) {
-            debug_textbox.value += toHexString(serport_fifo[i]) + " ";
-        }
-        debug_textbox.value += "\r\n";
-        serport_fifo = null;
-
-        serport_tx(serport_genSetAddressCmd(0x7C00)
-            // [0xFF, 0x00, 0x7C, 0x00, 0x10, 0xD4]
-            , async function () { // sent set address
+    await serport_resetReader();
+    if (serport_hasQuery == false)
+    {
+        await serport_tx(serport_genInitQuery(), async function () { // sent query
 
             var tmp = await serport_readToEnd();
-            if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
-                debug_textbox.value += "ESC failed to ack address set command\r\n";
+            if (tmp == null || tmp.length < 9) {
+                debug_textbox.value += "ESC failed to reply to initial query\r\n";
+                if (tmp != null && tmp.length > 0) {
+                    debug_textbox.value += "reply: ";
+                    for (var i = 0; i < tmp.length; i++) {
+                        debug_textbox.value += toHexString(tmp[i]) + " ";
+                    }
+                    debug_textbox.value += "\r\n";
+                }
                 return;
             }
 
-            serport_fifo = null;
-            serport_tx(serport_genSetBufferCmd(0x00, len)
-                // [0xFE, 0x00, 0x00, 0x30, 0x31, 0xFC]
-                , async function () { // sent set buffer
-                // ESC does not reply to this
+            debug_textbox.value += "ESC query reply: ";
+            for (var i = 0; i < serport_fifo.length; i++) {
+                debug_textbox.value += toHexString(serport_fifo[i]) + " ";
+            }
+            debug_textbox.value += "\r\n";
 
-                serport_fifo = null;
-                // expected to send (0x30 + 2) bytes
-                serport_tx(serport_genPayload(payload, 0x00, len)
-                    , async function () { // sent payload
+            serport_hasQuery = true;
 
-                    var tmp = await serport_readToEnd();
-                    if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
-                        debug_textbox.value += "ESC failed to ack payload\r\n";
-                        return;
-                    }
-
-                    serport_tx(serport_genFlashCmd(0x01)
-                        , async function () { // sent flash command
-
-                        var tmp = await serport_readToEnd();
-                        if (tmp == null || tmp.length < 1 || tmp[0] != ack_byte) {
-                            debug_textbox.value += "ESC failed to ack flash command\r\n";
-                            return;
-                        }
-
-                        if (cb) {
-                            cb();
-                        }
-
-                    }); // sent flash command
-                }); // sent payload
-            }); // sent set buffer
-        }); // sent set address
-    }); // sent query
+            await serport_writeBinaryInner(payload, len, cb);
+        }); // sent query
+    }
+    else
+    {
+        await serport_writeBinaryInner(payload, len, cb);
+    }
 }
