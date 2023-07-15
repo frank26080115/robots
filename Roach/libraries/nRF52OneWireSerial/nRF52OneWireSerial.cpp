@@ -375,7 +375,7 @@ void nRF52OneWireSerial::flush(void)
     #endif
 }
 
-uint32_t nRF52OneWireSerial::echo(Stream* dest, bool flush)
+uint32_t nRF52OneWireSerial::echo(Stream* dest, bool flush, Stream* dbg)
 {
     uint32_t ret = 0;
     int i = dest->available();
@@ -418,6 +418,9 @@ uint32_t nRF52OneWireSerial::echo(Stream* dest, bool flush)
         {
             this->readBytes(tmpbuf, (size_t)i);
             dest->write((const uint8_t*) tmpbuf, (size_t)i);
+            if (dbg) {
+                dbg->write((const uint8_t*) tmpbuf, (size_t)i);
+            }
         }
         else
         {
@@ -426,6 +429,9 @@ uint32_t nRF52OneWireSerial::echo(Stream* dest, bool flush)
             {
                 uint8_t x = (uint8_t)this->read();
                 dest->write(x);
+                if (dbg) {
+                    dbg->write(x);
+                }
             }
         }
         if (flush || tmpbuf)

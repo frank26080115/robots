@@ -44,7 +44,7 @@ class nRF52OneWireSerial : public Stream
         uint32_t _tx_delay, _rx_delay_centering, _rx_delay_intrabit, _rx_delay_stopbit;
         #endif
 
-        uint32_t echo(Stream* dest, bool flush = false);
+        uint32_t echo(Stream* dest, bool flush = false, Stream* dbg = NULL);
         inline void echoForever(Stream* dest) { while (true) { yield(); echo(dest); } };
 
     private:
