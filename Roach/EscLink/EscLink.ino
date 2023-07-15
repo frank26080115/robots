@@ -10,18 +10,14 @@ nRF52OneWireSerial
         ow(SERVO_PIN, 19200, false);
     #endif
 
-#ifdef ESCLINK_TESTGEN
 Uart Serial2 = Uart(NRF_UARTE1, UARTE1_IRQn, A3, A2);
-#endif
 
 void setup()
 {
     sd_softdevice_disable();
     Serial1.begin(19200);
     Serial.begin(19200);
-    #ifdef ESCLINK_TESTGEN
     Serial2.begin(19200);
-    #endif
     ow.begin();
     #ifdef ESCLINK_TESTGEN
     ow.println("hello");
@@ -32,7 +28,7 @@ void setup()
 
 void loop()
 {
-    ow.echo(&Serial);
+    ow.echo(&Serial, false, &Serial2);
     #ifdef ESCLINK_TESTGEN
     static uint8_t i = 0;
     Serial2.write((uint8_t)i);
@@ -41,7 +37,6 @@ void loop()
     #endif
 }
 
-#ifdef ESCLINK_TESTGEN
 extern "C"
 {
   void UARTE1_IRQHandler()
@@ -49,4 +44,3 @@ extern "C"
     Serial2.IrqHandler();
   }
 }
-#endif
