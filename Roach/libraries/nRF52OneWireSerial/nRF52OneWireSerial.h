@@ -12,13 +12,15 @@ extern void nrfows_delayloops(uint32_t loops);
 #endif
 
 #define NRFOWS_USE_HW_SERIAL
-#define NRFOWS_RX_BUFF_SIZE 512
+#define NRFOWS_USE_TWO_STOP_BITS
+#define NRFOWS_RX_BUFF_SIZE (64 * 5)
+#define NRFOWS_TX_BUFF_SIZE (64 * 5)
 
 class nRF52OneWireSerial : public Stream
 {
     public:
         #ifdef NRFOWS_USE_HW_SERIAL
-        nRF52OneWireSerial(Uart* ser, NRF_UARTE_Type* uarte, int pin);
+        nRF52OneWireSerial(Uart* ser, NRF_UARTE_Type* uarte, IRQn_Type irqn, int pin);
         void task(void);
         #else
         nRF52OneWireSerial(int pin, uint32_t baud, bool invert);
@@ -50,6 +52,7 @@ class nRF52OneWireSerial : public Stream
     private:
         int _pin;
         volatile uint32_t _last_time = 0;
+        uint8_t _tx_buff[NRFOWS_TX_BUFF_SIZE];
         #ifndef NRFOWS_USE_HW_SERIAL
         uint32_t _baud;
         bool _invert;
@@ -63,9 +66,13 @@ class nRF52OneWireSerial : public Stream
         void listen(void);
         #else
         Uart* _serial;
+        IRQn_Type _irqn;
         uint32_t _pin_hw;
         uint32_t _last_avail = 0;
         NRF_UARTE_Type* _nrfUart;
+        uint32_t _last_tx_time = 0;
+        uint32_t _last_txrst_time = 0;
+        void checkUartReset(void);
         #endif
 };
 
