@@ -2,11 +2,10 @@
 #include "wiring_private.h"
 
 #ifdef NRFOWS_USE_HW_SERIAL
-nRF52OneWireSerial::nRF52OneWireSerial(Uart* ser, NRF_UARTE_Type* uarte, IRQn_Type irqn, int pin)
+nRF52OneWireSerial::nRF52OneWireSerial(Uart* ser, NRF_UARTE_Type* uarte, int pin)
 {
     _serial = ser;
     _nrfUart = uarte;
-    _irqn = irqn;
     _pin = pin;
     _pin_hw = g_ADigitalPinMap[pin];
 }
@@ -87,8 +86,6 @@ void nRF52OneWireSerial::listen(void)
 size_t nRF52OneWireSerial::write(uint8_t b)
 {
     #ifdef NRFOWS_USE_HW_SERIAL
-    //this->checkUartReset();
-
     pinMode(_pin, OUTPUT);
     _nrfUart->INTENCLR = UARTE_INTENCLR_ENDRX_Msk;
     _nrfUart->PSEL.RXD = 0xFFFFFFFF;
@@ -187,8 +184,6 @@ size_t nRF52OneWireSerial::write(uint8_t b)
 size_t nRF52OneWireSerial::write(const uint8_t *buffer, size_t size)
 {
     #ifdef NRFOWS_USE_HW_SERIAL
-    //this->checkUartReset();
-
     pinMode(_pin, OUTPUT);
     _nrfUart->INTENCLR = UARTE_INTENCLR_ENDRX_Msk;
     _nrfUart->PSEL.RXD = 0xFFFFFFFF;
@@ -286,53 +281,6 @@ size_t nRF52OneWireSerial::write(const uint8_t *buffer, size_t size)
     return (size_t)j;
     #endif
 }
-
-#ifdef NRFOWS_USE_HW_SERIAL
-void nRF52OneWireSerial::checkUartReset(void)
-{
-    uint32_t now = millis();
-    if (_last_tx_time != 0 && _last_txrst_time != 0)
-    {
-        if ((now - _last_tx_time) >= 50 && (now - _last_txrst_time) >= 1000) {
-            uint32_t br = _nrfUart->BAUDRATE;
-            uint32_t tptr = _nrfUart->TXD.PTR;
-            uint32_t rptr = _nrfUart->RXD.PTR;
-            //_serial->end();
-            //_serial->begin(19200);
-            NVIC_DisableIRQ(_irqn);
-            _nrfUart->INTENCLR = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ENDTX_Msk;
-            _nrfUart->EVENTS_RXTO = 0;
-            _nrfUart->EVENTS_TXSTOPPED = 0;
-            _nrfUart->TASKS_STOPRX = 0x1UL;
-            _nrfUart->TASKS_STOPTX = 0x1UL;
-            _nrfUart->TXD.PTR = 0;
-            _nrfUart->RXD.PTR = 0;
-            // Wait for TXSTOPPED event and for RXTO event
-            // This is required before disabling UART to fully power down transceiver PHY.
-            // Otherwise transceiver will continue to consume ~900uA
-            while ( !(_nrfUart->EVENTS_TXSTOPPED && _nrfUart->EVENTS_RXTO) ) yield();
-            _nrfUart->ENABLE = UARTE_ENABLE_ENABLE_Disabled;
-            _nrfUart->ENABLE = UARTE_ENABLE_ENABLE_Enabled;
-            _nrfUart->TXD.PTR = tptr;
-            _nrfUart->EVENTS_ENDTX = 0x0UL;
-            _nrfUart->RXD.PTR = rptr;
-            _nrfUart->RXD.MAXCNT = 1;
-            _nrfUart->TASKS_STARTRX = 0x1UL;
-            _nrfUart->INTENSET = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ENDTX_Msk;
-            NVIC_ClearPendingIRQ(_irqn);
-            NVIC_SetPriority(_irqn, 3);
-            NVIC_EnableIRQ(_irqn);
-            _nrfUart->BAUDRATE = br;
-            _last_txrst_time = now;
-        }
-    }
-    else
-    {
-        _last_txrst_time = now;
-    }
-    _last_tx_time = now;
-}
-#endif
 
 #ifndef NRFOWS_USE_HW_SERIAL
 

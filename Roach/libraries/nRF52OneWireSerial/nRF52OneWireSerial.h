@@ -20,7 +20,7 @@ class nRF52OneWireSerial : public Stream
 {
     public:
         #ifdef NRFOWS_USE_HW_SERIAL
-        nRF52OneWireSerial(Uart* ser, NRF_UARTE_Type* uarte, IRQn_Type irqn, int pin);
+        nRF52OneWireSerial(Uart* ser, NRF_UARTE_Type* uarte, int pin);
         void task(void);
         #else
         nRF52OneWireSerial(int pin, uint32_t baud, bool invert);
@@ -66,7 +66,6 @@ class nRF52OneWireSerial : public Stream
         void listen(void);
         #else
         Uart* _serial;
-        IRQn_Type _irqn;
         uint32_t _pin_hw;
         uint32_t _last_avail = 0;
         NRF_UARTE_Type* _nrfUart;
