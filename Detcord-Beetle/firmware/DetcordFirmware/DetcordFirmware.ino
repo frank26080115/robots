@@ -2,6 +2,7 @@
 #include <Adafruit_TinyUSB.h>
 #include <RoachLib.h>
 #include <nRF52RcRadio.h>
+#include <RoachRobot.h>
 #include <RoachCmdLine.h>
 #include <RoachUsbMsd.h>
 #include <RoachPerfCnt.h>
@@ -50,7 +51,19 @@ RoachHeadingManager heading_mgr((uint32_t*)&(nvm_robot.heading_timeout));
 RoachHeartbeat hb_red = RoachHeartbeat(DETCORDHW_PIN_LED);
 RoachRgbLed    hb_rgb = RoachRgbLed();
 
-nRF52OneWireSerial esc_link = nRF52OneWireSerial(&Serial1, NRF_UARTE0, DETCORDHW_PIN_SERVO_WEAP);
+detcord_nvm_t nvm;
+roach_rf_nvm_t nvm_rf;
+extern roach_nvm_gui_desc_t cfggroup_rf[]
+extern roach_nvm_gui_desc_t cfggroup_drive[];
+extern roach_nvm_gui_desc_t cfggroup_weap[];
+extern roach_nvm_gui_desc_t cfggroup_sensor[];
+roach_nvm_gui_desc_t** cfggroup_rxall = {
+    (roach_nvm_gui_desc_t*)cfggroup_rf,
+    (roach_nvm_gui_desc_t*)cfggroup_drive,
+    (roach_nvm_gui_desc_t*)cfggroup_weap,
+    (roach_nvm_gui_desc_t*)cfggroup_sensor,
+    NULL,
+};
 
 void setup()
 {
@@ -74,18 +87,28 @@ void setup()
 
     radio.begin();
     radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
+
+    RoachWdt_init(500);
 }
 
 void loop()
 {
-    
+    RoachWdt_feed();
+    robot_tasks();
+    if (radio.available())
+    {
+        // note: this should be every 10 milliseconds
+        
+    }
 }
 
-void robot_task()
+void robot_tasks()
 {
     radio.task();
     nbtwi_task();
     imu.task();
     RoachUsbMsd_task();
     cmdline_task();
+    heartbeat_task();
+    RoSync_task();
 }

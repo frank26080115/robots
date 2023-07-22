@@ -50,42 +50,49 @@ void roachrobot_handleFileSave(void* cmd, char* argstr, Stream* stream)
     }
 }
 
-bool roachrobot_saveSettingsToFile(const char* fname)
+bool roachrobot_saveSettingsToFile(const char* fname, uint8_t* data)
 {
     RoachFile f;
     bool suc = f.open(fname, O_RDWR | O_CREAT);
     if (suc)
     {
-        roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_drive);
-        roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_weap);
-        roachnvm_writetofile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
+        roachnvm_writetofile(&f, data, cfggroup_drive);
+        roachnvm_writetofile(&f, data, cfggroup_weap);
+        roachnvm_writetofile(&f, data, cfggroup_sensor);
         f.close();
         return true;
     }
     return false
 }
 
-bool roachrobot_loadSettingsFile(const char* fname)
+bool roachrobot_loadSettingsFile(const char* fname, uint8_t* data)
 {
     RoachFile f;
     bool suc = f.open(fname);
     if (suc)
     {
-        roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_drive);
-        roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_weap);
-        roachnvm_readfromfile(&f, (uint8_t*)&nvm_rx, cfggroup_imu);
+        roachnvm_readfromfile(&f, data, cfggroup_drive);
+        roachnvm_readfromfile(&f, data, cfggroup_weap);
+        roachnvm_readfromfile(&f, data, cfggroup_sensor);
         f.close();
         return true;
     }
     return false
 }
 
-bool roachrobot_loadSettings(void)
+bool roachrobot_loadSettings(uint8_t* data)
 {
-    return roachrobot_loadSettingsFile(ROACHROBOT_STARTUP_FILE_NAME);
+    return roachrobot_loadSettingsFile(ROACHROBOT_STARTUP_FILE_NAME, data);
 }
 
-bool roachrobot_saveSettings(void)
+bool roachrobot_saveSettings(uint8_t* data)
 {
-    return roachrobot_saveSettingsToFile(ROACHROBOT_STARTUP_FILE_NAME);
+    return roachrobot_saveSettingsToFile(ROACHROBOT_STARTUP_FILE_NAME, data);
+}
+
+void roachrobot_defaultSettings(uint8_t* data)
+{
+    roachnvm_setdefaults(data, cfggroup_drive);
+    roachnvm_setdefaults(data, cfggroup_weap);
+    roachnvm_setdefaults(data, cfggroup_sensor);
 }
