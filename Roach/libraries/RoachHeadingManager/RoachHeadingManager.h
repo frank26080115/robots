@@ -28,9 +28,9 @@ class RoachHeadingManager
                 , bool force_reset, int32_t steering, float yaw, uint32_t session
             #endif
             );
-        inline int32_t getTgtHeading(void)  { return tgt_head; };
-        inline int32_t getCurHeading(void)  { return cur_head; };
-        inline int32_t getOffsetAngle(void) { return angle_offset; };
+        inline int32_t getTgtHeading(void)  { return tgt_head; };     // target  angle for the PID controller
+        inline int32_t getCurHeading(void)  { return cur_head; };     // current angle for the PID controller
+        inline int32_t getOffsetAngle(void) { return angle_offset; }; // difference between the human input heading and the target angle heading
 
     private:
         #ifdef RHEADMGR_USE_MODULES
@@ -41,9 +41,9 @@ class RoachHeadingManager
 
         uint32_t* override_timeout;
 
-        int32_t angle_offset;
-        int32_t cur_head;
-        int32_t tgt_head;
+        int32_t angle_offset; // difference between the human input heading and the target angle heading
+        int32_t cur_head;     // current angle for the PID controller
+        int32_t tgt_head;     // target  angle for the PID controller
         roach_ctrl_pkt_t prev_pkt;
         uint32_t prev_session_id = 0;
         uint32_t release_timestamp = 0;

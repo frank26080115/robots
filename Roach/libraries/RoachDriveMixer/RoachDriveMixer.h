@@ -16,11 +16,13 @@ class RoachDriveMixer
         roach_nvm_servo_t* cfg_left;
         roach_nvm_servo_t* cfg_right;
         inline void setFlip(uint8_t x) { _flip = x; };
+        inline void setUpsideDown(uint8_t x) { _upsidedown = x; };
 
     private:
         int32_t _result_left = 0, _result_right = 0;
         int32_t _raw_left = 0, _raw_right = 0;
-        uint8_t _flip;
+        uint8_t _flip = 0;
+        bool    _upsidedown = false;
         int32_t _crossmix = 0;
         int32_t _virtual_heading;
         int32_t applyServoParams(roach_nvm_servo_t* cfg, int32_t x);

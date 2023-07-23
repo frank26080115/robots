@@ -29,16 +29,23 @@ void RoachDriveMixer::mix(int32_t throttle, int32_t steering, int32_t gyro_corre
     _raw_left  = left;
     _raw_right = right;
 
-    if ((flip & ROACH_FLIP_LR) != 0) {
+    if ((_flip & ROACH_FLIP_LR) != 0) {
         int32_t temp = right;
         right = left;
         left = temp;
     }
-    if ((flip & ROACH_FLIP_REV_LEFT) != 0) {
+    if ((_flip & ROACH_FLIP_REV_LEFT) != 0) {
         left *= -1;
     }
-    if ((flip & ROACH_FLIP_REV_RIGHT) != 0) {
+    if ((_flip & ROACH_FLIP_REV_RIGHT) != 0) {
         right *= -1;
+    }
+    if (_upsidedown) {
+        left *= -1;
+        right *= -1;
+        int32_t tmpswap = right;
+        right = left;
+        left = tmpswap;
     }
 
     right = applyServoParams(cfg_left, right);
