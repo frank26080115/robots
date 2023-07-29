@@ -70,6 +70,16 @@ void RoachPot::task(void)
 
     int32_t x32 = x;
     last_adc_raw = x32;
+
+    #if 1
+    // ability to run without a config
+    if (cfg == NULL) {
+        last_adc = x32;
+        last_val = x32;
+        return;
+    }
+    #endif
+
     if (cfg->filter != 0)
     {
         int32_t filtered = roach_lpf(x32, last_adc_filter, cfg->filter);
