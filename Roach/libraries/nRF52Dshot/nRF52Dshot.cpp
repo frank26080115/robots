@@ -130,9 +130,9 @@ void nRF52Dshot::begin(void)
 void nRF52Dshot::detach(void)
 {
     #if defined(ARDUINO_ARCH_NRF52840)
-        _pwm->PSEL.OUT[_pwmout] = g_APinDescription[_pin].name;
+        _pwm->PSEL.OUT[_pwmout] = 0xFFFFFFFF;
     #else
-        _pwm->PSEL.OUT[_pwmout] = g_ADigitalPinMap[_pin];
+        _pwm->PSEL.OUT[_pwmout] = 0xFFFFFFFF;
     #endif
     pinMode(_pin, INPUT);
     _active = false;
@@ -269,11 +269,11 @@ uint16_t nRF52Dshot::convertPpm(uint16_t ppm)
     #ifndef NRFDSHOT_SUPPORT_SPEED_1200
     const
     #endif
-    int32_t out_max =
+    int32_t out_max = (
     #ifdef NRFDSHOT_SUPPORT_SPEED_1200
         (_speed == DSHOT_SPEED_1200) ? 4095 :
     #endif
-        2047;
+        2047 ) - 48;
     NRFDSHOT_CONV_THROTTLE(ppm);
 }
 

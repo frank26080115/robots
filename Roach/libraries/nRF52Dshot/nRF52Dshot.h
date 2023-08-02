@@ -14,7 +14,7 @@
 enum
 {
     DSHOT_SPEED_150,  // not supported by AM32
-    DSHOT_SPEED_300,
+    DSHOT_SPEED_300,  // does not seem to work on AM32, even though it is supported
     DSHOT_SPEED_600,
     #ifdef NRFDSHOT_SUPPORT_SPEED_1200
     DSHOT_SPEED_1200, // not supported by AM32
@@ -41,7 +41,7 @@ enum
 class nRF52Dshot
 {
     public:
-        nRF52Dshot(int pin, uint8_t speed = DSHOT_SPEED_300, uint32_t interval = 10, NRF_PWM_Type* p_pwm = NULL, int8_t pwm_out = -1);
+        nRF52Dshot(int pin, uint8_t speed = DSHOT_SPEED_600, uint32_t interval = 10, NRF_PWM_Type* p_pwm = NULL, int8_t pwm_out = -1);
         void begin(void);
         void detach();                                    // release pin, to be used for serial port later
         void task(void);                                  // automatically sends packets at regular intervals

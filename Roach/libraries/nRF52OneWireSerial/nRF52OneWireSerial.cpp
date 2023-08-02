@@ -86,10 +86,10 @@ void nRF52OneWireSerial::listen(void)
 size_t nRF52OneWireSerial::write(uint8_t b)
 {
     #ifdef NRFOWS_USE_HW_SERIAL
-    pinMode(_pin, OUTPUT);
     _nrfUart->INTENCLR = UARTE_INTENCLR_ENDRX_Msk;
     _nrfUart->PSEL.RXD = 0xFFFFFFFF;
     _nrfUart->PSEL.TXD = _pin_hw;
+    pinMode(_pin, OUTPUT);
     #ifdef NRFOWS_USE_TWO_STOP_BITS
     _nrfUart->CONFIG = UARTE_CONFIG_STOP_Two << UARTE_CONFIG_STOP_Pos;
     #endif
@@ -184,10 +184,10 @@ size_t nRF52OneWireSerial::write(uint8_t b)
 size_t nRF52OneWireSerial::write(const uint8_t *buffer, size_t size)
 {
     #ifdef NRFOWS_USE_HW_SERIAL
-    pinMode(_pin, OUTPUT);
     _nrfUart->INTENCLR = UARTE_INTENCLR_ENDRX_Msk;
     _nrfUart->PSEL.RXD = 0xFFFFFFFF;
     _nrfUart->PSEL.TXD = _pin_hw;
+    pinMode(_pin, OUTPUT);
     #ifdef NRFOWS_USE_TWO_STOP_BITS
     _nrfUart->CONFIG = UARTE_CONFIG_STOP_Two << UARTE_CONFIG_STOP_Pos;
     #endif
