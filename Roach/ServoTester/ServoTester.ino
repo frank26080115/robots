@@ -6,6 +6,7 @@
 #include <RoachCmdLine.h>
 #include <RoachHeartbeat.h>
 #include <nRF52OneWireSerial.h>
+#include <nRF52UicrWriter.h>
 
 #define ROACHHW_PIN_LED_RED  3
 #define ROACHHW_PIN_LED_BLU  4
@@ -26,8 +27,10 @@ const uint8_t hb_longshort[] = { 0x42, 0x18, 0x00, };
 RoachHeartbeat hb = RoachHeartbeat(ROACHHW_PIN_LED_RED);
 
 void esclink_func(void* cmd, char* argstr, Stream* stream);
+void nfc_func(void* cmd, char* argstr, Stream* stream);
 const cmd_def_t cmds[] = {
     { "esclink", esclink_func },
+    { "nfc",     nfc_func },
     { "", NULL }, // end of table
 };
 
@@ -180,4 +183,25 @@ void esclink_func(void* cmd, char* argstr, Stream* stream)
 
     delay(500);
     NVIC_SystemReset();
+}
+
+void nfc_func(void* cmd, char* argstr, Stream* stream)
+{
+    if (nrfuw_uicrIsNfcEnabled())
+    {
+        Serial.println("NFC is enabled");
+        nrfuw_uicrDisableNfc();
+        if (nrfuw_uicrIsNfcEnabled() == false)
+        {
+            Serial.println("NFC has been disabled");
+        }
+        else
+        {
+            Serial.println("Failed to disable NFC");
+        }
+    }
+    else
+    {
+        Serial.println("NFC is disabled");
+    }
 }
