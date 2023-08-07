@@ -78,9 +78,7 @@ void setup()
     }
     cmdline_init();
 
-    drive_left.begin();
-    drive_right.begin();
-    weapon.begin();
+    
 
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
     imu.begin();
@@ -93,17 +91,19 @@ void setup()
 
 void loop()
 {
+    uint32_t now = millis();
     RoachWdt_feed();
     robot_tasks();
     if (radio.available())
     {
         // note: this should be every 10 milliseconds
-        
+        rfailsafe_feed(now);
     }
 }
 
 void robot_tasks()
 {
+    uint32_t now = millis();
     radio.task();
     nbtwi_task();
     imu.task();
@@ -111,4 +111,19 @@ void robot_tasks()
     cmdline_task();
     heartbeat_task();
     RoSync_task();
+    rfailsafe_task(now);
+}
+
+void onSafe()
+{
+    drive_left.begin();
+    drive_right.begin();
+    weapon.begin();
+}
+
+void onFail()
+{
+    drive_left.detach();
+    drive_right.detach();
+    weapon.detach();
 }
