@@ -20,6 +20,10 @@
 #define RHB_HW_PIN_NRFEXPR_LED_R 3
 #define RHB_HW_PIN_NRFEXPR_LED_B 4
 
+#define RHB_HW_PIN_XIAOBLE_LED_R 11
+#define RHB_HW_PIN_XIAOBLE_LED_G 13
+#define RHB_HW_PIN_XIAOBLE_LED_B 12
+
 //#define ROACHRGBLED_DEBUG
 //#define ROACHNEOPIX_DEBUG
 //#define ROACHRGBLED_BLOCKING
@@ -34,7 +38,7 @@
 #define RHB_HUE_BLUE      RHB_HUE_DEG(240)
 #define RHB_HUE_PURPLE    RHB_HUE_DEG(277)
 
-class RoachHeartbeat
+class RoachHeartbeat // single LED blinking engine
 {
     public:
         RoachHeartbeat(int pin);
@@ -52,10 +56,24 @@ class RoachHeartbeat
         int _ani_idx;
 };
 
-class RoachRgbLed
+class RoachRgbLed // used as indicator on SeeedStudio XIAO BLE
 {
     public:
-        RoachRgbLed(bool dotstar = true, int pind = RHB_HW_PIN_DOTSTAR_DAT, int pinc = RHB_HW_PIN_DOTSTAR_CLK, NRF_SPIM_Type* p_spi = NRF_SPIM2);
+        RoachRgbLed(int pin_r = RHB_HW_PIN_XIAOBLE_LED_R, int pin_g = RHB_HW_PIN_XIAOBLE_LED_G, int pin_b = RHB_HW_PIN_XIAOBLE_LED_B, bool active_high = false, bool pwm = false);
+        void begin(void);
+        void set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite = 0xFF, bool force = false);
+        void setRgb(uint32_t x, uint8_t brite = 0xFF, bool force = false);
+        void setHue(int32_t hue, uint8_t brite = 0xFF, bool force = false);
+    private:
+        bool _acthigh, _pwm;
+        int _pin_r, _pin_g, _pin_b;
+        uint8_t _r, _g, _b, _brite;
+};
+
+class RoachDotStar // used on Adafruit ItsyBitsy nRF52840
+{
+    public:
+        RoachDotStar(bool dotstar = true, int pind = RHB_HW_PIN_DOTSTAR_DAT, int pinc = RHB_HW_PIN_DOTSTAR_CLK, NRF_SPIM_Type* p_spi = NRF_SPIM2);
         void begin(void);
         void set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite = 0xFF, bool force = false);
         void setRgb(uint32_t x, uint8_t brite = 0xFF, bool force = false);
@@ -71,7 +89,7 @@ class RoachRgbLed
         uint8_t _buffer[ROACHRGBLED_BUFFER_SIZE];
 };
 
-class RoachNeoPixel
+class RoachNeoPixel // used on Adafruit Feather nRF52840
 {
     public:
         RoachNeoPixel(int pind = RHB_HW_PIN_NEOPIXEL, NRF_PWM_Type* p_pwm = NULL, int pwm_out = -1);

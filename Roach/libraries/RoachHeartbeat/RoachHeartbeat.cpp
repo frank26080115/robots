@@ -21,7 +21,118 @@ void RoachWdt_feed(void)
     NRF_WDT->RR[0] = NRF_WDT_RR_VALUE;
 }
 
-RoachRgbLed::RoachRgbLed(bool dotstar, int pind, int pinc, NRF_SPIM_Type* p_spi)
+RoachRgbLed::RoachRgbLed(int pin_r, int pin_g, int pin_b, bool active_high, bool pwm)
+{
+    _pin_r = pin_r;
+    _pin_g = pin_g;
+    _pin_b = pin_b;
+    _acthigh = active_high;
+    _pwm = pwm;
+}
+
+void RoachRgbLed::begin(void)
+{
+    if (_acthigh)
+    {
+        pinMode(_pin_r, OUTPUT);
+        pinMode(_pin_g, OUTPUT);
+        pinMode(_pin_b, OUTPUT);
+        digitalWrite(_pin_r, LOW);
+        digitalWrite(_pin_g, LOW);
+        digitalWrite(_pin_b, LOW);
+        if (_pwm)
+        {
+            analogWrite(_pin_r, 0);
+            analogWrite(_pin_g, 0);
+            analogWrite(_pin_b, 0);
+        }
+    }
+    else
+    {
+        if (_pwm)
+        {
+            pinMode(_pin_r, OUTPUT);
+            pinMode(_pin_g, OUTPUT);
+            pinMode(_pin_b, OUTPUT);
+            analogWrite(_pin_r, 0xFF);
+            analogWrite(_pin_g, 0xFF);
+            analogWrite(_pin_b, 0xFF);
+        }
+        else
+        {
+            pinMode(_pin_r, INPUT);
+            pinMode(_pin_g, INPUT);
+            pinMode(_pin_b, INPUT);
+        }
+    }
+}
+
+void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force)
+{
+    if (r == _r && g == _g && b == _b && brite == _brite && force == false)
+    {
+        // don't waste time setting the same colour
+        return;
+    }
+
+    _r = r;
+    _g = g;
+    _b = b;
+    _brite = brite;
+
+    if (brite <= 0)
+    {
+        r = 0;
+        g = 0;
+        b = 0;
+    }
+    else if (_pwm && brite < 255)
+    {
+        uint32_t r32 = r, g32 = g, b32 = b;
+        r32 *= brite;
+        g32 *= brite;
+        b32 *= brite;
+        r32 >>= 8; r = r32;
+        g32 >>= 8; g = g32;
+        b32 >>= 8; b = b32;
+    }
+
+    if (_acthigh)
+    {
+        if (_pwm)
+        {
+            analogWrite(_pin_r, r);
+            analogWrite(_pin_g, g);
+            analogWrite(_pin_b, b);
+        }
+        else
+        {
+            digitalWrite(_pin_r, r != 0 ? HIGH : LOW);
+            digitalWrite(_pin_g, g != 0 ? HIGH : LOW);
+            digitalWrite(_pin_b, b != 0 ? HIGH : LOW);
+        }
+    }
+    else
+    {
+        if (_pwm)
+        {
+            analogWrite(_pin_r, 0xFF - r);
+            analogWrite(_pin_g, 0xFF - g);
+            analogWrite(_pin_b, 0xFF - b);
+        }
+        else
+        {
+            pinMode(_pin_r, r == 0 ? INPUT : OUTPUT);
+            pinMode(_pin_g, g == 0 ? INPUT : OUTPUT);
+            pinMode(_pin_b, b == 0 ? INPUT : OUTPUT);
+            if (r) { digitalWrite(_pin_r, LOW); }
+            if (g) { digitalWrite(_pin_g, LOW); }
+            if (b) { digitalWrite(_pin_b, LOW); }
+        }
+    }
+}
+
+RoachDotStar::RoachDotStar(bool dotstar, int pind, int pinc, NRF_SPIM_Type* p_spi)
 {
     _spi = p_spi;
     _dotstar = dotstar;
@@ -62,7 +173,7 @@ RoachNeoPixel::RoachNeoPixel(int pind, NRF_PWM_Type* p_pwm, int pwm_out)
     _pwmout = pwm_out;
 }
 
-void RoachRgbLed::begin(void)
+void RoachDotStar::begin(void)
 {
     spiConfig();
 }
@@ -177,7 +288,7 @@ static void spi_handler(nrfx_spim_evt_t const * p_event, void * p_context)
 }
 #endif
 
-void RoachRgbLed::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force)
+void RoachDotStar::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool force)
 {
     if (r == _r && g == _g && b == _b && brite == _brite && force == false)
     {
@@ -390,7 +501,7 @@ void RoachNeoPixel::set(uint8_t r, uint8_t g, uint8_t b, uint8_t brite, bool for
     #endif
 }
 
-void RoachRgbLed::setRgb(uint32_t x, uint8_t brite, bool force)
+void RoachDotStar::setRgb(uint32_t x, uint8_t brite, bool force)
 {
     set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), brite, force);
 }
@@ -400,12 +511,22 @@ void RoachNeoPixel::setRgb(uint32_t x, uint8_t brite, bool force)
     set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), brite, force);
 }
 
-void RoachRgbLed::setHue(int32_t hue, uint8_t brite, bool force)
+void RoachRgbLed::setRgb(uint32_t x, uint8_t brite, bool force)
+{
+    set((uint8_t)((x & 0xFF0000) >> 16), (uint8_t)((x & 0xFF00) >> 8), (uint8_t)((x & 0xFF) >> 0), brite, force);
+}
+
+void RoachDotStar::setHue(int32_t hue, uint8_t brite, bool force)
 {
     setRgb((uint32_t)RoachHeartbeat_getRgbFromHue(hue), brite, force);
 }
 
 void RoachNeoPixel::setHue(int32_t hue, uint8_t brite, bool force)
+{
+    setRgb((uint32_t)RoachHeartbeat_getRgbFromHue(hue), brite, force);
+}
+
+void RoachRgbLed::setHue(int32_t hue, uint8_t brite, bool force)
 {
     setRgb((uint32_t)RoachHeartbeat_getRgbFromHue(hue), brite, force);
 }
@@ -453,7 +574,7 @@ uint32_t RoachHeartbeat_getRgbFromHue(int32_t h)
     return ret;
 }
 
-void RoachRgbLed::spiConfig(void)
+void RoachDotStar::spiConfig(void)
 {
     nrfx_spim_config_t cfg =
     {
@@ -497,10 +618,10 @@ void RoachRgbLed::spiConfig(void)
 
     #ifdef ROACHRGBLED_DEBUG
     if (ret == NRFX_SUCCESS) {
-        Serial.printf("RoachRgbLed initialized\r\n");
+        Serial.printf("RoachDotStar initialized\r\n");
     }
     else {
-        Serial.printf("RoachRgbLed initialization error 0x%08X\r\n", ret);
+        Serial.printf("RoachDotStar initialization error 0x%08X\r\n", ret);
     }
     #endif
 }
