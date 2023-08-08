@@ -1,5 +1,5 @@
-#ifndef _ROACHIMU_H_
-#define _ROACHIMU_H_
+#ifndef _ROACHIMU_BNO_H_
+#define _ROACHIMU_BNO_H_
 
 #include <Arduino.h>
 
@@ -80,15 +80,15 @@ typedef struct
 __attribute__ ((packed))
 euler_t;
 
-class RoachIMU
+class RoachIMU_BNO
 {
     public:
-        RoachIMU(int samp_interval   = 5000,
-                 int rd_interval     = 0,
-                 int orientation     = 0,
-                 int dev_addr        = BNO08x_I2CADDR_DEFAULT,
-                 int rst             = -1
-                );
+        RoachIMU_BNO(int samp_interval   = 5000,
+                     int rd_interval     = 0,
+                     int orientation     = 0,
+                     int dev_addr        = BNO08x_I2CADDR_DEFAULT,
+                     int rst             = -1
+                    );
         void begin(void);
         void task(void);
 

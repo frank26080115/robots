@@ -1,4 +1,5 @@
 #include "RoachIMU.h"
+#include "RoachIMU_BNO.h"
 #include <RoachLib.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +8,7 @@
 //#define ROACHIMU_ENABLE_DEBUG
 //#define ROACHIMU_REJECT_OUTLIERS
 
-static RoachIMU* instance = NULL;
+static RoachIMU_BNO* instance = NULL;
 
 static int  i2chal_write (sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
 static int  i2chal_read  (sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t *t_us);
@@ -26,7 +27,7 @@ static void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* y
 static void quaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees);
 static void quaternionToEulerGI(sh2_GyroIntegratedRV_t* rotational_vector, euler_t* ypr, bool degrees);
 
-RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int dev_addr, int rst)
+RoachIMU_BNO::RoachIMU_BNO(int samp_interval, int rd_interval, int orientation, int dev_addr, int rst)
 {
     sample_interval = samp_interval;
     read_interval = rd_interval;
@@ -37,7 +38,7 @@ RoachIMU::RoachIMU(int samp_interval, int rd_interval, int orientation, int dev_
     instance = this;
 }
 
-void RoachIMU::begin(void)
+void RoachIMU_BNO::begin(void)
 {
     hal.open = i2chal_open;
     hal.close = i2chal_close;
@@ -47,7 +48,7 @@ void RoachIMU::begin(void)
     state_machine = ROACHIMU_SM_SETUP;
 }
 
-void RoachIMU::task(void)
+void RoachIMU_BNO::task(void)
 {
     nbtwi_task();
 
@@ -438,7 +439,7 @@ void RoachIMU::task(void)
     }
 }
 
-void RoachIMU::pause_service(void)
+void RoachIMU_BNO::pause_service(void)
 {
     // finish up any on-going transactions and leave it in the done state
     while (state_machine >= ROACHIMU_SM_SVC_START && state_machine < ROACHIMU_SM_SVC_READ_DONE_LOOP) {
@@ -450,13 +451,13 @@ void RoachIMU::pause_service(void)
     #endif
 }
 
-void RoachIMU::tare(void)
+void RoachIMU_BNO::tare(void)
 {
     pause_service();
     sh2_setTareNow(0x07, (sh2_TareBasis_t)0x05); // tare all three axis, for gyro-integrated-RV
 }
 
-void RoachIMU::doMath(void)
+void RoachIMU_BNO::doMath(void)
 {
     #ifndef ROACHIMU_AUTO_MATH
     if (has_new)
@@ -573,10 +574,10 @@ void RoachIMU::doMath(void)
     }
 }
 
-bool RoachIMU::i2c_write(uint8_t* buf, int len)
+bool RoachIMU_BNO::i2c_write(uint8_t* buf, int len)
 {
     #ifdef ROACHIMU_ENABLE_DEBUG
-    //Serial.printf("RoachIMU::i2c_write %u\r\n", len);
+    //Serial.printf("RoachIMU_BNO::i2c_write %u\r\n", len);
     #endif
 
     pause_service();
@@ -606,10 +607,10 @@ bool RoachIMU::i2c_write(uint8_t* buf, int len)
     #endif
 }
 
-bool RoachIMU::i2c_read(uint8_t* buf, int len)
+bool RoachIMU_BNO::i2c_read(uint8_t* buf, int len)
 {
     #ifdef ROACHIMU_ENABLE_DEBUG
-    //Serial.printf("RoachIMU::i2c_read %u\r\n", len);
+    //Serial.printf("RoachIMU_BNO::i2c_read %u\r\n", len);
     #endif
 
     pause_service();
@@ -640,7 +641,7 @@ bool RoachIMU::i2c_read(uint8_t* buf, int len)
         nbtwi_readResult(rx_buff_i2c, len, true);
     }
     else {
-        Serial.printf("RoachIMU::i2c_read err no result\r\n");
+        Serial.printf("RoachIMU_BNO::i2c_read err no result\r\n");
         return false;
     }
     #endif
@@ -669,7 +670,7 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t
     // uint8_t *pBufferOrig = pBuffer;
 
     #ifdef ROACHIMU_ENABLE_DEBUG
-    Serial.printf("RoachIMU i2chal_read %u\r\n", len);
+    Serial.printf("RoachIMU_BNO i2chal_read %u\r\n", len);
     #endif
 
     uint8_t header[4];
@@ -736,7 +737,7 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t
 static int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len)
 {
     #ifdef ROACHIMU_ENABLE_DEBUG
-    Serial.printf("RoachIMU i2chal_write %u\r\n", len);
+    Serial.printf("RoachIMU_BNO i2chal_write %u\r\n", len);
     #endif
 
     size_t i2c_buffer_max = ROACHIMU_BUFF_TX_SIZE;
@@ -811,7 +812,7 @@ static void hal_sensorHandler(void *cookie, sh2_SensorEvent_t *event)
     instance->sensorHandler(event);
 }
 
-void RoachIMU::sensorHandler(sh2_SensorEvent_t* event)
+void RoachIMU_BNO::sensorHandler(sh2_SensorEvent_t* event)
 {
     int rc;
     rc = sh2_decodeSensorEvent(&sensor_value, event);
