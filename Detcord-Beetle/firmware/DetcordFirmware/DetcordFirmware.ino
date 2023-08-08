@@ -54,7 +54,7 @@ detcord_nvm_t nvm;
 RoachHeadingManager heading_mgr((uint32_t*)&(nvm.heading_timeout));
 
 RoachHeartbeat hb_red = RoachHeartbeat(DETCORDHW_PIN_LED);
-RoachRgbLed    hb_rgb = RoachRgbLed();
+RoachDotStar   hb_rgb = RoachDotStar();
 
 extern roach_nvm_gui_desc_t cfggroup_rf[];
 extern roach_nvm_gui_desc_t cfggroup_drive[];
@@ -90,6 +90,7 @@ void setup()
     radio.begin();
     radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 
+    PerfCnt_init();
     RoachWdt_init(500);
 
     rtmgr_init(10, 1000);
@@ -111,7 +112,9 @@ void robot_tasks(uint32_t now) // short tasks
     RoachUsbMsd_task();
     cmdline.task();
     heartbeat_task();
-    RoSync_task();
+    #ifdef PERFCNT_ENABLED
+    PerfCnt_task();
+    #endif
 }
 
 void rtmgr_taskPeriodic(bool has_cmd)
@@ -119,6 +122,10 @@ void rtmgr_taskPeriodic(bool has_cmd)
     if (has_cmd)
     {
         // TODO
+
+        RoSync_task(); // there's no point in calling this from robot_tasks, the radio telemetry transmissions only happen on successful reception
+        roachrobot_pipeCmdLine();
+        roachrobot_telemTask(); // this will fill out common fields in the telem packet and then send it off
     }
     mixer.mix(0, 0, 0); // TODO
     drive_left.writeMicroseconds(mixer.getLeft());

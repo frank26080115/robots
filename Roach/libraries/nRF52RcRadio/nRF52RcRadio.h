@@ -18,7 +18,7 @@ class nRF52RcRadio
         nRF52RcRadio  (bool is_tx); // constructor, selects if the role is transmitter or receiver
         void begin    (int fem_tx = -1, int fem_rx = -1);      // init hardware
         void config   (uint32_t chan_map, uint32_t uid, uint32_t salt); // provide channel map as a bitmask, unique identifier for pairing, and security salt
-        void send     (uint8_t* data);                         // queue data to be sent, and optionally: send immediately
+        void send     (uint8_t* data);                         // queue data to be sent
         int  available(void);                                  // check if new packet has been received
         int  read     (uint8_t* data);                         // copy the new packet to a buffer
         void task     (void);                                  // periodic task, call from loop()

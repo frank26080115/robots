@@ -8,13 +8,13 @@ extern RoachCmdLine cmdline;
 
 void roachrobot_init(void)
 {
-    roachnvm_buildrxcfggroup();
 }
 
 void roachrobot_telemTask(void)
 {
     telem_pkt.rssi = radio.getRssi();
     telem_pkt.chksum_nvm = nvm_checksum;
+    radio.send((uint8_t*)&telem_pkt); // radio is in RX mode, the telemetry will only actually be sent when requested
 }
 
 void roachrobot_pipeCmdLine(void)

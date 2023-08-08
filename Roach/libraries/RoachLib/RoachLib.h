@@ -22,10 +22,9 @@
 extern roach_nvm_gui_desc_t cfggroup_rf[];
 extern roach_nvm_gui_desc_t cfggroup_drive[];
 extern roach_nvm_gui_desc_t cfggroup_weap[];
-extern roach_nvm_gui_desc_t cfggroup_imu[];
+extern roach_nvm_gui_desc_t cfggroup_sensor[];
 
 int roachnvm_cntgroup(roach_nvm_gui_desc_t* g);
-void roachnvm_buildrxcfggroup(void);
 int roachnvm_rx_getcnt(void);
 roach_nvm_gui_desc_t* roachnvm_rx_getAt(int idx);
 

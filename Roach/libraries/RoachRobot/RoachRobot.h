@@ -17,6 +17,8 @@ extern uint32_t nvm_checksum;
 extern uint8_t* nvm_ptr8;
 extern uint32_t roachrobot_nvmSize;
 
+void roachrobot_init(void);
+
 void roachrobot_handleFileLoad(void* cmd, char* argstr, Stream* stream);
 void roachrobot_handleFileSave(void* cmd, char* argstr, Stream* stream);
 bool roachrobot_saveSettingsToFile(const char* fname, uint8_t* data);
@@ -26,5 +28,7 @@ bool roachrobot_saveSettings(uint8_t* data);
 void roachrobot_defaultSettings(uint8_t* data);
 
 void roachrobot_recalcChecksum(void);
+void roachrobot_pipeCmdLine(void);
+void roachrobot_telemTask(void);
 
 #endif

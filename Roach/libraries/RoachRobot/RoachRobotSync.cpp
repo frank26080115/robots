@@ -84,9 +84,9 @@ void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream)
         }
     }
     i++;
-    roachnvm_parseitem(nvm_ptr8, cfggroup_drive, argstr, &(argstr[i]));
-    roachnvm_parseitem(nvm_ptr8, cfggroup_weap,  argstr, &(argstr[i]));
-    roachnvm_parseitem(nvm_ptr8, cfggroup_imu,   argstr, &(argstr[i]));
+    roachnvm_parseitem(nvm_ptr8, cfggroup_drive , argstr, &(argstr[i]));
+    roachnvm_parseitem(nvm_ptr8, cfggroup_weap  , argstr, &(argstr[i]));
+    roachnvm_parseitem(nvm_ptr8, cfggroup_sensor, argstr, &(argstr[i]));
     roachrobot_lastUploadTime = millis();
     //roachrobot_recalcChecksum();
 }
