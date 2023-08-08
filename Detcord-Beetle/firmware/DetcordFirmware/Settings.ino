@@ -57,3 +57,13 @@ void settings_init(void)
     roachrobot_defaultSettings((uint8_t*)&nvm);
     roachrobot_loadSettings((uint8_t*)&nvm);
 }
+
+bool settings_save(void)
+{
+    return true;
+}
+
+void settings_factoryReset(void)
+{
+
+}

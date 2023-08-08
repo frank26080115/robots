@@ -1,11 +1,20 @@
 #include "RoachRobot.h"
 #include "RoachRobotPrivate.h"
+#include <RoachUsbMsd.h>
+
+#define ROACHROBOT_STARTUP_FILE_NAME "cfg.txt"
+
+uint32_t nvm_checksum;
+uint8_t* nvm_ptr8;
 
 void roachrobot_handleFileLoad(void* cmd, char* argstr, Stream* stream)
 {
     if (argstr[0] == 0)
     {
-        if (roachrobot_loadSettings()) {
+        if (nvm_ptr8 == NULL) {
+            stream->println("ERR: NVM structure pointer is null when loading");
+        }
+        else if (roachrobot_loadSettings(nvm_ptr8)) {
             stream->println("loaded startup file");
         }
         else {
@@ -14,7 +23,7 @@ void roachrobot_handleFileLoad(void* cmd, char* argstr, Stream* stream)
     }
     else
     {
-        if (roachrobot_loadSettingsFile(argstr)) {
+        if (roachrobot_loadSettingsFile(argstr, nvm_ptr8)) {
             stream->printf("loaded file %s\r\n", argstr);
         }
         else {
@@ -32,7 +41,10 @@ void roachrobot_handleFileSave(void* cmd, char* argstr, Stream* stream)
     }
     if (argstr[0] == 0)
     {
-        if (roachrobot_saveSettings()) {
+        if (nvm_ptr8 == NULL) {
+            stream->println("ERR: NVM structure pointer is null when saving");
+        }
+        else if (roachrobot_saveSettings(nvm_ptr8)) {
             stream->println("saved to startup file");
         }
         else {
@@ -41,7 +53,7 @@ void roachrobot_handleFileSave(void* cmd, char* argstr, Stream* stream)
     }
     else
     {
-        if (roachrobot_saveSettingsToFile(argstr)) {
+        if (roachrobot_saveSettingsToFile(argstr, nvm_ptr8)) {
             stream->printf("saved to %s\r\n", argstr);
         }
         else {
@@ -62,7 +74,7 @@ bool roachrobot_saveSettingsToFile(const char* fname, uint8_t* data)
         f.close();
         return true;
     }
-    return false
+    return false;
 }
 
 bool roachrobot_loadSettingsFile(const char* fname, uint8_t* data)
@@ -77,7 +89,7 @@ bool roachrobot_loadSettingsFile(const char* fname, uint8_t* data)
         f.close();
         return true;
     }
-    return false
+    return false;
 }
 
 bool roachrobot_loadSettings(uint8_t* data)

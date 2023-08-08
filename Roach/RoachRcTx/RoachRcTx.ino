@@ -8,6 +8,7 @@
 #include <RoachCmdLine.h>
 #include <RoachUsbMsd.h>
 #include <RoachPerfCnt.h>
+#include <RoachHeartbeat.h>
 #if defined(ESP32)
 #include <SPIFFS.h>
 #elif defined(NRF52840_XXAA)
@@ -77,16 +78,18 @@ bool weap_sw_warning = false;
 uint8_t encoder_mode = 0;
 bool pots_locked = false;
 
+RoachHeartbeat hb_red = RoachHeartbeat(ROACHHW_PIN_LED_RED);
+RoachHeartbeat hb_blu = RoachHeartbeat(ROACHHW_PIN_LED_BLU);
+
 void setup(void)
 {
     //sd_softdevice_disable();
     safeboot_check();
     //hw_bringup();
 
-    pinMode(ROACHHW_PIN_LED_RED, OUTPUT);
-    pinMode(ROACHHW_PIN_LED_BLU, OUTPUT);
-    digitalWrite(ROACHHW_PIN_LED_RED, HIGH);
-    digitalWrite(ROACHHW_PIN_LED_BLU, LOW);
+    RoachWdt_init(ROACH_WDT_TIMEOUT_MS);
+    hb_red.begin();
+    hb_blu.begin();
 
     nrf5rand_init(NRF5RAND_BUFF_SIZE, true, false);
     Serial.begin(115200);
@@ -140,6 +143,7 @@ void ctrler_tasks(void)
 {
     //uint32_t now = millis();
     PerfCnt_task();
+    RoachWdt_feed();
     RoachButton_allTask();
     RoachPot_allTask(); // polls ADCs non-blocking
     // TODO: buttons are using interrupts only, no tasks, but check reliability
@@ -148,6 +152,7 @@ void ctrler_tasks(void)
 
     if (radio.isBusy()) // if the transmission is happening, then we have time to do extra stuff
     {
+        heartbeat_task();
         RoachEnc_task();     // transfers hardware values to RAM atomically
         nrf5rand_task();     // collect random numbers from RNG
         rosync_task();       // checks for robot synchronization

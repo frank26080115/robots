@@ -3,6 +3,7 @@
 #include <RoachLib.h>
 #include <nRF52RcRadio.h>
 #include <RoachRobot.h>
+#include <RoachRobotTaskManager.h>
 #include <RoachCmdLine.h>
 #include <RoachUsbMsd.h>
 #include <RoachPerfCnt.h>
@@ -44,20 +45,18 @@ RoachIMU imu(5000, 0, 0, BNO08x_I2CADDR_DEFAULT, -1);
 
 extern roach_nvm_gui_desc_t nvm_desc[];
 roach_rf_nvm_t nvm_rf;
-detcord_nvm_t nvm_robot;
+detcord_nvm_t nvm;
 
-RoachHeadingManager heading_mgr((uint32_t*)&(nvm_robot.heading_timeout));
+RoachHeadingManager heading_mgr((uint32_t*)&(nvm.heading_timeout));
 
 RoachHeartbeat hb_red = RoachHeartbeat(DETCORDHW_PIN_LED);
 RoachRgbLed    hb_rgb = RoachRgbLed();
 
-detcord_nvm_t nvm;
-roach_rf_nvm_t nvm_rf;
-extern roach_nvm_gui_desc_t cfggroup_rf[]
+extern roach_nvm_gui_desc_t cfggroup_rf[];
 extern roach_nvm_gui_desc_t cfggroup_drive[];
 extern roach_nvm_gui_desc_t cfggroup_weap[];
 extern roach_nvm_gui_desc_t cfggroup_sensor[];
-roach_nvm_gui_desc_t** cfggroup_rxall = {
+roach_nvm_gui_desc_t* cfggroup_rxall[] = {
     (roach_nvm_gui_desc_t*)cfggroup_rf,
     (roach_nvm_gui_desc_t*)cfggroup_drive,
     (roach_nvm_gui_desc_t*)cfggroup_weap,
@@ -76,9 +75,6 @@ void setup()
     {
         RoachUsbMsd_presentUsbMsd();
     }
-    cmdline_init();
-
-    
 
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
     imu.begin();
@@ -87,6 +83,8 @@ void setup()
     radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 
     RoachWdt_init(500);
+
+    rtmgr_init(10, 1000);
 }
 
 void loop()
@@ -94,11 +92,7 @@ void loop()
     uint32_t now = millis();
     RoachWdt_feed();
     robot_tasks();
-    if (radio.available())
-    {
-        // note: this should be every 10 milliseconds
-        rfailsafe_feed(now);
-    }
+    rtmgr_task(millis());
 }
 
 void robot_tasks()
@@ -108,22 +102,45 @@ void robot_tasks()
     nbtwi_task();
     imu.task();
     RoachUsbMsd_task();
-    cmdline_task();
+    cmdline.task();
     heartbeat_task();
     RoSync_task();
-    rfailsafe_task(now);
 }
 
-void onSafe()
+void rtmgr_taskPeriodic(bool has_cmd)
 {
-    drive_left.begin();
-    drive_right.begin();
-    weapon.begin();
+    if (has_cmd)
+    {
+
+    }
 }
 
-void onFail()
+void rtmgr_onPreFailed(void)
 {
-    drive_left.detach();
-    drive_right.detach();
-    weapon.detach();
+
+}
+
+void rtmgr_taskPreFailed(void)
+{
+
+}
+
+void rtmgr_onPostFailed(void)
+{
+
+}
+
+void rtmgr_taskPostFailed(void)
+{
+
+}
+
+void rtmgr_onSafe(bool full_init)
+{
+    if (full_init)
+    {
+        drive_left.begin();
+        drive_right.begin();
+        weapon.begin();
+    }
 }

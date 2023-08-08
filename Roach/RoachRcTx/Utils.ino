@@ -83,3 +83,8 @@ void waitFor(uint32_t x)
         ctrler_tasks();
     }
 }
+
+float batt_get(void)
+{
+    return 0;
+}

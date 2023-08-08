@@ -19,10 +19,12 @@ void EscLink(void)
     esc_link = new nRF52OneWireSerial(DETCORDHW_PIN_SERVO_WEAP, baud);
     #endif
 
+    esc_link->begin();
+
     // this loop will not service anything unnecessary, and the robot needs to be rebooted
     while (true)
     {
-        esc_link.echo(&Serial, true);
+        esc_link->echo(&Serial, true);
         heartbeat_task();
         RoachWdt_feed();
     }
