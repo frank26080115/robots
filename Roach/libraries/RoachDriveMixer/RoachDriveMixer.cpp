@@ -88,7 +88,7 @@ RoachVirtualHeading::RoachVirtualHeading(void)
 {
 }
 
-int32_t track(int32_t left, int32_t right)
+int32_t RoachVirtualHeading::track(int32_t left, int32_t right)
 {
     uint32_t now = millis();
     if ((now - _last_time) < 10) {
@@ -147,7 +147,7 @@ void RoachVirtualHeading::applyAccel(int32_t in, int32_t* outp)
         out += cfg->accel;
         out = out > in ? in : out;
     }
-    else if (in >= 0 && outp < in)
+    else if (in >= 0 && out < in)
     {
         out -= cfg->deccel;
         out = out < in ? in : out;

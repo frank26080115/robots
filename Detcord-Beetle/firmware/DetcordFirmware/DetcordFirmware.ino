@@ -10,6 +10,8 @@
 #include <RoachServo.h>
 #include <nRF52Dshot.h>
 #include <RoachIMU.h>
+#include <RoachPID.h>
+#include <RoachDriveMixer.h>
 #include <RoachHeartbeat.h>
 #include <RoachHeadingManager.h>
 #include <nRF52OneWireSerial.h>
@@ -42,6 +44,8 @@ RoachServo drive_right(DETCORDHW_PIN_SERVO_DRV_R);
     weapon(DETCORDHW_PIN_SERVO_WEAP);
 
 RoachIMU imu(5000, 0, 0, BNO08x_I2CADDR_DEFAULT, -1);
+RoachPID pid;
+RoachDriveMixer mixer;
 
 extern roach_nvm_gui_desc_t nvm_desc[];
 roach_rf_nvm_t nvm_rf;
@@ -79,6 +83,10 @@ void setup()
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
     imu.begin();
 
+    pid.cfg = &(nvm.pid_heading);
+    mixer.cfg_left = &(nvm.drive_left);
+    mixer.cfg_right = &(nvm.drive_right);
+
     radio.begin();
     radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 
@@ -91,13 +99,12 @@ void loop()
 {
     uint32_t now = millis();
     RoachWdt_feed();
-    robot_tasks();
-    rtmgr_task(millis());
+    robot_tasks(now); // short tasks
+    rtmgr_task(now); // this will: call 10ms periodic task, and handle failsafe events
 }
 
-void robot_tasks()
+void robot_tasks(uint32_t now) // short tasks
 {
-    uint32_t now = millis();
     radio.task();
     nbtwi_task();
     imu.task();
@@ -111,28 +118,36 @@ void rtmgr_taskPeriodic(bool has_cmd)
 {
     if (has_cmd)
     {
-
+        // TODO
     }
+    mixer.mix(0, 0, 0); // TODO
+    drive_left.writeMicroseconds(mixer.getLeft());
+    drive_right.writeMicroseconds(mixer.getRight());
 }
 
 void rtmgr_onPreFailed(void)
 {
-
+    mixer.mix(0, 0, 0);
+    drive_left.writeMicroseconds(mixer.getLeft());
+    drive_right.writeMicroseconds(mixer.getRight());
+    weapon.setThrottle(0);
 }
 
 void rtmgr_taskPreFailed(void)
 {
-
+    // do nothing
 }
 
 void rtmgr_onPostFailed(void)
 {
-
+    drive_left.detach();
+    drive_right.detach();
+    weapon.detach();
 }
 
 void rtmgr_taskPostFailed(void)
 {
-
+    // do nothing
 }
 
 void rtmgr_onSafe(bool full_init)
@@ -142,5 +157,12 @@ void rtmgr_onSafe(bool full_init)
         drive_left.begin();
         drive_right.begin();
         weapon.begin();
+    }
+    else
+    {
+        mixer.mix(0, 0, 0);
+        drive_left.writeMicroseconds(mixer.getLeft());
+        drive_right.writeMicroseconds(mixer.getRight());
+        weapon.setThrottle(0);
     }
 }
