@@ -45,12 +45,12 @@ class nRF52Dshot
         void begin(void);
         void detach();                                    // release pin, to be used for serial port later
         void task(void);                                  // automatically sends packets at regular intervals
-        void setThrottle(uint16_t t, bool sync = false);  // sets the throttle value to be sent periodically
+        void setThrottle(uint16_t t, bool sync = false);  // sets the throttle value to be sent periodically, 0 to 1999 (or 0 to 4047 for DSHOT1200)
         void sendCmd(uint16_t cmd, uint8_t cnt = 1);      // sends a DSHOT command, optionally repeat
         void sendNow(void);                               // send the next packet right now;
         void pwmConfig(void);                             // configures the PWM generator
-        uint16_t convertPpm(uint16_t ppm);                // convert a 1000-2000 PPM value to 0 to 2047 for DSHOT (or 0 to 4095 for DSHOT1200)
-        void writeMicroseconds(uint16_t us);              // compatible with the Servo library
+        uint16_t convertPpm(uint16_t ppm);                // convert a 1000-2000 PPM value to 48 to 2047 for DSHOT (or 48 to 4095 for DSHOT1200)
+        void writeMicroseconds(uint16_t us);              // compatible with the Servo library, units 1000-2000
 
     private:
         int _pin; uint8_t _speed; uint32_t _interval; bool _active;

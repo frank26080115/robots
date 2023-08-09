@@ -7,6 +7,7 @@
 #include <RoachCmdLine.h>
 #include <RoachUsbMsd.h>
 #include <RoachPerfCnt.h>
+#include <RoachPot.h>
 #include <RoachServo.h>
 #include <nRF52Dshot.h>
 #include <RoachIMU.h>
@@ -34,7 +35,7 @@ nRF52RcRadio radio = nRF52RcRadio(false);
 roach_ctrl_pkt_t  rx_pkt    = {0};
 roach_telem_pkt_t telem_pkt = {0};
 
-RoachServo drive_left(DETCORDHW_PIN_SERVO_DRV_L);
+RoachServo drive_left (DETCORDHW_PIN_SERVO_DRV_L);
 RoachServo drive_right(DETCORDHW_PIN_SERVO_DRV_R);
 #ifdef USE_DSHOT
     nRF52Dshot
@@ -52,6 +53,8 @@ RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ);
 
 RoachPID pid;
 RoachDriveMixer mixer;
+
+RoachPot battery(DETCORDHW_PIN_ADC_BATT);
 
 extern roach_nvm_gui_desc_t nvm_desc[];
 roach_rf_nvm_t nvm_rf;
@@ -94,6 +97,8 @@ void setup()
         RoachUsbMsd_presentUsbMsd();
     }
 
+    battery.begin();
+
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
     imu.begin();
 
@@ -126,6 +131,8 @@ void robot_tasks(uint32_t now) // short tasks
     RoachUsbMsd_task();
     cmdline.task();
     heartbeat_task();
+    RoachPot_allTask();
+    settings_task();
     #ifdef PERFCNT_ENABLED
     PerfCnt_task();
     #endif
@@ -137,27 +144,51 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         radio.read((uint8_t*)&rx_pkt);
     }
 
-    if (imu.isReady() == false || imu.hasFailed()) {
-        heading_mgr.setReset();
-    }
-    #ifndef ROACHIMU_AUTO_MATH
-    else if (imu.hasNew(false)) {
-        imu.doMath();
-    }
-    #endif
-    heading_mgr.task(&rx_pkt, imu.heading, radio.getSessionId());
+    int32_t gyro_corr = 0;
+    if ((rx_pkt.flags & ROACHPKTFLAG_GYROACTIVE) != 0)
+    {
+        if (imu.isReady() == false || imu.hasFailed()) {
+            heading_mgr.setReset();
+            pid.reset();
+        }
+        #ifndef ROACHIMU_AUTO_MATH
+        else if (imu.hasNew(false)) {
+            imu.doMath();
+        }
+        #endif
+        heading_mgr.task(&rx_pkt, imu.heading, radio.getSessionId());
 
-    int32_t gyro_corr = pid.compute(heading_mgr.getCurHeading(), heading_mgr.getTgtHeading());
+        gyro_corr = pid.compute(heading_mgr.getCurHeading(), heading_mgr.getTgtHeading());
+    }
+    else
+    {
+        gyro_corr = 0;
+        heading_mgr.setReset();
+        pid.reset();
+    }
 
     mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
     drive_left.writeMicroseconds(mixer.getLeft());
     drive_right.writeMicroseconds(mixer.getRight());
+
+    if ((rx_pkt.flags & ROACHPKTFLAG_WEAPON) != 0)
+    {
+        weapon.writeMicroseconds(rx_pkt.weapon);
+    }
+    else
+    {
+        weapon.setThrottle(0);
+    }
+    #ifdef USE_DSHOT
+    weapon.task();
+    #endif
 
     if (has_cmd)
     {
         RoSync_task(); // there's no point in calling this from robot_tasks, the radio telemetry transmissions only happen on successful reception
         roachrobot_pipeCmdLine();
 
+        telem_pkt.battery = roach_value_map(battery.getAdcFiltered(), 0, DETCORDHW_BATT_ADC_4200MV, 0, 4200, false);
         telem_pkt.heading = (imu.isReady() == false) ? ROACH_HEADING_INVALID_NOTREADY : ((imu.hasFailed()) ? ROACH_HEADING_INVALID_HASFAILED : ((uint16_t)lround(imu.heading + 180)));
         roachrobot_telemTask(); // this will fill out common fields in the telem packet and then send it off
     }
@@ -165,6 +196,8 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
 
 void rtmgr_onPreFailed(void)
 {
+    heading_mgr.setReset();
+    pid.reset();
     mixer.mix(0, 0, 0);
     drive_left.writeMicroseconds(mixer.getLeft());
     drive_right.writeMicroseconds(mixer.getRight());
@@ -173,7 +206,10 @@ void rtmgr_onPreFailed(void)
 
 void rtmgr_taskPreFailed(void)
 {
-    // do nothing
+    #ifdef USE_DSHOT
+    weapon.task();
+    #endif
+    RoSync_task();
 }
 
 void rtmgr_onPostFailed(void)
@@ -185,7 +221,7 @@ void rtmgr_onPostFailed(void)
 
 void rtmgr_taskPostFailed(void)
 {
-    // do nothing
+    RoSync_task();
 }
 
 void rtmgr_onSafe(bool full_init)
@@ -196,12 +232,10 @@ void rtmgr_onSafe(bool full_init)
         drive_right.begin();
         weapon.begin();
     }
-    else
-    {
-        mixer.mix(0, 0, 0);
-        drive_left.writeMicroseconds(mixer.getLeft());
-        drive_right.writeMicroseconds(mixer.getRight());
-        weapon.setThrottle(0);
-    }
+    mixer.mix(0, 0, 0);
+    drive_left.writeMicroseconds(mixer.getLeft());
+    drive_right.writeMicroseconds(mixer.getRight());
+    weapon.setThrottle(0);
     heading_mgr.setReset();
+    pid.reset();
 }

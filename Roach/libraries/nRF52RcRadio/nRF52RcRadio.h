@@ -59,7 +59,7 @@ class nRF52RcRadio
         inline uint32_t* getRxErrStat(void) { return _stat_rx_errs; };
         #endif
 
-        void contTxTest(uint16_t f, bool mod); // continuous transmission test, modulated or unmodulated carrier
+        void contTxTest(uint16_t f, bool mod, void(*loop_cb)(void) = NULL); // continuous transmission test, modulated or unmodulated carrier
 
     private:
         bool     _is_tx; // role

@@ -5,6 +5,7 @@ void waitFor(uint32_t x)
     while (((now = millis()) - tstart) < x)
     {
         yield();
+        RoachWdt_feed();
         robot_tasks(now);
     }
 }

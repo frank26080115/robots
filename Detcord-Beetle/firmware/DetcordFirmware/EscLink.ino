@@ -8,6 +8,14 @@ void EscLink(void)
 {
     static nRF52OneWireSerial* esc_link;
 
+    rtmgr_permEnd();
+    while (rtmgr_hasEnded() != 2)
+    {
+        heartbeat_task();
+        RoachWdt_feed();
+        rtmgr_task(millis());
+    }
+
     weapon.detach();
 
     const int baud = 19200;

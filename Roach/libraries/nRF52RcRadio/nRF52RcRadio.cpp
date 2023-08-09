@@ -1488,7 +1488,7 @@ void nRF52RcRadio::resume(void)
     _statemachine_next = _statemachine;
 }
 
-void nRF52RcRadio::contTxTest(uint16_t freq, bool mod)
+void nRF52RcRadio::contTxTest(uint16_t freq, bool mod, void(*loop_cb)(void))
 {
     pause();
     FEM_TX();
@@ -1504,5 +1504,8 @@ void nRF52RcRadio::contTxTest(uint16_t freq, bool mod)
     NRF_RADIO->TASKS_TXEN = 1;
     while (NRF_RADIO->STATE != RADIO_STATE_STATE_Tx && NRF_RADIO->STATE != RADIO_STATE_STATE_TxRu && NRF_RADIO->STATE != RADIO_STATE_STATE_TxIdle) {
         yield();
+        if (loop_cb) {
+            loop_cb();
+        }
     }
 }

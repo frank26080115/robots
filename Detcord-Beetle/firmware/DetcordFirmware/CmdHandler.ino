@@ -11,6 +11,11 @@ const cmd_def_t cmds[] = {
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
     { "save"        , save_func },
+    { "esclink"     , esclink_func },
+    { "readbatt"    , readbatt_func },
+    { "readimu"     , readimu_func },
+    { "rtmgrsim"    , rtmgrsim_func },
+    { "rtmgrend"    , rtmgrend_func },
     { "", NULL }, // end of table
 };
 
@@ -82,7 +87,8 @@ void conttx_func(void* cmd, char* argstr, Stream* stream)
 {
     int f = atoi(argstr);
     stream->printf("RF cont-tx test f=%d\r\n", f);
-    radio.contTxTest(f, false);
+    radio.contTxTest(f, false, RoachWdt_feed());
+    // this is blocking forever, requires power-down to stop
 }
 
 void regenrf_func(void* cmd, char* argstr, Stream* stream)
@@ -95,4 +101,49 @@ void regenrf_func(void* cmd, char* argstr, Stream* stream)
 void readrf_func(void* cmd, char* argstr, Stream* stream)
 {
     stream->printf("RF params: 0x%08X 0x%08X 0x%08X\r\n", nvm_rf.uid, nvm_rf.salt, nvm_rf.chan_map);
+}
+
+void esclink_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("ESC Link active\r\n");
+    EscLink();
+}
+
+void readbatt_func(void* cmd, char* argstr, Stream* stream)
+{
+    bool forever = atoi(argstr);
+    do
+    {
+        RoachPot_allTask();
+        stream->printf("[%u] BATT: %u\r\n", millis(), battery.getAdcFiltered());
+        if (forever) {
+            waitFor(250);
+        }
+    }
+    while (forever);
+}
+
+void readimu_func(void* cmd, char* argstr, Stream* stream)
+{
+    bool forever = atoi(argstr);
+    do
+    {
+        nbtwi_task();
+        imu.task();
+        stream->printf("[%u] ROLL: %4.1f    PITCH: %4.1f    YAW: %4.1f\r\n", millis(), imu.euler.roll, imu.euler.pitch, imu.euler.yaw);
+        if (forever) {
+            waitFor(250);
+        }
+    }
+    while (forever);
+}
+
+void rtmgrsim_func(void* cmd, char* argstr, Stream* stream)
+{
+    
+}
+
+void rtmgrend_func(void* cmd, char* argstr, Stream* stream)
+{
+    
 }

@@ -67,3 +67,7 @@ void settings_factoryReset(void)
 {
 
 }
+
+void settings_task(void)
+{
+}

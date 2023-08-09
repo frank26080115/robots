@@ -70,19 +70,20 @@ void RoachPot::task(void)
 
     int32_t x32 = x;
     last_adc_raw = x32;
-
-    #if 1
-    // ability to run without a config
-    if (cfg == NULL) {
-        last_adc = x32;
-        last_val = x32;
-        return;
+    uint16_t filter_const = 0;
+    if (cfg != NULL) {
+        if (cfg->filter != 0)
+        {
+            filter_const = cfg->filter;
+        }
     }
-    #endif
+    if (filter_const == 0) {
+        filter_const = alt_filter;
+    }
 
-    if (cfg->filter != 0)
+    if (filter_const != 0)
     {
-        int32_t filtered = roach_lpf(x32, last_adc_filter, cfg->filter);
+        int32_t filtered = roach_lpf(x32, last_adc_filter, filter_const);
         last_adc_filter = filtered;
         last_adc = roach_reduce_to_scale(filtered);
     }
@@ -90,6 +91,14 @@ void RoachPot::task(void)
     {
         last_adc = x32;
     }
+
+    #if 1
+    // ability to run without a config
+    if (cfg == NULL) {
+        last_val = last_adc;
+        return;
+    }
+    #endif
 
     x32 = last_adc;
     if (state_machine == ROACHPOT_SM_CALIB_CENTER)

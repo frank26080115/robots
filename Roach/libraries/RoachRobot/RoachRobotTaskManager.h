@@ -12,5 +12,8 @@ extern void rtmgr_taskPeriodic(bool has_cmd);
 
 void rtmgr_init(uint32_t intv, uint32_t timeout);
 void rtmgr_task(uint32_t now);
+void rtmgr_permEnd(void);
+uint8_t rtmgr_hasEnded(void);
+void rtmgr_setSimulation(bool);
 
 #endif

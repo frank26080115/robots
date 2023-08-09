@@ -28,10 +28,12 @@ class RoachPot
         void calib_limits(void);
         void calib_stop(void);
         void simulate(int x);
+        void setFilter(float
         void prep(void);
         bool has_new;
         bool calib_done;
-        roach_nvm_pot_t* cfg;
+        roach_nvm_pot_t* cfg = NULL;
+        int32_t alt_filter = 0;
 
     private:
         uint8_t state_machine;
