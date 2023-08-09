@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include <RoachLib.h>
+#include "RoachMahony.h"
 
 #if defined(ESP32)
 #error ESP32 not supported for LSM6DS3
@@ -23,75 +24,44 @@
 #define ROACHIMU_DEF_PIN_INT 18
 
 #define ROACHIMU_EXTRA_DATA
-#define ROACHIMU_AUTO_MATH
-
-typedef struct
-{
-    int cargo_remaining;
-    int cargo_read_amount;
-    bool first_read;
-    int read_size;
-}
-svc_state_t;
 
 enum
 {
     ROACHIMU_SM_SETUP,
+    ROACHIMU_SM_SETUP_WAIT,
     ROACHIMU_SM_RUN,
+    ROACHIMU_SM_RUN_WAIT,
     ROACHIMU_SM_ERROR,
-    ROACHIMU_SM_ERROR_WAIT,
 };
 
-class RoachIMU_LSM
+class RoachIMU_LSM : public RoachIMU_Common
 {
     public:
-        RoachIMU_LSM(int samp_interval   = 5000,
-                     int rd_interval     = 0,
-                     int orientation     = 0,
+        RoachIMU_LSM(int orientation     = 0,
                      int dev_addr        = LSM6DS3_I2CADDR_DEFAULT,
+                     int pwr_pin         = ROACHIMU_DEF_PIN_PWR,
+                     int irq_pin         = ROACHIMU_DEF_PIN_INT
                     );
-        void begin(void);
-        void task(void);
+        virtual void begin(void);
+        virtual void task(void);
 
-        bool is_ready;
-        bool has_new;
-        bool is_inverted;
-        float heading;
-        uint8_t install_orientation;
-        int total_cnt = 0;
-
-        void pause_service(void);
-        void doMath(void);
         void tare(void);
 
-        // hasFailed will indicate if the IMU is reliable, this should be permanent and not recoverable
-        inline bool hasFailed(void) { return fail_cnt > 3 || perm_fail > 3; };
-
-        inline uint32_t totalFails(void) { return total_fails; };
-        inline uint32_t getTotal(void) { return total_cnt; };
-
-        // error occured signals that the heading track reference needs to be reset
-        inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x || hasFailed(); };
-
-        euler_t euler;
-
-        uint8_t state_machine;
-        int pin_sda, pin_scl, pin_rst;
+    protected:
+        virtual void writeEuler(euler_t*);
 
     private:
+        RoachMahony* ahrs;
         #if defined(ESP32)
         nbe_i2c_t nbe_i2c;
         #elif defined(NRF52840_XXAA)
         #endif
         uint8_t i2c_addr;
+        uint8_t tx_buff[64];
+        uint8_t rx_buff[64];
         uint8_t init_idx;
         uint32_t sample_time, read_time, error_time;
-        int sample_interval, read_interval, calc_interval;
-        int err_cnt, fail_cnt = 0, total_fails = 0, rej_cnt = 0;
-        bool err_occured = false;
-        int perm_fail = 0;
-
-        euler_t* euler_filter = NULL;
+        int pin_irq, pin_pwr;
 };
 
 #endif

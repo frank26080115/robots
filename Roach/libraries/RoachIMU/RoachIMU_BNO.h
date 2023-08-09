@@ -25,7 +25,6 @@
 #define ROACHIMU_DEF_PIN_SCL 23
 
 #define ROACHIMU_EXTRA_DATA
-#define ROACHIMU_AUTO_MATH
 
 typedef struct
 {
@@ -58,29 +57,7 @@ enum
     ROACHIMU_SM_ERROR_WAIT,
 };
 
-enum
-{
-    ROACHIMU_ORIENTATION_XYZ = 0,
-    ROACHIMU_ORIENTATION_XZY,
-    ROACHIMU_ORIENTATION_YZX,
-    ROACHIMU_ORIENTATION_YXZ,
-    ROACHIMU_ORIENTATION_ZXY,
-    ROACHIMU_ORIENTATION_ZYX,
-    ROACHIMU_ORIENTATION_FLIP_ROLL  = 0x80,
-    ROACHIMU_ORIENTATION_FLIP_PITCH = 0x40,
-    //ROACHIMU_ORIENTATION_FLIP_YAW   = 0x20,
-};
-
-typedef struct
-{
-    float yaw;
-    float pitch;
-    float roll;
-}
-__attribute__ ((packed))
-euler_t;
-
-class RoachIMU_BNO
+class RoachIMU_BNO : public RoachIMU_Common
 {
     public:
         RoachIMU_BNO(int samp_interval   = 5000,
@@ -89,36 +66,19 @@ class RoachIMU_BNO
                      int dev_addr        = BNO08x_I2CADDR_DEFAULT,
                      int rst             = -1
                     );
-        void begin(void);
-        void task(void);
-
-        bool is_ready;
-        bool has_new;
-        bool is_inverted;
-        float heading;
-        uint8_t install_orientation;
-        int total_cnt = 0;
+        virtual void begin(void);
+        virtual void task(void);
 
         void pause_service(void);
-        void doMath(void);
         void tare(void);
-
-        // hasFailed will indicate if the IMU is reliable, this should be permanent and not recoverable
-        inline bool hasFailed(void) { return fail_cnt > 3 || perm_fail > 3; };
-
-        inline uint32_t totalFails(void) { return total_fails; };
-        inline uint32_t getTotal(void) { return total_cnt; };
-
-        // error occured signals that the heading track reference needs to be reset
-        inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x || hasFailed(); };
 
         bool i2c_write(uint8_t* buf, int len);
         bool i2c_read (uint8_t* buf, int len);
         void sensorHandler(sh2_SensorEvent_t*);
 
+        int pin_rst;
         bool reset_occured;
         sh2_GyroIntegratedRV_t girv;
-        euler_t euler;
         sh2_ProductIds_t prodIds;
         #ifdef ROACHIMU_EXTRA_DATA
         sh2_Accelerometer_t accelerometer;
@@ -128,28 +88,22 @@ class RoachIMU_BNO
         sh2_RawGyroscope_t gyroscopeRaw;
         #endif
 
-        uint8_t state_machine;
-        int pin_sda, pin_scl, pin_rst;
+    protected:
+        virtual void writeEuler(euler_t*);
 
     private:
         #if defined(ESP32)
         nbe_i2c_t nbe_i2c;
         #elif defined(NRF52840_XXAA)
         #endif
-        uint8_t i2c_addr;
+
         sh2_Hal_t hal;
         svc_state_t svc_reader;
         uint8_t tx_buff[ROACHIMU_BUFF_TX_SIZE];
         uint8_t rx_buff_i2c[ROACHIMU_BUFF_RX_SIZE]; // used by the nbe library, raw single i2c transaction data
         uint8_t rx_buff_sh2[ROACHIMU_BUFF_RX_SIZE]; // used by the sh2 library, assembled packets
         int     rx_buff_wptr;                       // write pointer for rx_buff_sh2
-        uint32_t sample_time, read_time, error_time;
-        int sample_interval, read_interval, calc_interval;
-        int err_cnt, fail_cnt = 0, total_fails = 0, rej_cnt = 0;
-        bool err_occured = false;
-        int perm_fail = 0;
-
-        euler_t* euler_filter = NULL;
+        int read_interval;
         sh2_SensorValue_t sensor_value;
 };
 

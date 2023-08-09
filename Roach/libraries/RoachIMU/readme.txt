@@ -1,6 +1,6 @@
 =Roach IMU=
 
-Library to use a BNO085 IMU for purposes related to a combat robot RC receiver.
+Library to use a BNO085 or LSM6DS3 IMU for purposes related to a combat robot RC receiver.
 
 3rd party code:
 

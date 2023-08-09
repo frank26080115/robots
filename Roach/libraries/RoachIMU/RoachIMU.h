@@ -8,6 +8,8 @@
 #define ROACHIMU_USE_BNO085
 //#define ROACHIMU_USE_LSM6DS3
 
+//#define ROACHIMU_AUTO_MATH
+
 enum
 {
     ROACHIMU_ORIENTATION_XYZ = 0,
@@ -29,6 +31,46 @@ typedef struct
 }
 __attribute__ ((packed))
 euler_t;
+
+class RoachIMU_Common
+{
+    public:
+        virtual void begin(void);
+        virtual void task(void);
+
+        // hasFailed will indicate if the IMU is reliable, this should be permanent and not recoverable
+        inline bool hasFailed(void) { return fail_cnt > 3 || perm_fail > 3; };
+        inline bool isReady  (void) { return is_ready; };
+        inline bool hasNew(bool clr) { bool x = has_new; if (clr) { has_new = false; } return x; };
+
+        inline uint32_t totalFails(void) { return total_fails; };
+        inline uint32_t getTotal(void) { return total_cnt; };
+
+        // error occured signals that the heading track reference needs to be reset
+        inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x || hasFailed(); };
+
+        void doMath(void);
+
+        euler_t euler;
+        bool has_new;
+        bool is_ready;
+        bool is_inverted;
+        float heading;
+        uint8_t install_orientation;
+        int total_cnt = 0;
+
+    protected:
+        virtual void writeEuler(euler_t*);
+        uint8_t i2c_addr;
+        uint8_t state_machine;
+        int pin_sda, pin_scl;
+        uint32_t sample_time, read_time, error_time;
+        int sample_interval, calc_interval;
+        int err_cnt, fail_cnt = 0, total_fails = 0, rej_cnt = 0;
+        bool err_occured = false;
+        int perm_fail = 0;
+        euler_t* euler_filter = NULL;
+};
 
 // conditionally include the right class and rename
 
