@@ -25,12 +25,13 @@ class RoachHeadingManager
             );
         bool task(roach_ctrl_pkt_t* pkt
             #ifndef RHEADMGR_USE_MODULES
-                , bool force_reset, int32_t steering, float yaw, uint32_t session
+                , float yaw, uint32_t session
             #endif
             );
-        inline int32_t getTgtHeading(void)  { return tgt_head; };     // target  angle for the PID controller
-        inline int32_t getCurHeading(void)  { return cur_head; };     // current angle for the PID controller
-        inline int32_t getOffsetAngle(void) { return angle_offset; }; // difference between the human input heading and the target angle heading
+        inline void    setReset      (void) { pending_reset = true; }; // some event triggers a need to reset the angles
+        inline int32_t getTgtHeading (void) { return tgt_head; };      // target  angle for the PID controller
+        inline int32_t getCurHeading (void) { return cur_head; };      // current angle for the PID controller
+        inline int32_t getOffsetAngle(void) { return angle_offset; };  // difference between the human input heading and the target angle heading
 
     private:
         #ifdef RHEADMGR_USE_MODULES
@@ -47,6 +48,7 @@ class RoachHeadingManager
         roach_ctrl_pkt_t prev_pkt;
         uint32_t prev_session_id = 0;
         uint32_t release_timestamp = 0;
+        bool pending_reset;
 };
 
 #endif

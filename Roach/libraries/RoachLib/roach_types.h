@@ -70,6 +70,9 @@ typedef struct
 PACK_STRUCT
 roach_telem_pkt_t;
 
+#define ROACH_HEADING_INVALID_NOTREADY  0xFFFF
+#define ROACH_HEADING_INVALID_HASFAILED 0xFFFE
+
 typedef struct
 {
     uint32_t uid;

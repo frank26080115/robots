@@ -43,7 +43,13 @@ RoachServo drive_right(DETCORDHW_PIN_SERVO_DRV_R);
 #endif
     weapon(DETCORDHW_PIN_SERVO_WEAP);
 
-RoachIMU imu(5000, 0, 0, BNO08x_I2CADDR_DEFAULT, -1);
+#ifdef ROACHIMU_USE_BNO085
+RoachIMU_BNO imu(5000, 0, ROACHIMU_ORIENTATION_XYZ, BNO08x_I2CADDR_DEFAULT, DETCORDHW_PIN_IMU_RST);
+#endif
+#ifdef ROACHIMU_USE_LSM6DS3
+RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ);
+#endif
+
 RoachPID pid;
 RoachDriveMixer mixer;
 
@@ -53,8 +59,16 @@ detcord_nvm_t nvm;
 
 RoachHeadingManager heading_mgr((uint32_t*)&(nvm.heading_timeout));
 
+#ifdef BOARD_IS_ITSYBITSY
 RoachHeartbeat hb_red = RoachHeartbeat(DETCORDHW_PIN_LED);
 RoachDotStar   hb_rgb = RoachDotStar();
+#endif
+
+#ifdef BOARD_IS_XIAOBLE
+void hb_cb(bool);
+RoachHeartbeat hb_red = RoachHeartbeat(hb_cb);
+RoachRgbLed    hb_rgb = RoachRgbLed();
+#endif
 
 extern roach_nvm_gui_desc_t cfggroup_rf[];
 extern roach_nvm_gui_desc_t cfggroup_drive[];
@@ -117,19 +131,36 @@ void robot_tasks(uint32_t now) // short tasks
     #endif
 }
 
-void rtmgr_taskPeriodic(bool has_cmd)
+void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio message (10 ms) or 12 ms
 {
-    if (has_cmd)
-    {
-        // TODO
-
-        RoSync_task(); // there's no point in calling this from robot_tasks, the radio telemetry transmissions only happen on successful reception
-        roachrobot_pipeCmdLine();
-        roachrobot_telemTask(); // this will fill out common fields in the telem packet and then send it off
+    if (has_cmd) {
+        radio.read((uint8_t*)&rx_pkt);
     }
-    mixer.mix(0, 0, 0); // TODO
+
+    if (imu.isReady() == false || imu.hasFailed()) {
+        heading_mgr.setReset();
+    }
+    #ifndef ROACHIMU_AUTO_MATH
+    else if (imu.hasNew(false)) {
+        imu.doMath();
+    }
+    #endif
+    heading_mgr.task(&rx_pkt, imu.heading, radio.getSessionId());
+
+    int32_t gyro_corr = pid.compute(heading_mgr.getCurHeading(), heading_mgr.getTgtHeading());
+
+    mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
     drive_left.writeMicroseconds(mixer.getLeft());
     drive_right.writeMicroseconds(mixer.getRight());
+
+    if (has_cmd)
+    {
+        RoSync_task(); // there's no point in calling this from robot_tasks, the radio telemetry transmissions only happen on successful reception
+        roachrobot_pipeCmdLine();
+
+        telem_pkt.heading = (imu.isReady() == false) ? ROACH_HEADING_INVALID_NOTREADY : ((imu.hasFailed()) ? ROACH_HEADING_INVALID_HASFAILED : ((uint16_t)lround(imu.heading + 180)));
+        roachrobot_telemTask(); // this will fill out common fields in the telem packet and then send it off
+    }
 }
 
 void rtmgr_onPreFailed(void)
@@ -172,4 +203,5 @@ void rtmgr_onSafe(bool full_init)
         drive_right.writeMicroseconds(mixer.getRight());
         weapon.setThrottle(0);
     }
+    heading_mgr.setReset();
 }

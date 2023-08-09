@@ -2,7 +2,7 @@
 
 RoachHeadingManager::RoachHeadingManager(uint32_t* p_timeout
 #ifdef RHEADMGR_USE_MODULES
-    ,nRF52RcRadio* r, RoachIMU* i, RoachPID* p
+    , nRF52RcRadio* r, RoachIMU* i, RoachPID* p
 #endif
 )
 {
@@ -16,7 +16,7 @@ RoachHeadingManager::RoachHeadingManager(uint32_t* p_timeout
 
 bool RoachHeadingManager::task(roach_ctrl_pkt_t* pkt
     #ifndef RHEADMGR_USE_MODULES
-        , bool force_reset, int32_t steering, float yaw, uint32_t session
+        , float yaw, uint32_t session
     #endif
     )
 {
@@ -24,7 +24,7 @@ bool RoachHeadingManager::task(roach_ctrl_pkt_t* pkt
         #ifdef RHEADMGR_USE_MODULES
             false
         #else
-            force_reset
+            pending_reset
         #endif
         ;
 
@@ -89,6 +89,8 @@ bool RoachHeadingManager::task(roach_ctrl_pkt_t* pkt
     tgt_head = pkt->heading + angle_offset;
     ROACH_WRAP_ANGLE(cur_head, 100);
     ROACH_WRAP_ANGLE(tgt_head, 100);
+
+    pending_reset = false;
 
     return need_reset;
 }
