@@ -73,7 +73,7 @@ static volatile uint32_t* pincfg_reg(uint32_t pin)
     return &port->PIN_CNF[pin];
 }
 
-void nbtwi_init(int scl, int sda, int bufsz)
+void nbtwi_init(int scl, int sda, int bufsz, bool highspeed)
 {
     *pincfg_reg(g_ADigitalPinMap[pin_scl = scl]) = ((uint32_t)GPIO_PIN_CNF_DIR_Input        << GPIO_PIN_CNF_DIR_Pos)
                                                  | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect    << GPIO_PIN_CNF_INPUT_Pos)
@@ -87,7 +87,7 @@ void nbtwi_init(int scl, int sda, int bufsz)
                                                  | ((uint32_t)GPIO_PIN_CNF_DRIVE_S0D1       << GPIO_PIN_CNF_DRIVE_Pos)
                                                  | ((uint32_t)GPIO_PIN_CNF_SENSE_Disabled   << GPIO_PIN_CNF_SENSE_Pos);
 
-    NRF_TWIM0->FREQUENCY = TWIM_FREQUENCY_FREQUENCY_K400;
+    NRF_TWIM0->FREQUENCY = highspeed ? TWIM_FREQUENCY_FREQUENCY_K400 : TWIM_FREQUENCY_FREQUENCY_K100;
     NRF_TWIM0->ENABLE    = (TWIM_ENABLE_ENABLE_Enabled << TWIM_ENABLE_ENABLE_Pos);
     NRF_TWIM0->PSEL.SCL  = g_ADigitalPinMap[pin_scl];
     NRF_TWIM0->PSEL.SDA  = g_ADigitalPinMap[pin_sda];
