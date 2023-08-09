@@ -626,17 +626,52 @@ void RoachDotStar::spiConfig(void)
     #endif
 }
 
-RoachHeartbeat::RoachHeartbeat(int pin)
+RoachHeartbeat::RoachHeartbeat(int pin, bool active_high)
 {
     _pin = pin;
+    _acthigh = active_high;
+}
+
+RoachHeartbeat::RoachHeartbeat(void (*cb) (bool))
+{
+    _pin = -1;
+    _cb = cb;
 }
 
 void RoachHeartbeat::begin(void)
 {
-    pinMode(_pin, OUTPUT);
-    digitalWrite(_pin, LOW);
-    _on = false;
+    if (_cb == NULL && _pin >= 0)
+    {
+        if (_acthigh)
+        {
+            pinMode(_pin, OUTPUT);
+            digitalWrite(_pin, LOW);
+        }
+    }
+    set(false);
     _last_time = millis();
+}
+
+void RoachHeartbeat::set(bool x)
+{
+    if (_cb != NULL)
+    {
+        _cb(x);
+    }
+    else if (_acthigh)
+    {
+        digitalWrite(_pin, x ? HIGH : LOW);
+    }
+    else if (x)
+    {
+        pinMode(_pin, OUTPUT);
+        digitalWrite(_pin, LOW);
+    }
+    else if (x == false)
+    {
+        pinMode(_pin, INPUT);
+    }
+    _on = x;
 }
 
 void RoachHeartbeat::play(const uint8_t* ani, bool wait)
@@ -648,8 +683,7 @@ void RoachHeartbeat::play(const uint8_t* ani, bool wait)
 
     // set NULL to stop animation
     if (ani == NULL) {
-        digitalWrite(_pin, LOW);
-        _on = false;
+        set(false);
     }
 
     // do not interrupt current animation if the same animation is playing
@@ -667,8 +701,7 @@ void RoachHeartbeat::play(const uint8_t* ani, bool wait)
     {
         // definitely start the animation
         // assume first iteration will be ON
-        digitalWrite(_pin, HIGH);
-        _on = true;
+        set(true);
         task();
     }
 }
@@ -697,9 +730,8 @@ void RoachHeartbeat::task(void)
         x >>= 4; // upper 4 nibble indicates time span
         if ((now - _last_time) >= (x * RHB_TIME_MULTI_ON)) // time to turn off
         {
-            digitalWrite(_pin, LOW);
+            set(false);
             _last_time = now;
-            _on = false;
         }
     }
     else
@@ -725,8 +757,7 @@ void RoachHeartbeat::task(void)
             if (x > 0) // next ON cycle is valid
             {
                 // turn ON
-                digitalWrite(_pin, HIGH);
-                _on = true;
+                set(true);
             }
         }
     }

@@ -41,19 +41,23 @@
 class RoachHeartbeat // single LED blinking engine
 {
     public:
-        RoachHeartbeat(int pin);
+        RoachHeartbeat(int pin, bool active_high = true);
+        RoachHeartbeat(void (*cb) (bool));
         void begin(void);
         void play(const uint8_t*, bool wait = false);
         void queue(const uint8_t*);
         void task(void);
+        void set(bool);
 
     private:
         int _pin;
+        bool _acthigh;
         uint32_t _last_time;
         bool _on;
         uint8_t* _animation = NULL;
         uint8_t* _queued = NULL;
         int _ani_idx;
+        void (*_cb) (bool) = NULL;
 };
 
 class RoachRgbLed // used as indicator on SeeedStudio XIAO BLE
