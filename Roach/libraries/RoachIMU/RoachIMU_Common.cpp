@@ -1,6 +1,5 @@
 #include "RoachIMU.h"
 
-
 void RoachIMU_Common::doMath(void)
 {
     #ifndef ROACHIMU_AUTO_MATH
@@ -107,6 +106,12 @@ void RoachIMU_Common::doMath(void)
         if ((install_orientation & ROACHIMU_ORIENTATION_FLIP_PITCH) != 0) {
             euler.pitch += 180;
         }
+        if ((install_orientation & ROACHIMU_ORIENTATION_REV_ROLL) != 0) {
+            euler.roll = 180 - euler.roll;
+        }
+        if ((install_orientation & ROACHIMU_ORIENTATION_REV_PITCH) != 0) {
+            euler.pitch = 180 - euler.pitch;
+        }
         ROACH_WRAP_ANGLE(euler.yaw  , 1);
         ROACH_WRAP_ANGLE(euler.roll , 1);
         ROACH_WRAP_ANGLE(euler.pitch, 1);
@@ -122,7 +127,6 @@ void RoachIMU_Common::doMath(void)
 
 void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees = false)
 {
-
     float sqr = sq(qr);
     float sqi = sq(qi);
     float sqj = sq(qj);

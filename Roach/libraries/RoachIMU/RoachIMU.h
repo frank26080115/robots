@@ -18,8 +18,10 @@ enum
     ROACHIMU_ORIENTATION_YXZ,
     ROACHIMU_ORIENTATION_ZXY,
     ROACHIMU_ORIENTATION_ZYX,
-    ROACHIMU_ORIENTATION_FLIP_ROLL  = 0x80,
-    ROACHIMU_ORIENTATION_FLIP_PITCH = 0x40,
+    ROACHIMU_ORIENTATION_FLIP_ROLL  = 0x100,
+    ROACHIMU_ORIENTATION_FLIP_PITCH = 0x200,
+    ROACHIMU_ORIENTATION_REV_ROLL   = 0x400,
+    ROACHIMU_ORIENTATION_REV_PITCH  = 0x800,
     //ROACHIMU_ORIENTATION_FLIP_YAW   = 0x20,
 };
 
@@ -56,7 +58,7 @@ class RoachIMU_Common
         bool is_ready;
         bool is_inverted;
         float heading; // units in real degrees, one of the euler angles determined by the orientation
-        uint8_t install_orientation;
+        uint16_t install_orientation;
         int total_cnt = 0;
 
     protected:

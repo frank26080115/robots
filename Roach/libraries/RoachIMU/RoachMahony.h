@@ -39,9 +39,9 @@ class RoachMahony
             float qa, qb, qc;
 
             // Convert gyroscope degrees/sec to radians/sec
-            gx *= 0.0174533f;
-            gy *= 0.0174533f;
-            gz *= 0.0174533f;
+            gx *= DEG_TO_RAD;
+            gy *= DEG_TO_RAD;
+            gz *= DEG_TO_RAD;
 
             // Compute feedback only if accelerometer measurement valid
             // (avoids NaN in accelerometer normalisation)

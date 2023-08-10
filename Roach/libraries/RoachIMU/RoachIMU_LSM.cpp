@@ -219,9 +219,9 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
     ahrs->updateIMU(gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z);
 
     // convert radians to degrees
-    eu->roll  = ahrs->roll  / 0.0174533f;
-    eu->pitch = ahrs->pitch / 0.0174533f;
-    eu->yaw   = ahrs->yaw   / 0.0174533f;
+    eu->roll  = ahrs->roll  * RAD_TO_DEG;
+    eu->pitch = ahrs->pitch * RAD_TO_DEG;
+    eu->yaw   = ahrs->yaw   * RAD_TO_DEG;
 }
 
 #endif
