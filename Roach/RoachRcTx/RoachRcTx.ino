@@ -184,27 +184,16 @@ void ctrler_buildPkt(void)
         tx_pkt.steering = (pots_locked == false) ? pot_steering.get() : 0;
         int h = RoachEnc_get(true);
         headingx += h * nvm_tx.heading_multiplier;
-        while (headingx >= 18000) {
-            headingx -= 36000;
-        }
-        while (headingx <= -18000) {
-            headingx += 36000;
-        }
-        heading = (headingx + 5) / 10;
-        tx_pkt.heading = heading;
+        ROACH_WRAP_ANGLE(headingx, ROACH_ANGLE_MULTIPLIER);
+        tx_pkt.heading = headingx;
     }
     else if (encoder_mode == ENCODERMODE_USEPOT)
     {
         tx_pkt.steering = 0;
         int hx = headingx;
-        hx += roach_value_map((pots_locked == false) ? pot_steering.get() : 0, 0, ROACH_SCALE_MULTIPLIER, 0, 9000, false);
-        while (hx >= 18000) {
-            hx -= 36000;
-        }
-        while (hx <= -18000) {
-            hx += 36000;
-        }
-        tx_pkt.heading = (hx + 5) / 10;
+        hx += roach_value_map((pots_locked == false) ? pot_steering.get() : 0, 0, ROACH_SCALE_MULTIPLIER, 0, (90 * ROACH_ANGLE_MULTIPLIER), false);
+        ROACH_WRAP_ANGLE(hx, ROACH_ANGLE_MULTIPLIER);
+        tx_pkt.heading = hx;
     }
     tx_pkt.pot_weap = (pots_locked == false) ? pot_weapon.get() : 0;
     tx_pkt.pot_aux  = (pots_locked == false) ? pot_aux.get()    : 0;

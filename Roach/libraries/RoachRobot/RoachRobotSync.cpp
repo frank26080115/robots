@@ -2,11 +2,16 @@
 #include "RoachRobotPrivate.h"
 
 uint32_t roachrobot_lastUploadTime;
-uint32_t roachrobot_nvmSize;
-bool roachrobot_downloadRequested = false;
+bool roachrobot_downloadRequestedNvm = false;
+bool roachrobot_downloadRequestedDesc = false;
 uint32_t roachrobot_downloadIdx = 0;
 
-void roachrobot_downloadChunk(void);
+bool roachrobot_syncHandleMsg(radio_binpkt_t*); // returns true if the message was handled
+void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream);
+void roachrobot_sendChunkNvm(void);
+void roachrobot_sendChunkDesc(void);
+
+static radio_binpkt_t tx_pkt;
 
 void roachrobot_syncTask(void)
 {
@@ -14,43 +19,97 @@ void roachrobot_syncTask(void)
     if (roachrobot_lastUploadTime != 0 && (now - roachrobot_lastUploadTime) >= 500)
     {
         roachrobot_recalcChecksum();
-        roachrobot_saveSettings(nvm_ptr8);
+        roachrobot_saveSettings(rosync_nvm);
         roachrobot_lastUploadTime = 0;
     }
 
-    if (roachrobot_downloadRequested && radio.textIsDone())
+    if (radio.textAvail())
     {
-        roachrobot_downloadChunk();
+        radio_binpkt_t* binpkt = radio.textReadPtr(false);
+        if (roachrobot_syncHandleMsg(binpkt)) {
+            radio.textReadPtr(true);
+        }
+    }
+
+    if (roachrobot_downloadRequestedNvm) {
+        roachrobot_sendChunkNvm();
+    }
+    if (roachrobot_downloadRequestedDesc) {
+        roachrobot_sendChunkDesc();
     }
 }
 
-void roachrobot_downloadChunk(void)
+bool roachrobot_syncHandleMsg(radio_binpkt_t* binpkt)
 {
-    uint8_t* ptr = (uint8_t*)nvm_ptr8;
-    char tmpbuf[NRFRR_PAYLOAD_SIZE];
-    int i = 0;
-    i = sprintf(tmpbuf, "D %04X ", roachrobot_downloadIdx);
-    int j;
-    for (j = roachrobot_downloadIdx; j < roachrobot_nvmSize && i < NRFRR_PAYLOAD_SIZE - 1; j++) {
-        uint8_t d = ptr[j];
-        i += sprintf(&tmpbuf[i], "%02X", d);
+    if (binpkt->addr == 0 && binpkt->len == 0 && binpkt->data[0] == 0)
+    {
+        switch (binpkt->typecode)
+        {
+            case ROACHCMD_SYNC_DOWNLOAD_DESC:
+                roachrobot_downloadRequestedDesc = true;
+                roachrobot_downloadRequestedNvm  = false;
+                roachrobot_downloadIdx = 0;
+                return true;
+            case ROACHCMD_SYNC_DOWNLOAD_CONF:
+                roachrobot_downloadRequestedNvm  = true;
+                roachrobot_downloadRequestedDesc = false;
+                roachrobot_downloadIdx = 0;
+                return true;
+        }
     }
-    radio.textSend(tmpbuf);
-    roachrobot_downloadIdx = j;
-    if (roachrobot_downloadIdx >= roachrobot_nvmSize) {
-        roachrobot_downloadRequested = false;
+    else
+    {
+        switch (binpkt->typecode)
+        {
+            case ROACHCMD_SYNC_UPLOAD_CONF:
+                // incoming string is in binpkt->data
+                // format is "%s=%s\n"
+                roachrobot_handleUploadLine(NULL, (char*)(binpkt->data), NULL);
+                return true;
+        }
+    }
+    return false;
+}
+
+void roachrobot_sendChunkNvm(void)
+{
+    if (radio.textIsDone() == false) {
+        return;
+    }
+    tx_pkt.typecode = ROACHCMD_SYNC_DOWNLOAD_NVM;
+    int dlen = rosync_nvm_sz - roachrobot_downloadIdx;
+    dlen = dlen > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : dlen;
+    tx_pkt.len = dlen > 0 ? dlen : 0;
+    if (tx_pkt.len > 0)
+    {
+        memcpy(tx_pkt.data, &(rosync_nvm[roachrobot_downloadIdx]), tx_pkt.len);
+        roachrobot_downloadIdx += tx_pkt.len;
+    }
+    radio.textSendBin(&tx_pkt);
+    if (dlen <= 0) {
+        roachrobot_downloadRequestedNvm = false;
     }
 }
 
-void roachrobot_recalcChecksum(void)
+void roachrobot_sendChunkDesc(void)
 {
-    nvm_checksum = roach_crcCalc(nvm_ptr8, roachrobot_nvmSize - 4, NULL);
-}
-
-void roachrobot_handleDownloadRequest(void* cmd, char* argstr, Stream* stream)
-{
-    roachrobot_downloadRequested = true;
-    roachrobot_downloadIdx = 0;
+    if (radio.textIsDone() == false) {
+        return;
+    }
+    tx_pkt.typecode = ROACHCMD_SYNC_DOWNLOAD_DESC;
+    int dlen = cfg_desc_sz - roachrobot_downloadIdx;
+    dlen = dlen > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : dlen;
+    tx_pkt.len = dlen > 0 ? dlen : 0;
+    if (tx_pkt.len > 0)
+    {
+        uint8_t* ptr = (uint8_t*)cfg_desc;
+        memcpy(tx_pkt.data, &(ptr[roachrobot_downloadIdx]), tx_pkt.len);
+        roachrobot_downloadIdx += tx_pkt.len;
+    }
+    radio.textSendBin(&tx_pkt);
+    if (dlen <= 0) {
+        roachrobot_downloadRequestedDesc = false;
+    }
 }
 
 void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream)
@@ -64,18 +123,22 @@ void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream)
             break;
         }
     }
-    argstr[i] = 0;
+    argstr[i] = 0; // this splits the string at the '='
+
     int j;
-    for (j = i - 1; j > 0; i++)
+    // this loop does trim-end on the left string
+    for (j = i - 1; j > 0; j--)
     {
-        char c = argstr[i];
-        if (c != ' ' && c != '\t') {
+        char c = argstr[j];
+        if (c == ' ' || c == '\t') {
             argstr[j] = 0;
         }
         else {
             break;
         }
     }
+
+    // this loop does trim-start on the right string
     for (i += 1; i < slen; i++)
     {
         char c = argstr[i];
@@ -84,9 +147,20 @@ void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream)
         }
     }
     i++;
-    roachnvm_parseitem(nvm_ptr8, cfggroup_drive , argstr, &(argstr[i]));
-    roachnvm_parseitem(nvm_ptr8, cfggroup_weap  , argstr, &(argstr[i]));
-    roachnvm_parseitem(nvm_ptr8, cfggroup_sensor, argstr, &(argstr[i]));
+
+    // this loop does trim-end on the right string
+    for (j = slen - 1; j > i; j--)
+    {
+        char c = argstr[j];
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+            argstr[j] = 0;
+        }
+        else {
+            break;
+        }
+    }
+
+    roachnvm_parseitem(rosync_nvm, cfg_desc, argstr, &(argstr[i]));
     roachrobot_lastUploadTime = millis();
     //roachrobot_recalcChecksum();
 }

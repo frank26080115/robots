@@ -19,18 +19,18 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
     _last_tgt = cur;
 
     _diff = tgt - cur;
-    while (_diff > 18000)
+    while (_diff > (180 * ROACH_ANGLE_MULTIPLIER))
     {
-        _diff -= 36000;
+        _diff -= (360 * ROACH_ANGLE_MULTIPLIER);
     }
-    while (_diff < -18000)
+    while (_diff < -(180 * ROACH_ANGLE_MULTIPLIER))
     {
-        _diff += 36000;
+        _diff += (360 * ROACH_ANGLE_MULTIPLIER);
     }
 
     _p = cfg->p * _diff;
 
-    if ((_diff >= 0 && _diff <= 9000 && last_diff < 0) || (_diff < 0 && _diff >= -9000 && last_diff >= 0)) {
+    if ((_diff >= 0 && _diff <= (90 * ROACH_ANGLE_MULTIPLIER) && last_diff < 0) || (_diff < 0 && _diff >= -(90 * ROACH_ANGLE_MULTIPLIER) && last_diff >= 0)) {
         // spun past target, accumulator should be 0 or pushing towards target, not away
         accumulator = (accumulator >= 0 && _diff < 0) || (accumulator < 0 && _diff >= 0) ? 0 : accumulator;
     }
@@ -51,7 +51,7 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
         accumulator = 0;
     }
 
-    if ((_diff >= 0 && last_diff <= -9000) || (_diff < 0 && last_diff >= 9000)) {
+    if ((_diff >= 0 && last_diff <= -(90 * ROACH_ANGLE_MULTIPLIER)) || (_diff < 0 && last_diff >= (90 * ROACH_ANGLE_MULTIPLIER))) {
         // rotated past 180
         // accumulator should follow P term
         if ((accumulator < 0 && _p >= 0) || (accumulator > 0 && _p < 0)) {

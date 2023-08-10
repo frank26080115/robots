@@ -76,7 +76,7 @@ bool RoachHeadingManager::task(roach_ctrl_pkt_t* pkt
         #ifdef RHEADMGR_USE_MODULES
         imu->euler.
         #endif
-        yaw * 100.0);
+        yaw * (float)ROACH_ANGLE_MULTIPLIER);
 
     if (need_reset)
     {
@@ -87,8 +87,8 @@ bool RoachHeadingManager::task(roach_ctrl_pkt_t* pkt
     }
 
     tgt_head = pkt->heading + angle_offset;
-    ROACH_WRAP_ANGLE(cur_head, 100);
-    ROACH_WRAP_ANGLE(tgt_head, 100);
+    ROACH_WRAP_ANGLE(cur_head, ROACH_ANGLE_MULTIPLIER);
+    ROACH_WRAP_ANGLE(tgt_head, ROACH_ANGLE_MULTIPLIER);
 
     pending_reset = false;
 

@@ -35,7 +35,7 @@ class RoachHeadingManager
         // resets the angle tracking
         inline void    setReset      (void) { pending_reset = true; };
 
-        // all outputs are -18000 to 18000 (degree * 100)
+        // all outputs are -1800 to 1800 (degree * ROACH_ANGLE_MULTIPLIER)
         inline int32_t getTgtHeading (void) { return tgt_head; };      // target  angle for the PID controller
         inline int32_t getCurHeading (void) { return cur_head; };      // current angle for the PID controller
         inline int32_t getOffsetAngle(void) { return angle_offset; };  // difference between the human input heading and the target angle heading

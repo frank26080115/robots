@@ -43,11 +43,13 @@ enum
 static uint8_t rusbmsd_statemachine = 0;
 static uint32_t rusbmsd_disconnect_time = 0;
 static bool rusbmsd_wanted = false;
+static bool fs_need_reinit = false; // if the computer changed the file system, re-initializing the cache is required
 
 void RoachUsbMsd_begin(void)
 {
     flash.begin();
     fs_formatted = fatfs.begin(&flash);
+    fs_need_reinit = false;
     Serial.begin(115200);
 }
 
@@ -64,14 +66,25 @@ void RoachUsbMsd_actuallyBegin(void)
 
 void RoachUsbMsd_task(void)
 {
-    if (rusbmsd_statemachine == RUSBMSD_SM_PRESENT)
+    if (rusbmsd_statemachine == RUSBMSD_SM_INVISIBLE)
     {
-        if ( !fs_formatted )
+        // do not check fs_formatted == false here, it will make the system too slow, as it probably failed previously
+        if (fs_need_reinit) // if the computer changed the file system, re-initializing the cache is required
         {
             fs_formatted = fatfs.begin(&flash);
+            fs_need_reinit = false;
         }
-        if (RoachUsbMsd_hasVbus() == false)
+    }
+    else if (rusbmsd_statemachine == RUSBMSD_SM_PRESENT)
+    {
+        if (fs_formatted == false || fs_need_reinit)
         {
+            fs_formatted = fatfs.begin(&flash);
+            fs_need_reinit = false;
+        }
+        if (RoachUsbMsd_hasVbus() == false) // unexpected disconnect
+        {
+            fs_need_reinit = true;
             if (usb_msc != NULL) {
                 delete usb_msc;
             }
@@ -149,7 +162,7 @@ void RoachUsbMsd_presentUsbMsd(void)
         usbd_mem_cache = malloc(sizeof(Adafruit_USBD_Device));
         memcpy(usbd_mem_cache, (void*)(&TinyUSBDevice), sizeof(Adafruit_USBD_Device));
     }
-    rusbmsd_wanted = true;
+    rusbmsd_wanted = true; // signal to state machine
     NRF_USBD->DPDMVALUE       = 0;
     NRF_USBD->TASKS_DPDMDRIVE = 1;
     NRF_USBD->USBPULLUP       = 0;
@@ -159,13 +172,14 @@ void RoachUsbMsd_presentUsbMsd(void)
 
 void RoachUsbMsd_unpresent(void)
 {
+    rusbmsd_wanted = false;
     if (RoachUsbMsd_hasVbus() == false) {
+        // disconnections are handled by state machine task
         return;
     }
     if (RoachUsbMsd_isUsbPresented() == false) {
         return;
     }
-    rusbmsd_wanted = false;
     if (usb_msc != NULL) {
         delete usb_msc;
     }
@@ -188,7 +202,7 @@ bool RoachUsbMsd_isUsbPresented(void)
 
 bool RoachUsbMsd_canSave(void)
 {
-    if (fs_formatted == false) {
+    if (fs_formatted == false || fs_need_reinit) {
         return false;
     }
     if (RoachUsbMsd_hasVbus() == false) {

@@ -1,3 +1,5 @@
+extern void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream);
+
 const cmd_def_t cmds[] = {
     { "factoryreset", factory_reset_func},
     { "echo"        , echo_func },
@@ -16,6 +18,9 @@ const cmd_def_t cmds[] = {
     { "readimu"     , readimu_func },
     { "rtmgrsim"    , rtmgrsim_func },
     { "rtmgrend"    , rtmgrend_func },
+
+    { "cfgwrite"    , roachrobot_handleUploadLine },
+
     { "", NULL }, // end of table
 };
 

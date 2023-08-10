@@ -18,11 +18,11 @@ uint32_t rosync_checksum_nvm  = 0;
 uint32_t rosync_checksum_desc = 0;
 
 RoachMenuCfgLister* rosync_menu = NULL;
-roach_nvm_gui_desc_t* rosync_desc_tbl = NULL;
-uint8_t* rosync_nvm = NULL;
+roach_nvm_gui_desc_t* rosync_desc_tbl = NULL; // this stores a massive table that's downloaded from the robot receiver
+uint8_t* rosync_nvm = NULL; // this mirrors the NVM structure stored on the robot receiver
 uint32_t rosync_nvm_wptr = 0;
 uint32_t rosync_nvm_sz = 0;
-RoachFile rosync_descDlFile;
+RoachFile rosync_descDlFile; // this is basically rosync_desc_tbl but in a file on the flash
 uint32_t rosync_descDlFileSize = 0;
 uint32_t rosync_lastRxTime = 0;
 uint32_t rosync_uploadIdx = 0, rosync_uploadTotal = 0;

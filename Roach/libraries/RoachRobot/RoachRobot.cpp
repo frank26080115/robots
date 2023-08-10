@@ -6,14 +6,21 @@
 
 extern RoachCmdLine cmdline;
 
-void roachrobot_init(void)
+void roachrobot_init(uint8_t* nvm_ptr, uint32_t nvm_size, roach_nvm_gui_desc_t* desc_ptr, uint32_t desc_size)
 {
+    rosync_nvm = nvm_ptr;
+    rosync_nvm_sz = nvm_size;
+    cfg_desc = desc_ptr;
+    cfg_desc_sz = desc_size;
+    roachrobot_recalcChecksum();
+    roachrobot_calcDescChecksum();
 }
 
 void roachrobot_telemTask(void)
 {
     telem_pkt.rssi = radio.getRssi();
-    telem_pkt.chksum_nvm = nvm_checksum;
+    telem_pkt.chksum_nvm = rosync_checksum_nvm;
+    telem_pkt.chksum_desc = rosync_checksum_desc;
     radio.send((uint8_t*)&telem_pkt); // radio is in RX mode, the telemetry will only actually be sent when requested
 }
 

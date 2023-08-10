@@ -56,7 +56,7 @@ RoachDriveMixer mixer;
 
 RoachPot battery(DETCORDHW_PIN_ADC_BATT, NULL);
 
-extern roach_nvm_gui_desc_t nvm_desc[];
+extern roach_nvm_gui_desc_t detcord_cfg_desc[];
 roach_rf_nvm_t nvm_rf;
 detcord_nvm_t nvm;
 
@@ -73,25 +73,13 @@ RoachHeartbeat hb_red = RoachHeartbeat(hb_cb);
 RoachRgbLed    hb_rgb = RoachRgbLed();
 #endif
 
-extern roach_nvm_gui_desc_t cfggroup_rf[];
-extern roach_nvm_gui_desc_t cfggroup_drive[];
-extern roach_nvm_gui_desc_t cfggroup_weap[];
-extern roach_nvm_gui_desc_t cfggroup_sensor[];
-roach_nvm_gui_desc_t* cfggroup_rxall[] = {
-    (roach_nvm_gui_desc_t*)cfggroup_rf,
-    (roach_nvm_gui_desc_t*)cfggroup_drive,
-    (roach_nvm_gui_desc_t*)cfggroup_weap,
-    (roach_nvm_gui_desc_t*)cfggroup_sensor,
-    NULL,
-};
-
 void setup()
 {
     hb_red.begin();
     hb_rgb.begin();
 
     settings_init();
-    RoachUsbMsd_begin();
+    RoachUsbMsd_begin(); // this also starts the serial port
     if (RoachUsbMsd_hasVbus())
     {
         RoachUsbMsd_presentUsbMsd();
@@ -113,6 +101,10 @@ void setup()
     RoachWdt_init(500);
 
     rtmgr_init(10, 1000);
+
+    roachrobot_init((uint8_t*)&nvm, (uint32_t)sizeof(nvm), (roach_nvm_gui_desc_t*)detcord_cfg_desc, (uint32_t)sizeof(detcord_cfg_desc));
+
+    debug_printf("Detcord finished setup()\r\n");
 }
 
 void loop()
@@ -197,7 +189,7 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         roachrobot_pipeCmdLine();
 
         telem_pkt.battery = roach_value_map(battery.getAdcFiltered(), 0, DETCORDHW_BATT_ADC_4200MV, 0, 4200, false);
-        telem_pkt.heading = (imu.isReady() == false) ? ROACH_HEADING_INVALID_NOTREADY : ((imu.hasFailed()) ? ROACH_HEADING_INVALID_HASFAILED : ((uint16_t)lround(imu.heading + 180)));
+        telem_pkt.heading = (imu.isReady() == false) ? ROACH_HEADING_INVALID_NOTREADY : ((imu.hasFailed()) ? ROACH_HEADING_INVALID_HASFAILED : ((uint16_t)lround(imu.heading * ROACH_ANGLE_MULTIPLIER)));
         roachrobot_telemTask(); // this will fill out common fields in the telem packet and then send it off
     }
 }

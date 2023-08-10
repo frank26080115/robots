@@ -45,7 +45,7 @@ typedef struct
 {
     int16_t  throttle; // range +/- ROACH_SCALE_MULTIPLIER
     int16_t  steering; // range +/- ROACH_SCALE_MULTIPLIER
-    int16_t  heading;  // absolute encoder data to set absolute heading, range -18000 to 18000 (deg * 100)
+    int16_t  heading;  // absolute encoder data to set absolute heading, range -1800 to 1800 (deg * ROACH_ANGLE_MULTIPLIER)
     int16_t  pot_weap; // range 0 to ROACH_SCALE_MULTIPLIER
     int16_t  pot_aux;  // range 0 to ROACH_SCALE_MULTIPLIER
     uint32_t flags;    // ROACHPKTFLAG_*
@@ -58,7 +58,7 @@ typedef struct
     uint16_t timestamp;
     uint32_t chksum_desc; // checksum over the NVM description structure, used as a UUID
     uint32_t chksum_nvm;  // checksum over the NVM contents, used to detect changes
-    int16_t  heading;     // unit -18000 to 18000 (deg * 100)
+    int16_t  heading;     // unit -1800 to 1800 (deg * ROACH_ANGLE_MULTIPLIER)
     uint16_t battery;     // unit mv, expected 0 to 4200
     uint8_t  temperature; // uhhhhh, not used right now
     int8_t   rssi;        // 16 is the best it can do, higher numer is worse
@@ -96,13 +96,13 @@ typedef struct
 {
     int32_t  p; // default estimate: 50 degree means 5000 error, output needs to be ROACH_SCALE_MULTIPLIER^3
                 // p = ROACH_SCALE_MULTIPLIER^3 / 5000
-    int32_t  i; // default estimate: error accumulated of 1800000, divided by 100 internally
-                // i = ROACH_SCALE_MULTIPLIER^3 / 18000
+    int32_t  i; // default estimate: error accumulated of 180000, divided by 100 internally
+                // i = ROACH_SCALE_MULTIPLIER^3 / 1800
     int32_t  d; // default estimate: 100 degree correction in one second means delta = 100
                 // d = ROACH_SCALE_MULTIPLIER^3 / 100
                 // note: d term polarity automatically determined
     uint32_t output_limit;      // ROACH_SCALE_MULTIPLIER^3
-    uint32_t accumulator_limit; // upper limit of the error accumulator // error of 18000 collected over 1 seconds is 1800000
+    uint32_t accumulator_limit; // upper limit of the error accumulator // error of 1800 collected over 1 seconds is 180000
     uint32_t accumulator_decay; // decay of accumulator once per tick (10ms usually)
 }
 PACK_STRUCT
@@ -141,7 +141,7 @@ typedef struct
 
     roach_nvm_pot_t pot_throttle;
     roach_nvm_pot_t pot_steering;
-    int32_t heading_multiplier;   // need to multiply encoder ticks into heading angle, range -18000 to 18000 (deg * 100), for 400 tick encoder, 18000 / 200 = 90
+    int32_t heading_multiplier;   // need to multiply encoder ticks into heading angle, range -1800 to 1800 (deg * ROACH_ANGLE_MULTIPLIER), for 400 tick encoder, 1800 / 200 = 9
 
     roach_nvm_pot_t pot_weapon;
     roach_nvm_pot_t pot_aux;

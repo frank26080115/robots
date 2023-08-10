@@ -4,17 +4,20 @@
 
 #define ROACHROBOT_STARTUP_FILE_NAME "cfg.txt"
 
-uint32_t nvm_checksum;
-uint8_t* nvm_ptr8;
+uint32_t rosync_checksum_nvm  = 0;
+uint32_t rosync_checksum_desc = 0;
+uint8_t* rosync_nvm = NULL;
+uint32_t rosync_nvm_sz = 0;
+uint32_t cfg_desc_sz = 0;
 
 void roachrobot_handleFileLoad(void* cmd, char* argstr, Stream* stream)
 {
     if (argstr[0] == 0)
     {
-        if (nvm_ptr8 == NULL) {
+        if (rosync_nvm == NULL) {
             stream->println("ERR: NVM structure pointer is null when loading");
         }
-        else if (roachrobot_loadSettings(nvm_ptr8)) {
+        else if (roachrobot_loadSettings(rosync_nvm)) {
             stream->println("loaded startup file");
         }
         else {
@@ -23,7 +26,7 @@ void roachrobot_handleFileLoad(void* cmd, char* argstr, Stream* stream)
     }
     else
     {
-        if (roachrobot_loadSettingsFile(argstr, nvm_ptr8)) {
+        if (roachrobot_loadSettingsFile(argstr, rosync_nvm)) {
             stream->printf("loaded file %s\r\n", argstr);
         }
         else {
@@ -41,10 +44,10 @@ void roachrobot_handleFileSave(void* cmd, char* argstr, Stream* stream)
     }
     if (argstr[0] == 0)
     {
-        if (nvm_ptr8 == NULL) {
+        if (rosync_nvm == NULL) {
             stream->println("ERR: NVM structure pointer is null when saving");
         }
-        else if (roachrobot_saveSettings(nvm_ptr8)) {
+        else if (roachrobot_saveSettings(rosync_nvm)) {
             stream->println("saved to startup file");
         }
         else {
@@ -53,7 +56,7 @@ void roachrobot_handleFileSave(void* cmd, char* argstr, Stream* stream)
     }
     else
     {
-        if (roachrobot_saveSettingsToFile(argstr, nvm_ptr8)) {
+        if (roachrobot_saveSettingsToFile(argstr, rosync_nvm)) {
             stream->printf("saved to %s\r\n", argstr);
         }
         else {
@@ -68,9 +71,7 @@ bool roachrobot_saveSettingsToFile(const char* fname, uint8_t* data)
     bool suc = f.open(fname, O_RDWR | O_CREAT);
     if (suc)
     {
-        roachnvm_writetofile(&f, data, cfggroup_drive);
-        roachnvm_writetofile(&f, data, cfggroup_weap);
-        roachnvm_writetofile(&f, data, cfggroup_sensor);
+        roachnvm_writetofile(&f, data, cfg_desc);
         f.close();
         return true;
     }
@@ -83,9 +84,7 @@ bool roachrobot_loadSettingsFile(const char* fname, uint8_t* data)
     bool suc = f.open(fname);
     if (suc)
     {
-        roachnvm_readfromfile(&f, data, cfggroup_drive);
-        roachnvm_readfromfile(&f, data, cfggroup_weap);
-        roachnvm_readfromfile(&f, data, cfggroup_sensor);
+        roachnvm_readfromfile(&f, data, cfg_desc);
         f.close();
         return true;
     }
@@ -104,7 +103,17 @@ bool roachrobot_saveSettings(uint8_t* data)
 
 void roachrobot_defaultSettings(uint8_t* data)
 {
-    roachnvm_setdefaults(data, cfggroup_drive);
-    roachnvm_setdefaults(data, cfggroup_weap);
-    roachnvm_setdefaults(data, cfggroup_sensor);
+    roachnvm_setdefaults(data, cfg_desc);
+}
+
+uint32_t roachrobot_recalcChecksum(void)
+{
+    rosync_checksum_nvm = roachnvm_getConfCrc(rosync_nvm, cfg_desc);
+    return rosync_checksum_nvm;
+}
+
+uint32_t roachrobot_calcDescChecksum(void)
+{
+    rosync_checksum_desc = roach_crcCalc((uint8_t*)cfg_desc, cfg_desc_sz, NULL);
+    return rosync_checksum_desc;
 }
