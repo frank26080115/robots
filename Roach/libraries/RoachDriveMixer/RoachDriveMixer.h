@@ -9,12 +9,20 @@ class RoachDriveMixer
 {
     public:
         RoachDriveMixer(void);
+
+        // throttle        range +/- ROACH_SCALE_MULTIPLIER
+        // steering        range +/- ROACH_SCALE_MULTIPLIER
+        // gyro_correction range +/- ROACH_SCALE_MULTIPLIER
         void mix(int32_t throttle, int32_t steering, int32_t gyro_correction);
+
+        // output unit is in microseconds as servo pulses, range 1000 to 2000, 1500 for stop
         inline int32_t getLeft (void) { return _result_left;  };
         inline int32_t getRight(void) { return _result_right; };
-        void setCrossMix(int32_t x) { _crossmix = x; };
-        roach_nvm_servo_t* cfg_left;
-        roach_nvm_servo_t* cfg_right;
+
+        roach_nvm_servo_t* cfg_left     = NULL;
+        roach_nvm_servo_t* cfg_right    = NULL;
+        int32_t*           cfg_crossmix = NULL;
+
         inline void setFlip(uint8_t x) { _flip = x; };
         inline void setUpsideDown(uint8_t x) { _upsidedown = x; };
 
@@ -23,10 +31,9 @@ class RoachDriveMixer
         int32_t _raw_left = 0, _raw_right = 0;
         uint8_t _flip = 0;
         bool    _upsidedown = false;
-        int32_t _crossmix = 0;
         int32_t _virtual_heading;
         int32_t applyServoParams(roach_nvm_servo_t* cfg, int32_t x);
-        int32_t calcCrossMixThrottle(int32_t throttle, int32_t steering);
+        int32_t calcCrossMixThrottle(int32_t throttle, int32_t steering); // slow down the robot if steering is hard
 };
 
 class RoachVirtualHeading

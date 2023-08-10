@@ -3,4 +3,6 @@
 
 #define USE_DSHOT
 
+#define ROACHPKTFLAG_WEAPON ROACHPKTFLAG_BTN1
+
 #endif

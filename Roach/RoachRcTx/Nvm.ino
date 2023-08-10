@@ -10,7 +10,7 @@ extern roach_nvm_gui_desc_t* rosync_desc_tbl;
 
 roach_nvm_gui_desc_t cfggroup_ctrler[] = {
     { ((uint32_t)(&(nvm_tx.heading_multiplier      )) - (uint32_t)(&nvm_tx)), "H scale"     , "s32x10" ,                     90,                 INT_MIN, INT_MAX               , 1, },
-    { ((uint32_t)(&(nvm_tx.cross_mix               )) - (uint32_t)(&nvm_tx)), "X mix"       , "s32x10" ,                      0,                 INT_MIN, INT_MAX               , 1, },
+    //{ ((uint32_t)(&(nvm_tx.cross_mix               )) - (uint32_t)(&nvm_tx)), "X mix"       , "s32x10" ,                      0,                 INT_MIN, INT_MAX               , 1, },
     { ((uint32_t)(&(nvm_tx.pot_throttle.center     )) - (uint32_t)(&nvm_tx)), "T center"    , "s16"    ,          ROACH_ADC_MID,                       0, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_throttle.deadzone   )) - (uint32_t)(&nvm_tx)), "T deadzone"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MAX / 32    , 1, },
     { ((uint32_t)(&(nvm_tx.pot_throttle.boundary   )) - (uint32_t)(&nvm_tx)), "T boundary"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MAX / 32    , 1, },

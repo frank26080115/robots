@@ -51,11 +51,11 @@ class RoachIMU_Common
 
         void doMath(void);
 
-        euler_t euler;
+        euler_t euler; // units in real degrees
         bool has_new;
         bool is_ready;
         bool is_inverted;
-        float heading;
+        float heading; // units in real degrees, one of the euler angles determined by the orientation
         uint8_t install_orientation;
         int total_cnt = 0;
 

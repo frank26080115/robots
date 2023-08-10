@@ -13,7 +13,11 @@ class RoachPID
         RoachPID(void);
         void reset(void);
         roach_nvm_pid_t* cfg;
+
+        // input angles are expected -18000 to 18000 (degree * 100)
+        // output expected to be +/- ROACH_SCALE_MULTIPLIER^3, used with RoachDriveMixer gyro_correction after roach_reduce_to_scale_2
         int32_t compute(int32_t x, int32_t tgt);
+
         void debug(void);
 
     private:

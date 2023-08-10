@@ -43,15 +43,12 @@ enum
 // try to keep this under 32 bytes
 typedef struct
 {
-    // uint8_t  seq;      // sequence number, not required, as the internal protocol already carries one
-    // uint8_t  pkt_type; // packet type, but we have a dedicated text channel for critical-but-not-frequent messages, we don't need this yet
-    int16_t  throttle;
-    int16_t  steering;
-    int16_t  heading;  // absolute encoder data to set absolute heading
-    int16_t  pot_weap;
-    int16_t  pot_aux;
-    uint32_t flags;
-    //uint32_t chan_map; // the transmitter channel map might not be the same as the receiver, the receiver might be running in single channel mode
+    int16_t  throttle; // range +/- ROACH_SCALE_MULTIPLIER
+    int16_t  steering; // range +/- ROACH_SCALE_MULTIPLIER
+    int16_t  heading;  // absolute encoder data to set absolute heading, range -18000 to 18000 (deg * 100)
+    int16_t  pot_weap; // range 0 to ROACH_SCALE_MULTIPLIER
+    int16_t  pot_aux;  // range 0 to ROACH_SCALE_MULTIPLIER
+    uint32_t flags;    // ROACHPKTFLAG_*
 }
 PACK_STRUCT
 roach_ctrl_pkt_t;
@@ -59,13 +56,13 @@ roach_ctrl_pkt_t;
 typedef struct
 {
     uint16_t timestamp;
-    uint32_t chksum_desc;
-    uint32_t chksum_nvm;
-    uint16_t heading;
-    uint16_t battery;
-    uint8_t  temperature;
-    int8_t   rssi;
-    int16_t  loss_rate;
+    uint32_t chksum_desc; // checksum over the NVM description structure, used as a UUID
+    uint32_t chksum_nvm;  // checksum over the NVM contents, used to detect changes
+    int16_t  heading;     // unit -18000 to 18000 (deg * 100)
+    uint16_t battery;     // unit mv, expected 0 to 4200
+    uint8_t  temperature; // uhhhhh, not used right now
+    int8_t   rssi;        // 16 is the best it can do, higher numer is worse
+    uint16_t loss_rate;   // per second packet loss rate
 }
 PACK_STRUCT
 roach_telem_pkt_t;
@@ -75,33 +72,38 @@ roach_telem_pkt_t;
 
 typedef struct
 {
-    uint32_t uid;
-    uint32_t salt;
-    uint32_t chan_map;
+    uint32_t uid;      // unique ID for one link
+    uint32_t salt;     // secret, never exposed
+    uint32_t chan_map; // each bit represents a channel
 }
 PACK_STRUCT
 roach_rf_nvm_t;
 
 typedef struct
 {
-    int16_t center;
-    int16_t deadzone;
-    int32_t trim;
-    int16_t scale;
-    int16_t limit_max;
-    int16_t limit_min;
+    int16_t center;    // microsecond units, should be 1500
+    int16_t deadzone;  // microsecond units
+    int32_t trim;      // microsecond units
+    int16_t scale;     // scaled with ROACH_SCALE_MULTIPLIER = 1
+    int16_t limit_max; // microsecond units, should be 2000
+    int16_t limit_min; // microsecond units, should be 1000
 }
 PACK_STRUCT
 roach_nvm_servo_t;
 
+// PID output expected to be +/- ROACH_SCALE_MULTIPLIER^3, used with RoachDriveMixer gyro_correction after roach_reduce_to_scale_2
 typedef struct
 {
-    int32_t  p;
-    int32_t  i;
-    int32_t  d;
-    uint32_t output_limit;
-    uint32_t accumulator_limit;
-    uint32_t accumulator_decay;
+    int32_t  p; // default estimate: 50 degree means 5000 error, output needs to be ROACH_SCALE_MULTIPLIER^3
+                // p = ROACH_SCALE_MULTIPLIER^3 / 5000
+    int32_t  i; // default estimate: error accumulated of 1800000, divided by 100 internally
+                // i = ROACH_SCALE_MULTIPLIER^3 / 18000
+    int32_t  d; // default estimate: 100 degree correction in one second means delta = 100
+                // d = ROACH_SCALE_MULTIPLIER^3 / 100
+                // note: d term polarity automatically determined
+    uint32_t output_limit;      // ROACH_SCALE_MULTIPLIER^3
+    uint32_t accumulator_limit; // upper limit of the error accumulator // error of 18000 collected over 1 seconds is 1800000
+    uint32_t accumulator_decay; // decay of accumulator once per tick (10ms usually)
 }
 PACK_STRUCT
 roach_nvm_pid_t;
@@ -118,14 +120,14 @@ roach_nvm_virheading_t;
 
 typedef struct
 {
-    int16_t center;
-    int16_t deadzone;
-    int16_t limit_max;
-    int16_t limit_min;
-    int16_t boundary;
-    int16_t expo;
-    int16_t filter;
-    int16_t scale;
+    int16_t center;    // this is a ADC value, calibrated
+    int16_t deadzone;  // ADC scale
+    int16_t limit_max; // ADC scale, calibrated
+    int16_t limit_min; // ADC scale, calibrated
+    int16_t boundary;  // ADC scale
+    int16_t expo;      // 0 = straight line, ROACH_SCALE_MULTIPLIER = exponential
+    int16_t filter;    // 0 to ROACH_SCALE_MULTIPLIER, 1 meaning heavy filter, ROACH_SCALE_MULTIPLIER means full pass
+    int16_t scale;     // multiplier, scaled with ROACH_SCALE_MULTIPLIER, default should be ROACH_SCALE_MULTIPLIER = 1
 }
 PACK_STRUCT
 roach_nvm_pot_t;
@@ -139,8 +141,8 @@ typedef struct
 
     roach_nvm_pot_t pot_throttle;
     roach_nvm_pot_t pot_steering;
-    int32_t heading_multiplier;
-    int32_t cross_mix;
+    int32_t heading_multiplier;   // need to multiply encoder ticks into heading angle, range -18000 to 18000 (deg * 100), for 400 tick encoder, 18000 / 200 = 90
+
     roach_nvm_pot_t pot_weapon;
     roach_nvm_pot_t pot_aux;
     roach_nvm_pot_t pot_battery;

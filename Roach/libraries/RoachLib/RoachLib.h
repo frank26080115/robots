@@ -40,6 +40,8 @@ void roachnvm_writedescfile(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl);
 void roachnvm_setdefaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
 
 int32_t roach_reduce_to_scale(int32_t x);
+int32_t roach_reduce_to_scale_2(int32_t x);
+int32_t roach_reduce_to_scale_3(int32_t x);
 int32_t roach_multiply_with_scale(int32_t a, int32_t b);
 int32_t roach_lpf(int32_t nval, int32_t oval_x, int32_t flt);
 int32_t roach_value_clamp(int32_t x, int32_t upper, int32_t lower);

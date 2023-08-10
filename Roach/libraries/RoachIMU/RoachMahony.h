@@ -24,6 +24,9 @@ class RoachMahony
             invSampleFreq = 1.0f / samp_freq;
         };
 
+        // gx gy gz expects units deg/sec
+        // ax ay az expects unit-less, will be normalized to 1G internally
+        // dt specified in seconds
         void updateIMU(float gx, float gy, float gz, float ax, float ay, float az, float dt = 0)
         {
             if (dt <= 0) {
@@ -101,15 +104,17 @@ class RoachMahony
             q2 *= recipNorm;
             q3 *= recipNorm;
 
-            roll = atan2f(q0 * q1 + q2 * q3, 0.5f - q1 * q1 - q2 * q2);
+            roll  = atan2f(q0 * q1 + q2 * q3, 0.5f - q1 * q1 - q2 * q2);
             pitch = asinf(-2.0f * (q1 * q3 - q0 * q2));
-            yaw = atan2f(q1 * q2 + q0 * q3, 0.5f - q2 * q2 - q3 * q3);
+            yaw   = atan2f(q1 * q2 + q0 * q3, 0.5f - q2 * q2 - q3 * q3);
+            // these calculations output in radians
+
             grav[0] = 2.0f * (q1 * q3 - q0 * q2);
             grav[1] = 2.0f * (q0 * q1 + q2 * q3);
             grav[2] = 2.0f * (q1 * q0 - 0.5f + q3 * q3);
         };
 
-        float roll, pitch, yaw;
+        float roll, pitch, yaw; // radians
 
     private:
         float twoKp; // 2 * proportional gain (Kp)

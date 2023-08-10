@@ -87,7 +87,7 @@ void conttx_func(void* cmd, char* argstr, Stream* stream)
 {
     int f = atoi(argstr);
     stream->printf("RF cont-tx test f=%d\r\n", f);
-    radio.contTxTest(f, false, RoachWdt_feed());
+    radio.contTxTest(f, false, RoachWdt_feed);
     // this is blocking forever, requires power-down to stop
 }
 
@@ -140,10 +140,10 @@ void readimu_func(void* cmd, char* argstr, Stream* stream)
 
 void rtmgrsim_func(void* cmd, char* argstr, Stream* stream)
 {
-    
+    rtmgr_setSimulation(atoi(argstr) != 0);
 }
 
 void rtmgrend_func(void* cmd, char* argstr, Stream* stream)
 {
-    
+    rtmgr_permEnd();
 }

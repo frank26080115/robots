@@ -12,6 +12,7 @@ void RoachDriveMixer::mix(int32_t throttle, int32_t steering, int32_t gyro_corre
     throttle = calcCrossMixThrottle(throttle, steering);
 
     steering += gyro_correction;
+    steering = roach_value_clamp(steering, input_limit, -input_limit);
 
     // https://home.kendra.com/mauser/joystick.html
     int32_t inv_steering = -steering;
@@ -77,10 +78,14 @@ int32_t RoachDriveMixer::applyServoParams(roach_nvm_servo_t* cfg, int32_t spd)
 
 int32_t RoachDriveMixer::calcCrossMixThrottle(int32_t throttle, int32_t steering)
 {
-    if (_crossmix == 0) {
+    // slow down the robot if steering is hard
+    if (cfg_crossmix == NULL) {
         return throttle;
     }
-    int32_t x = ROACH_SCALE_MULTIPLIER - roach_value_map(abs(steering), 0, ROACH_SCALE_MULTIPLIER, 0, _crossmix, true);
+    if (*cfg_crossmix == 0) {
+        return throttle;
+    }
+    int32_t x = ROACH_SCALE_MULTIPLIER - roach_value_map(abs(steering), 0, ROACH_SCALE_MULTIPLIER, 0, *cfg_crossmix, true);
     return roach_multiply_with_scale(throttle, x);
 }
 

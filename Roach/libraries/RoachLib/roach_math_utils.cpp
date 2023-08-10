@@ -5,6 +5,16 @@ int32_t roach_reduce_to_scale(int32_t x)
     return roach_div_rounded(x, ROACH_SCALE_MULTIPLIER);
 }
 
+int32_t roach_reduce_to_scale_2(int32_t x)
+{
+    return roach_div_rounded(x, ROACH_SCALE_MULTIPLIER * ROACH_SCALE_MULTIPLIER);
+}
+
+int32_t roach_reduce_to_scale_3(int32_t x)
+{
+    return roach_div_rounded(x, ROACH_SCALE_MULTIPLIER * ROACH_SCALE_MULTIPLIER * ROACH_SCALE_MULTIPLIER);
+}
+
 int32_t roach_multiply_with_scale(int32_t a, int32_t b)
 {
     int32_t x = a * b;

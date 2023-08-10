@@ -54,7 +54,7 @@ RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ);
 RoachPID pid;
 RoachDriveMixer mixer;
 
-RoachPot battery(DETCORDHW_PIN_ADC_BATT);
+RoachPot battery(DETCORDHW_PIN_ADC_BATT, NULL);
 
 extern roach_nvm_gui_desc_t nvm_desc[];
 roach_rf_nvm_t nvm_rf;
@@ -167,17 +167,25 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         pid.reset();
     }
 
-    mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
+    mixer.mix(rx_pkt.throttle, rx_pkt.steering, roach_reduce_to_scale(gyro_corr));
     drive_left.writeMicroseconds(mixer.getLeft());
     drive_right.writeMicroseconds(mixer.getRight());
 
     if ((rx_pkt.flags & ROACHPKTFLAG_WEAPON) != 0)
     {
-        weapon.writeMicroseconds(rx_pkt.weapon);
+        #ifdef USE_DSHOT
+        weapon.setThrottle(roach_value_clamp(roach_multiply_with_scale(rx_pkt.pot_weap, nvm.weapon.scale), nvm.weapon.limit_max, 0));
+        #else
+        weapon.writeMicroseconds(roach_value_clamp(nvm.weapon.limit_min + (roach_multiply_with_scale(rx_pkt.pot_weap, nvm.weapon.scale)), nvm.weapon.limit_max, nvm.weapon.limit_min));
+        #endif
     }
     else
     {
+        #ifdef USE_DSHOT
         weapon.setThrottle(0);
+        #else
+        weapon.writeMicroseconds(nvm.weapon.limit_min);
+        #endif
     }
     #ifdef USE_DSHOT
     weapon.task();
@@ -201,7 +209,11 @@ void rtmgr_onPreFailed(void)
     mixer.mix(0, 0, 0);
     drive_left.writeMicroseconds(mixer.getLeft());
     drive_right.writeMicroseconds(mixer.getRight());
+    #ifdef USE_DSHOT
     weapon.setThrottle(0);
+    #else
+    weapon.writeMicroseconds(nvm.weapon.limit_min);
+    #endif
 }
 
 void rtmgr_taskPreFailed(void)
@@ -235,7 +247,11 @@ void rtmgr_onSafe(bool full_init)
     mixer.mix(0, 0, 0);
     drive_left.writeMicroseconds(mixer.getLeft());
     drive_right.writeMicroseconds(mixer.getRight());
+    #ifdef USE_DSHOT
     weapon.setThrottle(0);
+    #else
+    weapon.writeMicroseconds(nvm.weapon.limit_min);
+    #endif
     heading_mgr.setReset();
     pid.reset();
 }

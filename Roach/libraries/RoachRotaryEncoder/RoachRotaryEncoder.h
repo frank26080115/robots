@@ -16,7 +16,7 @@ void RoachEnc_task(void);
 #endif
 
 void RoachEnc_begin(int pin_a, int pin_b);
-int32_t RoachEnc_get(bool clr);
+int32_t RoachEnc_get(bool clr); // outputs raw encoder tick numbers
 bool RoachEnc_hasMoved(bool clr);
 uint32_t RoachEnc_getLastTime(void);
 void RoachEnc_simulate(int x);

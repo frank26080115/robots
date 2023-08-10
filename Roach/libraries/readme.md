@@ -69,7 +69,10 @@ Project Roach - List of Libraries
     * simply counts the number of times the task executes in one second
     * if the count is too low, below 10ms per count, then the system will malfunction
   * RoachPID
-    * implements a PID controller, but for angles, so wrap-around is handled gracefully
+    * implements a PID controller
+    * for angles, so wrap-around is handled gracefully
+    * internally used units are weird
+    * D term polarity is handled automatically
   * RoachPot
     * analog potentiometer reading
     * handles calibration of center and end-points

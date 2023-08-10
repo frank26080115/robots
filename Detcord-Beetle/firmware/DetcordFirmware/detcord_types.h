@@ -23,7 +23,7 @@ typedef struct
     roach_nvm_pid_t pid_heading;
     //roach_nvm_pid_t pid_spindown; // experiment: adjust weapon speed to turn the robot, like a satellite's reaction wheels
     //uint16_t spindown_limit;
-    uint32_t weap_rampup; // just in case the ESC is bad, slowly accelerate weapon, 0 to disable
+    //uint32_t weap_rampup; // just in case the ESC is bad, slowly accelerate weapon, 0 to disable
 
     uint16_t heading_timeout; // when steering override is used, how long to timeout the heading-hold disabled mode
 

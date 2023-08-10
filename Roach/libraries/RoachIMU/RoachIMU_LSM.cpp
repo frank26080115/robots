@@ -7,10 +7,10 @@
 
 static const uint8_t lsm6ds3_init_table[][2] = 
 {
-    { LSM6DS3_REG_CTRL1_XL, 0x4C }, // set the Accelerometer control register to work at 104 Hz, 4 g,and in bypass mode and enable ODR/4
-    { LSM6DS3_REG_CTRL2_G , 0x4A }, // set the gyroscope control register to work at 104 Hz, 2000 dps and in bypass mode
-    { LSM6DS3_REG_CTRL8_XL, 0x09 }, // set the ODR config register to ODR/4
+    { LSM6DS3_REG_CTRL8_XL, 0x09 }, // set the accel ODR config register to ODR/4
     { LSM6DS3_REG_CTRL7_G , 0x00 }, // set gyroscope power mode to high performance and bandwidth to 16 MHz
+    { LSM6DS3_REG_CTRL1_XL, 0x4C }, // set the accelerometer control register to work at 104 Hz, 4 g,and in bypass mode and enable ODR/4
+    { LSM6DS3_REG_CTRL2_G , 0x4A }, // set the gyroscope control register to work at 104 Hz, 2000 dps and in bypass mode
 
     { LSM6DS3_REG_CTRL3_C , 0x44 }, // enable BDU block update, enable auto-inc address, interrupt pin active-high push-pull
 
@@ -31,12 +31,12 @@ static const uint8_t lsm6ds3_init_table[][2] =
 
 typedef struct
 {
-    uint16_t  gyro_x;
-    uint16_t  gyro_y;
-    uint16_t  gyro_z;
-    uint16_t accel_x;
-    uint16_t accel_y;
-    uint16_t accel_z;
+    int16_t  gyro_x;
+    int16_t  gyro_y;
+    int16_t  gyro_z;
+    int16_t accel_x;
+    int16_t accel_y;
+    int16_t accel_z;
 }
 __attribute__ ((packed))
 lsm_data_t;
@@ -193,16 +193,35 @@ void RoachIMU_LSM::task(void)
 void RoachIMU_LSM::writeEuler(euler_t* eu)
 {
     lsm_data_t* pkt = (lsm_data_t*)rx_buff;
-    float  gyro_x = pkt-> gyro_x;
-    float  gyro_y = pkt-> gyro_y;
-    float  gyro_z = pkt-> gyro_z;
+
     float accel_x = pkt->accel_x;
     float accel_y = pkt->accel_y;
     float accel_z = pkt->accel_z;
+
+    // gyro is configured for 2000dps full-scale
+    // gyro output specified 70 mdps/LSB
+
+    int32_t gyro_x32 = pkt->gyro_x;
+    int32_t gyro_y32 = pkt->gyro_y;
+    int32_t gyro_z32 = pkt->gyro_z;
+    gyro_x32 *= 7;
+    gyro_y32 *= 7;
+    gyro_z32 *= 7;
+    float gyro_x = gyro_x32;
+    float gyro_y = gyro_y32;
+    float gyro_z = gyro_z32;
+    gyro_x /= 100.0;
+    gyro_y /= 100.0;
+    gyro_z /= 100.0;
+
+    // accel data is unitless when used inside AHRS
+
     ahrs->updateIMU(gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z);
-    eu->roll  = ahrs->roll;
-    eu->pitch = ahrs->pitch;
-    eu->yaw   = ahrs->yaw;
+
+    // convert radians to degrees
+    eu->roll  = ahrs->roll  / 0.0174533f;
+    eu->pitch = ahrs->pitch / 0.0174533f;
+    eu->yaw   = ahrs->yaw   / 0.0174533f;
 }
 
 #endif

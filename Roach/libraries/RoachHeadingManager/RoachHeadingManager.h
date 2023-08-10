@@ -23,12 +23,19 @@ class RoachHeadingManager
                 nRF52RcRadio* r, RoachIMU* i, RoachPID* p
             #endif
             );
+
+        // yaw angle specified in real degrees
         bool task(roach_ctrl_pkt_t* pkt
             #ifndef RHEADMGR_USE_MODULES
                 , float yaw, uint32_t session
             #endif
             );
-        inline void    setReset      (void) { pending_reset = true; }; // some event triggers a need to reset the angles
+
+        // this should be triggered by events such as radio loss or IMU falure
+        // resets the angle tracking
+        inline void    setReset      (void) { pending_reset = true; };
+
+        // all outputs are -18000 to 18000 (degree * 100)
         inline int32_t getTgtHeading (void) { return tgt_head; };      // target  angle for the PID controller
         inline int32_t getCurHeading (void) { return cur_head; };      // current angle for the PID controller
         inline int32_t getOffsetAngle(void) { return angle_offset; };  // difference between the human input heading and the target angle heading
