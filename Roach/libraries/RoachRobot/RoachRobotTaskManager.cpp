@@ -1,4 +1,5 @@
 #include "RoachRobotTaskManager.h"
+#include "RoachRobotPrivate.h"
 
 static uint32_t task_interval;
 static uint32_t failsafe_timeout;
@@ -45,22 +46,19 @@ void rtmgr_task(uint32_t now)
     {
         case RTMGR_STATE_RUN:
         case RTMGR_STATE_SIM:
-            if (failsafe_timeout == 0)
             {
-                if (radio.isConnected() == false && statemachine != RTMGR_STATE_SIM)
-                {
-                    fail_time = now;
-                    statemachine = RTMGR_STATE_PREFAIL;
-                    rtmgr_onPreFailed();
-                    break;
+                bool enter_failsafe = false;
+                if (failsafe_timeout == 0) {
+                    enter_failsafe = (radio.isConnected() == false && statemachine != RTMGR_STATE_SIM);
                 }
-            }
-            else
-            {
-                if ((now - last_rx) >= failsafe_timeout && statemachine != RTMGR_STATE_SIM)
+                else {
+                    enter_failsafe = ((now - last_rx) >= failsafe_timeout && statemachine != RTMGR_STATE_SIM);
+                }
+                if (enter_failsafe)
                 {
                     fail_time = now;
                     statemachine = RTMGR_STATE_PREFAIL;
+                    debug_printf("[%u] rtmgr_onPreFailed\r\n", now);
                     rtmgr_onPreFailed();
                     break;
                 }
@@ -70,6 +68,7 @@ void rtmgr_task(uint32_t now)
         case RTMGR_STATE_PREEND:
             if ((has_cmd = radio.available()) && statemachine != RTMGR_STATE_PREEND)
             {
+                debug_printf("[%u] rtmgr_onSafe from pre\r\n", now);
                 rtmgr_onSafe(need_full_init);
                 need_full_init = false;
                 statemachine = RTMGR_STATE_RUN;
@@ -77,12 +76,16 @@ void rtmgr_task(uint32_t now)
             }
             else
             {
-                if ((now - fail_time) < (task_interval * 10))
+                if ((now - fail_time) < (task_interval * 20))
                 {
-                    rtmgr_taskPreFailed();
+                    if ((now - last_time) >= task_interval) {
+                        last_time = now;
+                        rtmgr_taskPreFailed();
+                    }
                 }
                 else
                 {
+                    debug_printf("[%u] rtmgr_onPostFailed\r\n", now);
                     rtmgr_onPostFailed();
                     statemachine = RTMGR_STATE_POSTFAIL;
                     need_full_init = true;
@@ -93,6 +96,7 @@ void rtmgr_task(uint32_t now)
         case RTMGR_STATE_POSTEND:
             if ((has_cmd = radio.available()) && statemachine != RTMGR_STATE_POSTEND)
             {
+                debug_printf("[%u] rtmgr_onSafe from post\r\n", now);
                 rtmgr_onSafe(need_full_init);
                 need_full_init = false;
                 statemachine = RTMGR_STATE_RUN;
@@ -100,13 +104,17 @@ void rtmgr_task(uint32_t now)
             }
             else
             {
-                rtmgr_taskPostFailed();
+                if ((now - last_time) >= task_interval) {
+                    last_time = now;
+                    rtmgr_taskPostFailed();
+                }
             }
             break;
         case RTMGR_STATE_START:
         default:
             if ((has_cmd = radio.available()))
             {
+                debug_printf("[%u] rtmgr_onSafe from init state\r\n", now);
                 rtmgr_onSafe(need_full_init);
                 need_full_init = false;
                 statemachine = RTMGR_STATE_RUN;
@@ -140,6 +148,7 @@ void rtmgr_setSimulation(bool x)
         if (statemachine != RTMGR_STATE_RUN && statemachine != RTMGR_STATE_SIM)
         {
             if (need_full_init) {
+                debug_printf("[%u] rtmgr_onSafe from rtmgr_setSimulation\r\n", now);
                 rtmgr_onSafe(need_full_init);
                 need_full_init = false;
             }

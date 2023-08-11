@@ -21,26 +21,39 @@ void roachrobot_syncTask(void)
         roachrobot_recalcChecksum();
         roachrobot_saveSettings(rosync_nvm);
         roachrobot_lastUploadTime = 0;
+        roachrobot_onUpdateCfg();
+        debug_printf("[%u] remote cfg write has been committed\r\n", millis());
     }
 
-    if (radio.textAvail())
+    if (radio.isConnected())
     {
-        radio_binpkt_t* binpkt = radio.textReadPtr(false);
-        if (roachrobot_syncHandleMsg(binpkt)) {
-            radio.textReadPtr(true);
+        if (radio.textAvail())
+        {
+            radio_binpkt_t* binpkt = radio.textReadPtr(false);
+            if (roachrobot_syncHandleMsg(binpkt)) {
+                // message handled, remove it from queue
+                radio.textReadPtr(true);
+            }
+        }
+
+        if (roachrobot_downloadRequestedNvm) {
+            roachrobot_sendChunkNvm();
+        }
+        if (roachrobot_downloadRequestedDesc) {
+            roachrobot_sendChunkDesc();
         }
     }
-
-    if (roachrobot_downloadRequestedNvm) {
-        roachrobot_sendChunkNvm();
-    }
-    if (roachrobot_downloadRequestedDesc) {
-        roachrobot_sendChunkDesc();
+    else
+    {
+        // not connected, end the transactions
+        roachrobot_downloadRequestedNvm  = false;
+        roachrobot_downloadRequestedDesc = false;
     }
 }
 
 bool roachrobot_syncHandleMsg(radio_binpkt_t* binpkt)
 {
+    // if the message can be handled, then do what needs to be done and report back that it's been handled
     if (binpkt->addr == 0 && binpkt->len == 0 && binpkt->data[0] == 0)
     {
         switch (binpkt->typecode)
@@ -49,11 +62,13 @@ bool roachrobot_syncHandleMsg(radio_binpkt_t* binpkt)
                 roachrobot_downloadRequestedDesc = true;
                 roachrobot_downloadRequestedNvm  = false;
                 roachrobot_downloadIdx = 0;
+                debug_printf("[%u] remote download request for desc\r\n", millis());
                 return true;
             case ROACHCMD_SYNC_DOWNLOAD_CONF:
                 roachrobot_downloadRequestedNvm  = true;
                 roachrobot_downloadRequestedDesc = false;
                 roachrobot_downloadIdx = 0;
+                debug_printf("[%u] remote download request for nvm\r\n", millis());
                 return true;
         }
     }
@@ -64,11 +79,12 @@ bool roachrobot_syncHandleMsg(radio_binpkt_t* binpkt)
             case ROACHCMD_SYNC_UPLOAD_CONF:
                 // incoming string is in binpkt->data
                 // format is "%s=%s\n"
+                debug_printf("[%u] remote upload request\r\n", millis());
                 roachrobot_handleUploadLine(NULL, (char*)(binpkt->data), NULL);
                 return true;
         }
     }
-    return false;
+    return false; // not handled
 }
 
 void roachrobot_sendChunkNvm(void)
@@ -88,6 +104,10 @@ void roachrobot_sendChunkNvm(void)
     radio.textSendBin(&tx_pkt);
     if (dlen <= 0) {
         roachrobot_downloadRequestedNvm = false;
+        debug_printf("[%u] nvm request done\r\n", millis());
+    }
+    else {
+        debug_printf("[%u] nvm chunk sent: %u\r\n", millis(), roachrobot_downloadIdx);
     }
 }
 
@@ -109,6 +129,10 @@ void roachrobot_sendChunkDesc(void)
     radio.textSendBin(&tx_pkt);
     if (dlen <= 0) {
         roachrobot_downloadRequestedDesc = false;
+        debug_printf("[%u] desc request done\r\n", millis());
+    }
+    else {
+        debug_printf("[%u] desc chunk sent: %u\r\n", millis(), roachrobot_downloadIdx);
     }
 }
 
@@ -159,6 +183,8 @@ void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream)
             break;
         }
     }
+
+    debug_printf("[%u] upload line: %s = %s\r\n", millis(), argstr, &(argstr[i]));
 
     roachnvm_parseitem(rosync_nvm, cfg_desc, argstr, &(argstr[i]));
     roachrobot_lastUploadTime = millis();

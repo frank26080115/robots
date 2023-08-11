@@ -25,6 +25,9 @@ const cmd_def_t cmds[] = {
     { "filesave"    , roachrobot_handleFileSave },
     { "fileload"    , roachrobot_handleFileLoad },
 
+    { "cfgfile"     , cfgfile_func },
+    { "dbgcfg"      , dbgcfg_func },
+
     { "", NULL }, // end of table
 };
 
@@ -155,4 +158,26 @@ void rtmgrsim_func(void* cmd, char* argstr, Stream* stream)
 void rtmgrend_func(void* cmd, char* argstr, Stream* stream)
 {
     rtmgr_permEnd();
+}
+
+void cfgfile_func(void* cmd, char* argstr, Stream* stream)
+{
+    if (roachrobot_generateDescFile())
+    {
+        stream->println("Generated cfg desc file");
+    }
+    else
+    {
+        stream->println("ERR: failed to generate cfg desc file");
+    }
+}
+
+void dbgcfg_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream.printf("CFG\r\n");
+    stream.printf("\tNVM  checksum: 0x%08X\r\n", rosync_checksum_nvm);
+    stream.printf("\tNVM  size    : %u\r\n"    , rosync_nvm_sz);
+    stream.printf("\tDesc checksum: 0x%08X\r\n", rosync_checksum_desc);
+    stream.printf("\tDesc size (bytes): %u\r\n", cfg_desc_sz);
+    stream.printf("\tDesc size (items): %u\r\n", roachnvm_cntgroup(cfg_desc));
 }

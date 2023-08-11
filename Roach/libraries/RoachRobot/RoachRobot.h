@@ -5,10 +5,10 @@
 #include <RoachLib.h>
 #include <nRF52RcRadio.h>
 
-extern nRF52RcRadio radio;
-extern roach_telem_pkt_t telem_pkt;
-extern roach_nvm_gui_desc_t* cfg_desc;
-extern roach_nvm_gui_desc_t cfgdesc_rf[];
+extern nRF52RcRadio radio;                   // declared from library
+extern roach_telem_pkt_t telem_pkt;          // declared from user app
+extern roach_nvm_gui_desc_t* cfg_desc;       // attached via init function
+extern roach_nvm_gui_desc_t cfgdesc_rf[];    // declared from RoachLib
 #define rosync_desc_tbl cfg_desc
 
 extern uint32_t rosync_checksum_nvm;
@@ -28,12 +28,15 @@ bool roachrobot_loadSettings(uint8_t* data);
 bool roachrobot_saveSettings(uint8_t* data);
 void roachrobot_defaultSettings(uint8_t* data);
 
-void roachrobot_syncTask(void);
+void roachrobot_syncTask(void); // call from application task loop, low priority, only useful if radio is active
 
 uint32_t roachrobot_recalcChecksum(void);
 uint32_t roachrobot_calcDescChecksum(void);
-void roachrobot_pipeCmdLine(void);
-void roachrobot_telemTask(uint32_t now);
+
+void roachrobot_pipeCmdLine(void); // call from application task loop, low priority, only useful if radio is active
+void roachrobot_telemTask(uint32_t now); // call to set telemetry packet with common data
+
+extern roachrobot_onUpdateCfg(void); // must be implemented in user application
 
 extern uint16_t RoachServo_calc(int32_t ctrl, roach_nvm_servo_t* cfg);
 

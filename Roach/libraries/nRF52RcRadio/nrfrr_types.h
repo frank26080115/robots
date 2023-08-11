@@ -90,6 +90,8 @@ typedef struct
     uint32_t addr;
     uint8_t  len;
     uint8_t  data[NRFRR_PAYLOAD_SIZE2];
+    // if the message is plain text, then typecode = ROACHCMD_TEXT and data contains a string, len is not used
+    // otherwise, the application is free to use whatever typecode it needs
 }
 __attribute__ ((packed))
 radio_binpkt_t;

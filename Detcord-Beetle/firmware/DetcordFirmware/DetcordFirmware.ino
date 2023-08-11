@@ -31,7 +31,6 @@ FatFile fatroot;
 FatFile fatfile;
 extern RoachCmdLine cmdline;
 
-nRF52RcRadio radio = nRF52RcRadio(false);
 roach_ctrl_pkt_t  rx_pkt    = {0};
 roach_telem_pkt_t telem_pkt = {0};
 
@@ -101,9 +100,9 @@ void setup()
     PerfCnt_init();
     RoachWdt_init(500);
 
-    rtmgr_init(10, 1000);
-
     roachrobot_init((uint8_t*)&nvm, (uint32_t)sizeof(nvm), (roach_nvm_gui_desc_t*)detcord_cfg_desc, settings_getDescSize());
+
+    rtmgr_init(10, 1000);
 
     debug_printf("Detcord finished setup()\r\n");
     debug_printf("RF params: 0x%08X    0x%08X    0x%08X\r\n", nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);

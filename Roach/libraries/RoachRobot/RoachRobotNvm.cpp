@@ -78,6 +78,10 @@ bool roachrobot_saveSettingsToFile(const char* fname, uint8_t* data)
         f.close();
         return true;
     }
+    else
+    {
+        debug_printf("ERR: roachrobot_saveSettingsToFile failed to open file\r\n");
+    }
     return false;
 }
 
@@ -91,6 +95,10 @@ bool roachrobot_loadSettingsFile(const char* fname, uint8_t* data)
         roachnvm_readfromfile(&f, data, cfg_desc);
         f.close();
         return true;
+    }
+    else
+    {
+        debug_printf("ERR: roachrobot_loadSettingsFile failed to open file\r\n");
     }
     return false;
 }
@@ -120,4 +128,17 @@ uint32_t roachrobot_calcDescChecksum(void)
 {
     rosync_checksum_desc = roach_crcCalc((uint8_t*)cfg_desc, cfg_desc_sz, NULL);
     return rosync_checksum_desc;
+}
+
+bool roachrobot_generateDescFile(void)
+{
+    RoachFile f;
+    bool suc = f.open("cfg_desc.bin", O_RDWR | O_CREAT);
+    if (suc)
+    {
+        f.write(cfg_desc, cfg_desc_sz);
+        f.close();
+        return true;
+    }
+    return false;
 }

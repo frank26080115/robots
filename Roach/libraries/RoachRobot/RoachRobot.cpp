@@ -6,6 +6,8 @@
 
 extern RoachCmdLine cmdline;
 
+nRF52RcRadio radio = nRF52RcRadio(false);
+
 void roachrobot_init(uint8_t* nvm_ptr, uint32_t nvm_size, roach_nvm_gui_desc_t* desc_ptr, uint32_t desc_size)
 {
     rosync_nvm    = nvm_ptr;
@@ -14,6 +16,9 @@ void roachrobot_init(uint8_t* nvm_ptr, uint32_t nvm_size, roach_nvm_gui_desc_t* 
     cfg_desc_sz   = desc_size;
     roachrobot_recalcChecksum();
     roachrobot_calcDescChecksum();
+
+    radio.begin();
+    radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 }
 
 void roachrobot_telemTask(uint32_t now)

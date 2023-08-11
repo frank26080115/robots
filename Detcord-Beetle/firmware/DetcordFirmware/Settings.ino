@@ -82,4 +82,10 @@ void settings_factoryReset(void)
 
 void settings_task(void)
 {
+    
+}
+
+void roachrobot_onUpdateCfg(void)
+{
+    // implemented for call from within RoachRobotSync.cpp
 }
