@@ -1,4 +1,6 @@
 extern void roachrobot_handleUploadLine(void* cmd, char* argstr, Stream* stream);
+extern void roachrobot_handleFileSave(void* cmd, char* argstr, Stream* stream);
+extern void roachrobot_handleFileLoad(void* cmd, char* argstr, Stream* stream);
 
 const cmd_def_t cmds[] = {
     { "factoryreset", factory_reset_func},
@@ -20,6 +22,8 @@ const cmd_def_t cmds[] = {
     { "rtmgrend"    , rtmgrend_func },
 
     { "cfgwrite"    , roachrobot_handleUploadLine },
+    { "filesave"    , roachrobot_handleFileSave },
+    { "fileload"    , roachrobot_handleFileLoad },
 
     { "", NULL }, // end of table
 };

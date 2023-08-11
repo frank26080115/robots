@@ -16,12 +16,16 @@ roach_nvm_gui_desc_t detcord_cfg_desc[] = {
 
     // category divider
 
+    #ifdef USE_DSHOT
+    { ((uint32_t)(&(nvm.weapon.limit_max  )) - (uint32_t)(&nvm)), "WM lim max" , "s16"    ,                   1999,                                 0,                              1999, 1, },
+    #else
     { ((uint32_t)(&(nvm.weapon.center     )) - (uint32_t)(&nvm)), "WM center"  , "s16"    ,        ROACH_SERVO_MIN,                   ROACH_SERVO_MIN,                   ROACH_SERVO_MAX, 1, },
     { ((uint32_t)(&(nvm.weapon.deadzone   )) - (uint32_t)(&nvm)), "WM deadzone", "s16"    ,        ROACH_ADC_NOISE,                                 0,                   ROACH_SERVO_OVR, 1, },
     { ((uint32_t)(&(nvm.weapon.trim       )) - (uint32_t)(&nvm)), "WM trim"    , "s32"    ,                      0,                                 0,                   ROACH_SERVO_OVR, 1, },
-    { ((uint32_t)(&(nvm.weapon.scale      )) - (uint32_t)(&nvm)), "WM scale"   , "s16x10" , ROACH_SCALE_MULTIPLIER,                                 0,                           INT_MAX, 1, },
+    { ((uint32_t)(&(nvm.weapon.scale      )) - (uint32_t)(&nvm)), "WM scale"   , "s16x10" ,                      0,                                 0,                           INT_MAX, 1, }, // 500?
     { ((uint32_t)(&(nvm.weapon.limit_min  )) - (uint32_t)(&nvm)), "WM lim min" , "s16"    ,        ROACH_SERVO_MIN, ROACH_SERVO_MIN - ROACH_SERVO_OVR,                   ROACH_SERVO_MID, 1, },
     { ((uint32_t)(&(nvm.weapon.limit_max  )) - (uint32_t)(&nvm)), "WM lim max" , "s16"    ,        ROACH_SERVO_MAX,                   ROACH_SERVO_MID, ROACH_SERVO_MAX + ROACH_SERVO_OVR, 1, },
+    #endif
     //{ ((uint32_t)(&(nvm.pid_spindown.p    )) - (uint32_t)(&nvm)), "SD P"       ,  "s16x10", ROACH_SCALE_MULTIPLIER, INT_MIN, INT_MAX  ,   1, },
     //{ ((uint32_t)(&(nvm.pid_spindown.i    )) - (uint32_t)(&nvm)), "SD I"       ,  "s16x10",                      0, INT_MIN, INT_MAX  ,   1, },
     //{ ((uint32_t)(&(nvm.pid_spindown.d    )) - (uint32_t)(&nvm)), "SD D"       ,  "s16x10",                      0, INT_MIN, INT_MAX  ,   1, },
@@ -39,20 +43,26 @@ roach_nvm_gui_desc_t detcord_cfg_desc[] = {
     // category divider
 
     //{ ((uint32_t)(&(nvm.imu_orientation              )) - (uint32_t)(&nvm)), "IMU ori"    , "s8"     ,                      0,       0, 6 * 8 - 1,   1, },
-    { ((uint32_t)(&(nvm.heading_timeout              )) - (uint32_t)(&nvm)), "IMU timeout", "s16"    ,                   3000,       0, INT_MAX  , 100, },
-    { ((uint32_t)(&(nvm.pid_heading.p                )) - (uint32_t)(&nvm)), "PID P"      , "s16x10" , ROACH_SCALE_MULTIPLIER, INT_MIN, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm.pid_heading.i                )) - (uint32_t)(&nvm)), "PID I"      , "s16x10" ,                      0, INT_MIN, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm.pid_heading.d                )) - (uint32_t)(&nvm)), "PID D"      , "s16x10" ,                      0, INT_MIN, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm.pid_heading.output_limit     )) - (uint32_t)(&nvm)), "PID out lim",     "s16",                INT_MAX,       0, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm.pid_heading.accumulator_limit)) - (uint32_t)(&nvm)), "PID i lim"  ,     "s16",                INT_MAX,       0, INT_MAX  ,   1, },
-    { ((uint32_t)(&(nvm.pid_heading.accumulator_decay)) - (uint32_t)(&nvm)), "PID i decay",     "s16",                      0,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm.heading_timeout              )) - (uint32_t)(&nvm)), "IMU timeout",     "s16",                   3000,       0, INT_MAX  , 100, },
+    { ((uint32_t)(&(nvm.pid_heading.p                )) - (uint32_t)(&nvm)), "PID P"      ,     "s32",                   2000, INT_MIN, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm.pid_heading.i                )) - (uint32_t)(&nvm)), "PID I"      ,     "s32",                      0, INT_MIN, INT_MAX  ,   1, }, // 50?
+    { ((uint32_t)(&(nvm.pid_heading.d                )) - (uint32_t)(&nvm)), "PID D"      ,     "s32",                      0, INT_MIN, INT_MAX  ,   1, }, // 10000?
+    { ((uint32_t)(&(nvm.pid_heading.output_limit     )) - (uint32_t)(&nvm)), "PID out lim",     "s32",    ROACH_SCALE_MUL_SQR,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm.pid_heading.accumulator_limit)) - (uint32_t)(&nvm)), "PID i lim"  ,     "s32",                 180000,       0, INT_MAX  ,   1, },
+    { ((uint32_t)(&(nvm.pid_heading.accumulator_decay)) - (uint32_t)(&nvm)), "PID i decay",     "s32",                      1,       0, INT_MAX  ,   1, },
     ROACH_NVM_GUI_DESC_END,
 };
 
 void settings_init(void)
 {
+    roachnvm_setdefaults((uint8_t*)&nvm_rf, cfgdesc_rf);
     roachrobot_defaultSettings((uint8_t*)&nvm);
     roachrobot_loadSettings((uint8_t*)&nvm);
+}
+
+uint32_t settings_getDescSize(void)
+{
+    return sizeof(detcord_cfg_desc);
 }
 
 bool settings_save(void)

@@ -57,6 +57,7 @@ RoachDriveMixer mixer;
 RoachPot battery(DETCORDHW_PIN_ADC_BATT, NULL);
 
 extern roach_nvm_gui_desc_t detcord_cfg_desc[];
+extern roach_nvm_gui_desc_t cfggroup_rf[];
 roach_rf_nvm_t nvm_rf;
 detcord_nvm_t nvm;
 
@@ -102,9 +103,10 @@ void setup()
 
     rtmgr_init(10, 1000);
 
-    roachrobot_init((uint8_t*)&nvm, (uint32_t)sizeof(nvm), (roach_nvm_gui_desc_t*)detcord_cfg_desc, (uint32_t)sizeof(detcord_cfg_desc));
+    roachrobot_init((uint8_t*)&nvm, (uint32_t)sizeof(nvm), (roach_nvm_gui_desc_t*)detcord_cfg_desc, settings_getDescSize());
 
     debug_printf("Detcord finished setup()\r\n");
+    debug_printf("RF params: 0x%08X    0x%08X    0x%08X\r\n", nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 }
 
 void loop()
@@ -159,16 +161,16 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         pid.reset();
     }
 
-    mixer.mix(rx_pkt.throttle, rx_pkt.steering, roach_reduce_to_scale(gyro_corr));
+    mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
     drive_left.writeMicroseconds(mixer.getLeft());
     drive_right.writeMicroseconds(mixer.getRight());
 
     if ((rx_pkt.flags & ROACHPKTFLAG_WEAPON) != 0)
     {
         #ifdef USE_DSHOT
-        weapon.setThrottle(roach_value_clamp(roach_multiply_with_scale(rx_pkt.pot_weap, nvm.weapon.scale), nvm.weapon.limit_max, 0));
+        weapon.setThrottle(RoachServo_calc(rx_pkt.pot_weap, &(nvm.weapon)));
         #else
-        weapon.writeMicroseconds(roach_value_clamp(nvm.weapon.limit_min + (roach_multiply_with_scale(rx_pkt.pot_weap, nvm.weapon.scale)), nvm.weapon.limit_max, nvm.weapon.limit_min));
+        weapon.writeMicroseconds(RoachServo_calc(rx_pkt.pot_weap, &(nvm.weapon)));
         #endif
     }
     else
@@ -190,7 +192,7 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
 
         telem_pkt.battery = roach_value_map(battery.getAdcFiltered(), 0, DETCORDHW_BATT_ADC_4200MV, 0, 4200, false);
         telem_pkt.heading = (imu.isReady() == false) ? ROACH_HEADING_INVALID_NOTREADY : ((imu.hasFailed()) ? ROACH_HEADING_INVALID_HASFAILED : ((uint16_t)lround(imu.heading * ROACH_ANGLE_MULTIPLIER)));
-        roachrobot_telemTask(); // this will fill out common fields in the telem packet and then send it off
+        roachrobot_telemTask(millis()); // this will fill out common fields in the telem packet and then send it off
     }
 }
 

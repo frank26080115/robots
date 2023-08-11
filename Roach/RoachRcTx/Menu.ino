@@ -243,7 +243,7 @@ void menu_setup(void)
 {
     menu_install_calibSync();
     menu_install_robot();
-    menu_install(new RoachMenuCfgLister(MENUID_CONFIG_CTRLER, "CONTROLLER", "ctrler", &nvm_tx, cfggroup_ctrler));
+    menu_install(new RoachMenuCfgLister(MENUID_CONFIG_CTRLER, "CONTROLLER", "ctrler", &nvm_tx, cfgdesc_ctrler));
     menu_install_fileOpener();
 }
 

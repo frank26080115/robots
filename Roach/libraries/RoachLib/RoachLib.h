@@ -19,10 +19,7 @@
 #define RoachFile FatFile
 #endif
 
-extern roach_nvm_gui_desc_t cfggroup_rf[];
-extern roach_nvm_gui_desc_t cfggroup_drive[];
-extern roach_nvm_gui_desc_t cfggroup_weap[];
-extern roach_nvm_gui_desc_t cfggroup_sensor[];
+extern roach_nvm_gui_desc_t cfgdesc_rf[];
 
 int roachnvm_cntgroup(roach_nvm_gui_desc_t* g);
 int roachnvm_rx_getcnt(void);
@@ -45,6 +42,7 @@ int32_t roach_reduce_to_scale_3(int32_t x);
 int32_t roach_multiply_with_scale(int32_t a, int32_t b);
 int32_t roach_lpf(int32_t nval, int32_t oval_x, int32_t flt);
 int32_t roach_value_clamp(int32_t x, int32_t upper, int32_t lower);
+static inline int32_t roach_value_clamp_abs(int32_t x, int32_t upper) { return roach_value_clamp(x, upper, -upper); }
 int32_t roach_value_map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min, int32_t out_max, bool limit);
 int roach_div_rounded(const int n, const int d);
 double roach_expo_curve(double x, double curve);

@@ -91,17 +91,19 @@ typedef struct
 PACK_STRUCT
 roach_nvm_servo_t;
 
-// PID output expected to be +/- ROACH_SCALE_MULTIPLIER^3, used with RoachDriveMixer gyro_correction after roach_reduce_to_scale_2
+// PID output expected to be +/- ROACH_SCALE_MULTIPLIER^2, used with RoachDriveMixer gyro_correction
+// ROACH_SCALE_MULTIPLIER^2 = 1000 * 1000 = 1000000
+// ROACH_ANGLE_MULTIPLIER = 10
 typedef struct
 {
-    int32_t  p; // default estimate: 50 degree means 5000 error, output needs to be ROACH_SCALE_MULTIPLIER^3
-                // p = ROACH_SCALE_MULTIPLIER^3 / 5000
-    int32_t  i; // default estimate: error accumulated of 180000, divided by 100 internally
-                // i = ROACH_SCALE_MULTIPLIER^3 / 1800
+    int32_t  p; // default estimate: 50 degree means 500 error, output needs to be ROACH_SCALE_MULTIPLIER^2
+                // p = ROACH_SCALE_MULTIPLIER^2 / 500
+    int32_t  i; // default estimate: error accumulated of 180000, divided by ROACH_ANGLE_MULTIPLIER internally
+                // i = ROACH_SCALE_MULTIPLIER^2 / 18000
     int32_t  d; // default estimate: 100 degree correction in one second means delta = 100
-                // d = ROACH_SCALE_MULTIPLIER^3 / 100
+                // d = ROACH_SCALE_MULTIPLIER^2 / 100
                 // note: d term polarity automatically determined
-    uint32_t output_limit;      // ROACH_SCALE_MULTIPLIER^3
+    uint32_t output_limit;      // ROACH_SCALE_MULTIPLIER^2
     uint32_t accumulator_limit; // upper limit of the error accumulator // error of 1800 collected over 1 seconds is 180000
     uint32_t accumulator_decay; // decay of accumulator once per tick (10ms usually)
 }

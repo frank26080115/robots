@@ -8,26 +8,33 @@ extern RoachCmdLine cmdline;
 
 void roachrobot_init(uint8_t* nvm_ptr, uint32_t nvm_size, roach_nvm_gui_desc_t* desc_ptr, uint32_t desc_size)
 {
-    rosync_nvm = nvm_ptr;
+    rosync_nvm    = nvm_ptr;
     rosync_nvm_sz = nvm_size;
-    cfg_desc = desc_ptr;
-    cfg_desc_sz = desc_size;
+    cfg_desc      = desc_ptr;
+    cfg_desc_sz   = desc_size;
     roachrobot_recalcChecksum();
     roachrobot_calcDescChecksum();
 }
 
-void roachrobot_telemTask(void)
+void roachrobot_telemTask(uint32_t now)
 {
-    telem_pkt.rssi = radio.getRssi();
-    telem_pkt.chksum_nvm = rosync_checksum_nvm;
+    telem_pkt.timestamp   = now / 10;
+    telem_pkt.loss_rate   = radio.stats_rate.loss;
+    telem_pkt.rssi        = radio.getRssi();
+    telem_pkt.chksum_nvm  = rosync_checksum_nvm;
     telem_pkt.chksum_desc = rosync_checksum_desc;
     radio.send((uint8_t*)&telem_pkt); // radio is in RX mode, the telemetry will only actually be sent when requested
 }
 
 void roachrobot_pipeCmdLine(void)
 {
-    if (radio.textAvail()) {
-        cmdline.sideinput_writes((const char*)radio.textReadPtr(true));
+    if (radio.textAvail())
+    {
+        radio_binpkt_t* binpkt = radio.textReadPtr(false);
+        if (binpkt->typecode == ROACHCMD_TEXT) {
+            cmdline.sideinput_writes((const char*)binpkt->data);
+            radio.textReadPtr(true);
+            cmdline.task();
+        }
     }
-    cmdline.task();
 }

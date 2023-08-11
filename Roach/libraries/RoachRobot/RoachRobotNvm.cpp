@@ -1,6 +1,7 @@
 #include "RoachRobot.h"
 #include "RoachRobotPrivate.h"
 #include <RoachUsbMsd.h>
+#include <RoachLib.h>
 
 #define ROACHROBOT_STARTUP_FILE_NAME "cfg.txt"
 
@@ -8,6 +9,7 @@ uint32_t rosync_checksum_nvm  = 0;
 uint32_t rosync_checksum_desc = 0;
 uint8_t* rosync_nvm = NULL;
 uint32_t rosync_nvm_sz = 0;
+roach_nvm_gui_desc_t* cfg_desc;
 uint32_t cfg_desc_sz = 0;
 
 void roachrobot_handleFileLoad(void* cmd, char* argstr, Stream* stream)
@@ -71,6 +73,7 @@ bool roachrobot_saveSettingsToFile(const char* fname, uint8_t* data)
     bool suc = f.open(fname, O_RDWR | O_CREAT);
     if (suc)
     {
+        roachnvm_writetofile(&f, (uint8_t*)&nvm_rf, cfgdesc_rf);
         roachnvm_writetofile(&f, data, cfg_desc);
         f.close();
         return true;
@@ -84,6 +87,7 @@ bool roachrobot_loadSettingsFile(const char* fname, uint8_t* data)
     bool suc = f.open(fname);
     if (suc)
     {
+        roachnvm_readfromfile(&f, (uint8_t*)&nvm_rf, cfgdesc_rf);
         roachnvm_readfromfile(&f, data, cfg_desc);
         f.close();
         return true;

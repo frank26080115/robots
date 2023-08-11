@@ -76,7 +76,7 @@ void roachrobot_sendChunkNvm(void)
     if (radio.textIsDone() == false) {
         return;
     }
-    tx_pkt.typecode = ROACHCMD_SYNC_DOWNLOAD_NVM;
+    tx_pkt.typecode = ROACHCMD_SYNC_DOWNLOAD_CONF;
     int dlen = rosync_nvm_sz - roachrobot_downloadIdx;
     dlen = dlen > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : dlen;
     tx_pkt.len = dlen > 0 ? dlen : 0;

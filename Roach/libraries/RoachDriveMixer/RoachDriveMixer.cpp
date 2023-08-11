@@ -12,7 +12,7 @@ void RoachDriveMixer::mix(int32_t throttle, int32_t steering, int32_t gyro_corre
     throttle = calcCrossMixThrottle(throttle, steering);
 
     steering += gyro_correction;
-    steering = roach_value_clamp(steering, input_limit, -input_limit);
+    steering = roach_value_clamp_abs(steering, input_limit);
 
     // https://home.kendra.com/mauser/joystick.html
     int32_t inv_steering = -steering;
@@ -69,7 +69,7 @@ int32_t RoachDriveMixer::applyServoParams(roach_nvm_servo_t* cfg, int32_t spd)
     {
         spd *= cfg->scale;
         spd = roach_reduce_to_scale(spd);
-        spd += cfg->deadzone * (spd > 0 ? 1 : -1);
+        spd += cfg->deadzone * (spd >= 0 ? 1 : -1);
         spd += cfg->trim;
         spd = roach_value_clamp(spd, cfg->limit_max, cfg->limit_min);
         return spd;

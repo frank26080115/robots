@@ -8,7 +8,7 @@
 extern uint8_t* rosync_nvm;
 extern roach_nvm_gui_desc_t* rosync_desc_tbl;
 
-roach_nvm_gui_desc_t cfggroup_ctrler[] = {
+roach_nvm_gui_desc_t cfgdesc_ctrler[] = {
     { ((uint32_t)(&(nvm_tx.heading_multiplier      )) - (uint32_t)(&nvm_tx)), "H scale"     , "s32x10" ,                      9,                 INT_MIN, INT_MAX               , 1, },
     //{ ((uint32_t)(&(nvm_tx.cross_mix               )) - (uint32_t)(&nvm_tx)), "X mix"       , "s32x10" ,                      0,                 INT_MIN, INT_MAX               , 1, },
     { ((uint32_t)(&(nvm_tx.pot_throttle.center     )) - (uint32_t)(&nvm_tx)), "T center"    , "s16"    ,          ROACH_ADC_MID,                       0, ROACH_ADC_MAX         , 1, },
@@ -60,8 +60,8 @@ void settings_init(void)
 void settings_factoryReset(void)
 {
     memset(&nvm_tx, 0, sizeof(roach_tx_nvm_t));
-    roachnvm_setdefaults((uint8_t*)&nvm_rf, cfggroup_rf);
-    roachnvm_setdefaults((uint8_t*)&nvm_tx, cfggroup_ctrler);
+    roachnvm_setdefaults((uint8_t*)&nvm_rf, cfgdesc_rf);
+    roachnvm_setdefaults((uint8_t*)&nvm_tx, cfgdesc_ctrler);
 }
 
 bool settings_save(void)
@@ -103,11 +103,11 @@ bool settings_loadFile(const char* fname)
     if (suc)
     {
         if ((flags & (1 << 0)) != 0 || flags == 0) {
-            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rf, cfggroup_rf);
+            roachnvm_readfromfile(&f, (uint8_t*)&nvm_rf, cfgdesc_rf);
             radio_init();
         }
         if ((flags & (1 << 1)) != 0 || flags == 0) {
-            roachnvm_readfromfile(&f, (uint8_t*)&nvm_tx, cfggroup_ctrler);
+            roachnvm_readfromfile(&f, (uint8_t*)&nvm_tx, cfgdesc_ctrler);
         }
         if ((flags & (1 << 2)) != 0 || flags == 0) {
             roachnvm_readfromfile(&f, (uint8_t*)rosync_nvm, rosync_desc_tbl);
@@ -143,10 +143,10 @@ bool settings_saveToFile(const char* fname)
     if (suc)
     {
         if ((flags & (1 << 0)) != 0 || flags == 0) {
-            roachnvm_writetofile(&f, (uint8_t*)&nvm_rf, cfggroup_rf);
+            roachnvm_writetofile(&f, (uint8_t*)&nvm_rf, cfgdesc_rf);
         }
         if ((flags & (1 << 1)) != 0 || flags == 0) {
-            roachnvm_writetofile(&f, (uint8_t*)&nvm_tx, cfggroup_ctrler);
+            roachnvm_writetofile(&f, (uint8_t*)&nvm_tx, cfgdesc_ctrler);
         }
         if ((flags & (1 << 2)) != 0 || flags == 0) {
             roachnvm_writetofile(&f, (uint8_t*)rosync_nvm, rosync_desc_tbl);

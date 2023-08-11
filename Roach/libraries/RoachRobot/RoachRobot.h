@@ -8,6 +8,7 @@
 extern nRF52RcRadio radio;
 extern roach_telem_pkt_t telem_pkt;
 extern roach_nvm_gui_desc_t* cfg_desc;
+extern roach_nvm_gui_desc_t cfgdesc_rf[];
 #define rosync_desc_tbl cfg_desc
 
 extern uint32_t rosync_checksum_nvm;
@@ -15,6 +16,7 @@ extern uint32_t rosync_checksum_desc;
 extern uint8_t* rosync_nvm;
 extern uint32_t rosync_nvm_sz;
 extern uint32_t cfg_desc_sz;
+extern roach_rf_nvm_t nvm_rf;
 
 void roachrobot_init(uint8_t* nvm_ptr, uint32_t nvm_size, roach_nvm_gui_desc_t* desc_ptr, uint32_t desc_size);
 
@@ -26,9 +28,13 @@ bool roachrobot_loadSettings(uint8_t* data);
 bool roachrobot_saveSettings(uint8_t* data);
 void roachrobot_defaultSettings(uint8_t* data);
 
+void roachrobot_syncTask(void);
+
 uint32_t roachrobot_recalcChecksum(void);
 uint32_t roachrobot_calcDescChecksum(void);
 void roachrobot_pipeCmdLine(void);
-void roachrobot_telemTask(void);
+void roachrobot_telemTask(uint32_t now);
+
+extern uint16_t RoachServo_calc(int32_t ctrl, roach_nvm_servo_t* cfg);
 
 #endif

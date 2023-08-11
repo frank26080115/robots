@@ -66,7 +66,7 @@ RoachPot pot_weapon   = RoachPot(ROACHHW_PIN_POT_WEAPON  , &(nvm_tx.pot_weapon))
 RoachPot pot_aux      = RoachPot(ROACHHW_PIN_POT_AUX     , &(nvm_tx.pot_aux));
 RoachPot pot_battery  = RoachPot(ROACHHW_PIN_POT_BATTERY , &(nvm_tx.pot_battery));
 
-extern roach_nvm_gui_desc_t cfggroup_ctrler[];
+extern roach_nvm_gui_desc_t cfgdesc_ctrler[];
 
 roach_ctrl_pkt_t  tx_pkt    = {0};
 roach_telem_pkt_t telem_pkt = {0};

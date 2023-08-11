@@ -19,14 +19,7 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
     _last_tgt = cur;
 
     _diff = tgt - cur;
-    while (_diff > (180 * ROACH_ANGLE_MULTIPLIER))
-    {
-        _diff -= (360 * ROACH_ANGLE_MULTIPLIER);
-    }
-    while (_diff < -(180 * ROACH_ANGLE_MULTIPLIER))
-    {
-        _diff += (360 * ROACH_ANGLE_MULTIPLIER);
-    }
+    ROACH_WRAP_ANGLE(_diff, ROACH_ANGLE_MULTIPLIER);
 
     _p = cfg->p * _diff;
 
@@ -38,7 +31,7 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
     accumulator += _diff;
     accumulator = accumulator > cfg->accumulator_limit ? cfg->accumulator_limit : (accumulator < -cfg->accumulator_limit ? -cfg->accumulator_limit : accumulator);
 
-    _i = cfg->i * roach_div_rounded(accumulator, 100);
+    _i = cfg->i * roach_div_rounded(accumulator, ROACH_ANGLE_MULTIPLIER);
     // I want more resolution for the I term, so remove the decimal places in the accumulated error
 
     if (accumulator > cfg->accumulator_decay) {
@@ -82,7 +75,7 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
     last_diff = _diff;
 
     int32_t actual_out = roach_reduce_to_scale(_output = (_p + _i + _d));
-    return roach_value_clamp(actual_out, cfg->output_limit, -cfg->output_limit);
+    return roach_value_clamp_abs(actual_out, cfg->output_limit);
 }
 
 void RoachPID::debug(void)
