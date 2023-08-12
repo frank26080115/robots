@@ -5,6 +5,8 @@
 
 #define ROACHROBOT_STARTUP_FILE_NAME "cfg.txt"
 
+roach_rf_nvm_t nvm_rf;
+
 uint32_t rosync_checksum_nvm  = 0;
 uint32_t rosync_checksum_desc = 0;
 uint8_t* rosync_nvm = NULL;

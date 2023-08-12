@@ -148,7 +148,7 @@ void rtmgr_setSimulation(bool x)
         if (statemachine != RTMGR_STATE_RUN && statemachine != RTMGR_STATE_SIM)
         {
             if (need_full_init) {
-                debug_printf("[%u] rtmgr_onSafe from rtmgr_setSimulation\r\n", now);
+                debug_printf("[%u] rtmgr_onSafe from rtmgr_setSimulation\r\n", millis());
                 rtmgr_onSafe(need_full_init);
                 need_full_init = false;
             }

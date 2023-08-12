@@ -7,6 +7,8 @@
 extern RoachCmdLine cmdline;
 
 nRF52RcRadio radio = nRF52RcRadio(false);
+roach_ctrl_pkt_t  rx_pkt    = {0};
+roach_telem_pkt_t telem_pkt = {0};
 
 void roachrobot_init(uint8_t* nvm_ptr, uint32_t nvm_size, roach_nvm_gui_desc_t* desc_ptr, uint32_t desc_size)
 {

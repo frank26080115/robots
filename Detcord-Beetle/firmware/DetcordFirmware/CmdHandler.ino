@@ -174,10 +174,10 @@ void cfgfile_func(void* cmd, char* argstr, Stream* stream)
 
 void dbgcfg_func(void* cmd, char* argstr, Stream* stream)
 {
-    stream.printf("CFG\r\n");
-    stream.printf("\tNVM  checksum: 0x%08X\r\n", rosync_checksum_nvm);
-    stream.printf("\tNVM  size    : %u\r\n"    , rosync_nvm_sz);
-    stream.printf("\tDesc checksum: 0x%08X\r\n", rosync_checksum_desc);
-    stream.printf("\tDesc size (bytes): %u\r\n", cfg_desc_sz);
-    stream.printf("\tDesc size (items): %u\r\n", roachnvm_cntgroup(cfg_desc));
+    stream->printf("CFG\r\n");
+    stream->printf("\tNVM  checksum: 0x%08X\r\n", rosync_checksum_nvm);
+    stream->printf("\tNVM  size    : %u\r\n"    , rosync_nvm_sz);
+    stream->printf("\tDesc checksum: 0x%08X\r\n", rosync_checksum_desc);
+    stream->printf("\tDesc size (bytes): %u\r\n", cfg_desc_sz);
+    stream->printf("\tDesc size (items): %u\r\n", roachnvm_cntgroup(cfg_desc));
 }

@@ -25,14 +25,9 @@
 #include <nRF5Rand.h>
 #include <NonBlockingTwi.h>
 
-bool can_start = false;
-
 FatFile fatroot;
 FatFile fatfile;
 extern RoachCmdLine cmdline;
-
-roach_ctrl_pkt_t  rx_pkt    = {0};
-roach_telem_pkt_t telem_pkt = {0};
 
 RoachServo drive_left (DETCORDHW_PIN_SERVO_DRV_L);
 RoachServo drive_right(DETCORDHW_PIN_SERVO_DRV_R);
@@ -56,8 +51,6 @@ RoachDriveMixer mixer;
 RoachPot battery(DETCORDHW_PIN_ADC_BATT, NULL);
 
 extern roach_nvm_gui_desc_t detcord_cfg_desc[];
-extern roach_nvm_gui_desc_t cfggroup_rf[];
-roach_rf_nvm_t nvm_rf;
 detcord_nvm_t nvm;
 
 RoachHeadingManager heading_mgr((uint32_t*)&(nvm.heading_timeout));
@@ -85,6 +78,7 @@ void setup()
         RoachUsbMsd_presentUsbMsd();
     }
 
+    battery.alt_filter = ROACH_FILTER_DEFAULT;
     battery.begin();
 
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
@@ -93,9 +87,6 @@ void setup()
     pid.cfg = &(nvm.pid_heading);
     mixer.cfg_left = &(nvm.drive_left);
     mixer.cfg_right = &(nvm.drive_right);
-
-    radio.begin();
-    radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 
     PerfCnt_init();
     RoachWdt_init(500);

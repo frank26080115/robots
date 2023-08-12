@@ -1,4 +1,5 @@
 #include "nRF52Dshot.h"
+#include <RoachLib.h>
 
 nRF52Dshot::nRF52Dshot(int pin, uint8_t speed, uint32_t interval, NRF_PWM_Type* p_pwm, int8_t pwm_out)
 {
@@ -157,7 +158,7 @@ void nRF52Dshot::pwmConfig(void)
 
 void nRF52Dshot::setThrottle(uint16_t t, bool sync)
 {
-    _throttle = nrfdshot_createPacket(t + 48);
+    _throttle = nrfdshot_createPacket(t + DSHOT_MIN_VALUE);
     if (sync)
     {
         _cmdcnt = 0;
@@ -243,8 +244,8 @@ void nRF52Dshot::writeMicroseconds(uint16_t us)
 }
 
 #define NRFDSHOT_CONV_THROTTLE(ppm) \
-    const int32_t in_min  = 1000;   \
-    const int32_t in_max  = 2000;   \
+    const int32_t in_min  = ROACH_SERVO_MIN; \
+    const int32_t in_max  = ROACH_SERVO_MAX; \
     const int32_t out_min = 0;      \
     int32_t a = (ppm)   - in_min;   \
     int32_t b = out_max - out_min;  \
@@ -273,13 +274,13 @@ uint16_t nRF52Dshot::convertPpm(uint16_t ppm)
     #ifdef NRFDSHOT_SUPPORT_SPEED_1200
         (_speed == DSHOT_SPEED_1200) ? 4095 :
     #endif
-        2047 ) - 48;
+        DSHOT_MAX_VALUE ) - DSHOT_MIN_VALUE;
     NRFDSHOT_CONV_THROTTLE(ppm);
 }
 
 uint16_t nrfdshot_convertPpm(uint16_t ppm)
 {
-    const int32_t out_max = 2047;
+    const int32_t out_max = DSHOT_MAX_VALUE;
 
     NRFDSHOT_CONV_THROTTLE(ppm);
 }
@@ -291,8 +292,11 @@ uint16_t nrfdshot_createPacket(uint16_t throttle)
     throttle <<= 1;
 
     // Indicate as command if less than 48
-    if (throttle < 48 && throttle > 0) {
+    if (throttle < DSHOT_MIN_VALUE && throttle > 0) {
         throttle |= 1;
+    }
+    else if (throttle > DSHOT_MAX_VALUE) { // limit throttle to max possible
+        throttle = DSHOT_MAX_VALUE;
     }
 
     uint16_t csum_data = throttle;

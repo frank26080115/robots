@@ -88,4 +88,5 @@ void settings_task(void)
 void roachrobot_onUpdateCfg(void)
 {
     // implemented for call from within RoachRobotSync.cpp
+    // TODO: if there are any objects that need to be updated when new settings are written
 }
