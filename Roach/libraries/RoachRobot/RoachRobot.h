@@ -11,7 +11,7 @@ extern roach_telem_pkt_t telem_pkt;          // declared from this library
 extern roach_nvm_gui_desc_t* cfg_desc;       // attached via init function
 extern roach_nvm_gui_desc_t cfgdesc_rf[];    // declared from RoachLib
 #define rosync_desc_tbl cfg_desc
-extern roach_rf_nvm_t nvm_rf;          // declared from this library
+extern roach_rf_nvm_t nvm_rf;                // declared from this library
 
 extern uint32_t rosync_checksum_nvm;
 extern uint32_t rosync_checksum_desc;

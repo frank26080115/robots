@@ -11,6 +11,7 @@ const cmd_def_t cmds[] = {
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
     { "save"        , save_func },
+    { "dfu"         , dfuenter_func },
     { "fakebtn"     , fakebtn_func },
     { "fakepott"    , fakepott_func },
     { "fakepots"    , fakepots_func },
@@ -100,6 +101,18 @@ void regenrf_func(void* cmd, char* argstr, Stream* stream)
 void readrf_func(void* cmd, char* argstr, Stream* stream)
 {
     stream->printf("RF params: 0x%08X 0x%08X 0x%08X\r\n", nvm_rf.uid, nvm_rf.salt, nvm_rf.chan_map);
+}
+
+void dfuenter_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("ENTERING DFU\r\n");
+    waitFor(200);
+    if (atoi(argstr) == 2) {
+        enterUf2Dfu();
+    }
+    else {
+        enterSerialDfu();
+    }
 }
 
 void fakebtn_func(void* cmd, char* argstr, Stream* stream)

@@ -31,6 +31,7 @@ RoachCmdLine::RoachCmdLine(Stream* stream_obj, cmd_def_t* user_cmd_list, bool lo
     this->_echo = local_echo;
     this->_cmd_list = user_cmd_list;
     this->_higher_priori = higher_priori;
+    this->_has_interaction = false;
 }
 
 int RoachCmdLine::task()
@@ -41,6 +42,7 @@ int RoachCmdLine::task()
         uint8_t c;
         if (_stream->available() > 0) {
             c = _stream->read();
+            _has_interaction = true;
         }
         else if (_sidefifo_r != _sidefifo_w) {
             c = _side_fifo[_sidefifo_r];

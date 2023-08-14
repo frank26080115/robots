@@ -28,6 +28,7 @@ class RoachCmdLine
         void sideinput_writec(char c);
         void sideinput_writes(const char* s);
         void sideinput_writeb(const char* s, uint32_t len);
+        inline bool has_interaction(void) { return _has_interaction; };
     protected:
         Stream* _stream;
         cmd_def_t* _cmd_list;
@@ -41,6 +42,7 @@ class RoachCmdLine
         bool _higher_priori;
         uint8_t* _side_fifo;
         uint32_t _sidefifo_w, _sidefifo_r, _sidefifo_s;
+        bool _has_interaction;
 };
 
 #endif

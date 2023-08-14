@@ -16,6 +16,13 @@
 #define ROACHTX_AUTOSAVE
 #define ROACHTX_AUTOEXIT
 
+#define DEVMODE_NO_RADIO
+//#define DEVMODE_WAIT_SERIAL
+#define DEVMODE_SUBMENU_FOREVER
+
+//#define debug_printf(...)            // do nothing
+#define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
+
 #include "roachtx_conf_hw.h"
 
 #endif

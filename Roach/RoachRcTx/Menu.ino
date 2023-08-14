@@ -110,10 +110,10 @@ class RoachMenuHome : public RoachMenu
             switch (btn)
             {
                 case BTNID_G5:
-                    _exit = EXITCODE_RIGHT;
+                    _exit = EXITCODE_LEFT;
                     break;
                 case BTNID_G6:
-                    _exit = EXITCODE_LEFT;
+                    _exit = EXITCODE_RIGHT;
                     break;
             }
         };
@@ -189,10 +189,10 @@ class RoachMenuInfo : public RoachMenu
             switch (btn)
             {
                 case BTNID_G5:
-                    _exit = EXITCODE_RIGHT;
+                    _exit = EXITCODE_LEFT;
                     break;
                 case BTNID_G6:
-                    _exit = EXITCODE_LEFT;
+                    _exit = EXITCODE_RIGHT;
                     break;
                 default:
                     _exit = EXITCODE_HOME;
@@ -215,7 +215,7 @@ void menu_run(void)
         current_menu = &menuHome;
         Serial.println("current menu is null, assigning home screen");
     }
-    Serial.printf("[u%]: running menu screen ID=%d\r\n", millis(), current_menu->getId());
+    Serial.printf("[%u]: running menu screen ID=%d\r\n", millis(), current_menu->getId());
     current_menu->run();
     int ec = current_menu->getExitCode();
     Serial.printf("[%u]: menu exited to top level, exitcode=%d\r\n", millis(), ec);
@@ -225,22 +225,28 @@ void menu_run(void)
     else if (ec == EXITCODE_BACK && current_menu->parent_menu != NULL) {
         current_menu = (RoachMenu*)current_menu->parent_menu;
     }
-    else if (current_menu == &menuHome && ec == EXITCODE_RIGHT) {
+    else if (current_menu == &menuHome && ec == EXITCODE_LEFT) {
         current_menu = &menuInfo;
     }
     else if ((current_menu == &menuHome || current_menu == &menuInfo) && ec == EXITCODE_LEFT) {
         current_menu = (RoachMenu*)menuListCur;
+        menuListCur = current_menu;
     }
     else if (ec == EXITCODE_LEFT) {
         current_menu = (RoachMenu*)menuListCur->prev_menu;
+        menuListCur = current_menu;
     }
     else if (ec == EXITCODE_RIGHT) {
         current_menu = (RoachMenu*)menuListCur->next_menu;
+        menuListCur = current_menu;
     }
 }
 
 void menu_setup(void)
 {
+    // individual code modules that represent a particular menu screen will implement a installer function
+    // call that installer function here, in order
+
     menu_install_calibSync();
     menu_install_robot();
     menu_install(new RoachMenuCfgLister(MENUID_CONFIG_CTRLER, "CONTROLLER", "ctrler", &nvm_tx, cfgdesc_ctrler));

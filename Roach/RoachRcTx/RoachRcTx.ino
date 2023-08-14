@@ -84,7 +84,7 @@ RoachHeartbeat hb_blu = RoachHeartbeat(ROACHHW_PIN_LED_BLU);
 void setup(void)
 {
     //sd_softdevice_disable();
-    safeboot_check();
+    safeboot_check(); // check if user wants to enter bootloader mode
     //hw_bringup();
 
     RoachWdt_init(ROACH_WDT_TIMEOUT_MS);
@@ -116,7 +116,11 @@ void setup(void)
     gui_init();
     // show splash screen for a short time, user can exit with a button
     // this will also ensure that the RNG buffer fills up
-    while (millis() <= 3000)
+    while (millis() <= 3000
+        #ifdef DEVMODE_WAIT_SERIAL
+        || cmdline.has_interaction() == false
+        #endif
+    )
     {
         ctrler_tasks();
         if (btns_hasAnyPressed()) {
@@ -148,14 +152,20 @@ void ctrler_tasks(void)
     RoachPot_allTask(); // polls ADCs non-blocking
     // TODO: buttons are using interrupts only, no tasks, but check reliability
     nbtwi_task(); // send any queued data to OLED
+    #ifndef DEVMODE_NO_RADIO
     radio.task(); // run the radio state machine, sends buffered data when time is right
+    #endif
 
+    #ifndef DEVMODE_NO_RADIO
     if (radio.isBusy()) // if the transmission is happening, then we have time to do extra stuff
+    #endif
     {
         heartbeat_task();
         RoachEnc_task();     // transfers hardware values to RAM atomically
         nrf5rand_task();     // collect random numbers from RNG
+        #ifndef DEVMODE_NO_RADIO
         rosync_task();       // checks for robot synchronization
+        #endif
         RoachUsbMsd_task();  // handles tasks for USB flash mass storage
         cmdline.task();      // handles command line
 
@@ -165,6 +175,7 @@ void ctrler_tasks(void)
         }
 
         ctrler_buildPkt();
+        #ifndef DEVMODE_NO_RADIO
         radio.send((uint8_t*)&tx_pkt);
 
         if (radio.available())
@@ -173,6 +184,7 @@ void ctrler_tasks(void)
         }
 
         ctrler_pktDebug();
+        #endif
     }
 }
 

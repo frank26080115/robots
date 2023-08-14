@@ -52,6 +52,7 @@ void RoachMenu::run(void)
         checkButtons();
 
         #ifdef ROACHTX_AUTOEXIT
+        #ifndef DEVMODE_SUBMENU_FOREVER
         if (gui_last_activity_time != 0 && _id != MENUID_HOME)
         {
             if ((millis() - gui_last_activity_time) >= 10000) {
@@ -59,6 +60,7 @@ void RoachMenu::run(void)
                 _exit = EXITCODE_HOME;
             }
         }
+        #endif
         #endif
 
         if (_interrupt == EXITCODE_BACK) {
@@ -101,32 +103,48 @@ void RoachMenu::onExit(void)
 
 void RoachMenu::onButton(uint8_t btn)
 {
-    #ifdef ROACHTX_AUTOEXIT
-    gui_last_activity_time = millis();
-    #endif
+}
+
+void RoachMenu::onButtonCheckExit(uint8_t btn)
+{
+    
 }
 
 void RoachMenu::checkButtons(void)
 {
     if (btn_up.hasPressed(true)) {
+        gui_last_activity_time = millis();
+        debug_printf("[%u] btn up\r\n", millis());
         this->onButton(BTNID_UP);
     }
     if (btn_down.hasPressed(true)) {
+        gui_last_activity_time = millis();
+        debug_printf("[%u] btn down\r\n", millis());
         this->onButton(BTNID_DOWN);
     }
     if (btn_left.hasPressed(true)) {
+        gui_last_activity_time = millis();
+        debug_printf("[%u] btn left\r\n", millis());
         this->onButton(BTNID_LEFT);
     }
     if (btn_right.hasPressed(true)) {
+        gui_last_activity_time = millis();
+        debug_printf("[%u] btn right\r\n", millis());
         this->onButton(BTNID_RIGHT);
     }
     if (btn_center.hasPressed(true)) {
+        gui_last_activity_time = millis();
+        debug_printf("[%u] btn center\r\n", millis());
         this->onButton(BTNID_CENTER);
     }
     if (btn_g5.hasPressed(true)) {
+        gui_last_activity_time = millis();
+        debug_printf("[%u] btn g5\r\n", millis());
         this->onButton(BTNID_G5);
     }
     if (btn_g6.hasPressed(true)) {
+        gui_last_activity_time = millis();
+        debug_printf("[%u] btn g6\r\n", millis());
         this->onButton(BTNID_G6);
     }
 }
@@ -140,7 +158,7 @@ RoachMenuListItem::~RoachMenuListItem(void)
 
 void RoachMenuListItem::sprintName(char* s)
 {
-    strncpy(s, _txt, (128 / 4));
+    strcpy(s, _txt);
 }
 
 char* RoachMenuListItem::getName(void)
@@ -153,6 +171,7 @@ RoachMenuFunctionItem::RoachMenuFunctionItem(const char* name)
     int slen = strlen(name);
     _txt   = (char*)malloc(slen + 1);
     strncpy(_txt, name, slen);
+    _txt[slen] = 0;
 }
 
 RoachMenuFileItem::RoachMenuFileItem(const char* fname)
@@ -162,6 +181,8 @@ RoachMenuFileItem::RoachMenuFileItem(const char* fname)
     _fname = (char*)malloc(slen + 1);
     strncpy(_txt, fname, slen);
     strncpy(_fname, fname, slen);
+    _txt[slen] = 0;
+    _fname[slen] = 0;
     int i;
     for (i = 2; i < slen - 4; i++)
     {
@@ -185,7 +206,7 @@ RoachMenuFileItem::~RoachMenuFileItem(void)
 
 void RoachMenuFileItem::sprintFName(char* s)
 {
-    strncpy(s, _fname, (128 / 4));
+    strcpy(s, _fname);
 }
 
 char* RoachMenuFileItem::getFName(void)
@@ -201,7 +222,7 @@ RoachMenuCfgItem::RoachMenuCfgItem(void* struct_ptr, roach_nvm_gui_desc_t* desc)
 
 void RoachMenuCfgItem::sprintName(char* s)
 {
-    strncpy(s, _desc->name, (128 / 4));
+    strcpy(s, _desc->name);
 }
 
 char* RoachMenuCfgItem::getName(void)

@@ -32,6 +32,7 @@ bool gui_canDisplay(void)
     if (nbtwi_isBusy() != false) {
         return false;
     }
+    #ifndef DEVMODE_NO_RADIO
     if (radio.isBusy())
     {
         uint32_t now = millis();
@@ -40,6 +41,9 @@ bool gui_canDisplay(void)
             return true;
         }
     }
+    #else
+    return true;
+    #endif
     return false;
 }
 

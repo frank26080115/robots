@@ -1,3 +1,8 @@
+// check if user wants to enter bootloader mode
+// the Roach robot remote control is enclosed with no access to the reset button
+// if during development, bad code is written and the microcontroller becomes not responsive over virtual serial port
+// a combination of buttons held, during power-up, will force the microcontroller into bootloader mode
+// thus providing a way to recover from the bad code without disassembling the enclosure
 void safeboot_check(void)
 {
     pinMode(ROACHHW_PIN_BTN_UP    , INPUT_PULLUP);

@@ -76,6 +76,7 @@ class RoachMenu
         virtual void onEnter(void);
         virtual void onExit(void);
         virtual void onButton(uint8_t btn);
+        virtual void onButtonCheckExit(uint8_t btn);
         virtual void checkButtons(void);
 };
 

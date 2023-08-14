@@ -15,7 +15,9 @@ class RoachMenuFuncCalibGyro : public RoachMenuFunctionItem
         virtual void onEnter(void)
         {
             RoachMenu::onEnter();
+            #ifndef DEVMODE_NO_RADIO
             radio.textSend("calibgyro");
+            #endif
         };
 
         virtual void draw_sidebar(void)
@@ -37,7 +39,9 @@ class RoachMenuFuncCalibGyro : public RoachMenuFunctionItem
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
+                    #ifndef DEVMODE_NO_RADIO
                     radio.textSend("calibgyro");
+                    #endif
                     break;
             }
         };
@@ -464,11 +468,20 @@ class RoachMenuCalibSync : public RoachMenuLister
 
         virtual void onButton(uint8_t btn)
         {
-            RoachMenuLister::onButton(btn);
+            RoachMenuLister::onButton(btn); // this should handle the up and down buttons
             if (_exit == 0)
             {
                 switch (btn)
                 {
+                    case BTNID_G6:
+                        _exit = EXITCODE_HOME;
+                        break;
+                    case BTNID_LEFT:
+                        _exit = EXITCODE_LEFT;
+                        break;
+                    case BTNID_RIGHT:
+                        _exit = EXITCODE_RIGHT;
+                        break;
                     case BTNID_CENTER:
                         {
                             RoachMenuFunctionItem* itm = (RoachMenuFunctionItem*)getNodeAt(_list_idx);
