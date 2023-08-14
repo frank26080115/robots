@@ -8,6 +8,8 @@
 #include <RoachButton.h>
 #include <RoachRotaryEncoder.h>
 
+#include "gui_symbols.h"
+
 enum
 {
     MENUID_NONE,
@@ -163,6 +165,7 @@ class RoachMenuFileOpenList : public RoachMenuLister
 {
     public:
         RoachMenuFileOpenList(void);
+        virtual void draw(void);
     protected:
         virtual void draw_sidebar(void);
         virtual void draw_title(void);
@@ -176,6 +179,7 @@ class RoachMenuFileSaveList : public RoachMenuLister
 {
     public:
         RoachMenuFileSaveList(const char* filter);
+        virtual void draw(void);
     protected:
         char _filter[16];
         char _newfilename[32];
@@ -190,6 +194,7 @@ class RoachMenuCfgLister : public RoachMenuLister
 {
     public:
         RoachMenuCfgLister(uint8_t id, const char* name, const char* filter, void* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
+        virtual void draw(void);
     protected:
         void* _struct;
         roach_nvm_gui_desc_t* _desc_tbl;

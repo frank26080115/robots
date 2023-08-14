@@ -225,6 +225,9 @@ void menu_run(void)
     else if (ec == EXITCODE_BACK && current_menu->parent_menu != NULL) {
         current_menu = (RoachMenu*)current_menu->parent_menu;
     }
+    else if (ec == EXITCODE_BACK && current_menu->parent_menu == NULL) {
+        current_menu = (RoachMenu*)&menuHome;
+    }
     else if (current_menu == &menuHome && ec == EXITCODE_LEFT) {
         current_menu = &menuInfo;
     }
@@ -239,6 +242,13 @@ void menu_run(void)
     else if (ec == EXITCODE_RIGHT) {
         current_menu = (RoachMenu*)menuListCur->next_menu;
         menuListCur = current_menu;
+    }
+    else if (ec == EXITCODE_BACK) {
+        current_menu = (RoachMenu*)menuListCur->next_menu;
+        menuListCur = current_menu;
+    }
+    else {
+        Serial.printf("[%u] err, menu exit (%u) unhandled\r\n", ec);
     }
 }
 

@@ -75,6 +75,10 @@ void RoachMenu::run(void)
 
             display();
         }
+
+        #ifdef DEVMODE_SLOW_LOOP
+        waitFor(DEVMODE_SLOW_LOOP);
+        #endif
     }
 
     onExit();
@@ -170,8 +174,7 @@ RoachMenuFunctionItem::RoachMenuFunctionItem(const char* name)
 {
     int slen = strlen(name);
     _txt   = (char*)malloc(slen + 1);
-    strncpy(_txt, name, slen);
-    _txt[slen] = 0;
+    strncpy0(_txt, name, slen);
 }
 
 RoachMenuFileItem::RoachMenuFileItem(const char* fname)
@@ -179,10 +182,8 @@ RoachMenuFileItem::RoachMenuFileItem(const char* fname)
     int slen = strlen(fname);
     _txt   = (char*)malloc(slen + 1);
     _fname = (char*)malloc(slen + 1);
-    strncpy(_txt, fname, slen);
-    strncpy(_fname, fname, slen);
-    _txt[slen] = 0;
-    _fname[slen] = 0;
+    strncpy0(_txt, fname, slen);
+    strncpy0(_fname, fname, slen);
     int i;
     for (i = 2; i < slen - 4; i++)
     {
@@ -331,44 +332,50 @@ void RoachMenuLister::draw(void)
 
     int8_t _draw_start_idx, _draw_end_idx;
 
-    if (_list_cnt <= ROACHMENU_LIST_MAX)
+    if (_list_cnt <= ROACHMENU_LIST_MAX) // the list is not long enough to require paging
     {
         _draw_start_idx = 0;
         _draw_end_idx = _list_cnt - 1;
     }
-    else
+    else // the list requires paging
     {
         _draw_start_idx = _list_idx - 3;
         _draw_end_idx = _list_idx + 3;
-        if (_draw_start_idx < 0) {
+        if (_draw_start_idx < 0) { // selected index is too high up
             _draw_start_idx = 0;
             _draw_end_idx = ROACHMENU_LIST_MAX - 1;
         }
-        else if (_draw_end_idx >= (_list_idx - 1)) {
+        else if (_draw_end_idx >= (_list_idx - 1)) { // selected index is too far down
             _draw_end_idx = _list_idx - 1;
             _draw_start_idx = _draw_end_idx - (ROACHMENU_LIST_MAX - 1);
         }
     }
-    int i, j;
+    int i; // displayed index
+    int j; // item index
     for (i = 0; i < ROACHMENU_LIST_MAX; i++)
     {
         j = _draw_start_idx + i;
         oled.setCursor(0, ROACHGUI_LINE_HEIGHT * (i + 2));
-        if (j == _list_idx)
+        if (j == _list_idx) // current selected index is the item
         {
-            oled.write((char)0x10);
+            oled.write((char)GUISYMB_THIS_ARROW);
         }
-        else if (i == 0 && _draw_start_idx != 0)
+        else if (i == 0 && _draw_start_idx != 0) // top of screen and there's stuff above
         {
-            oled.write((char)0x18);
+            oled.write((char)GUISYMB_UP_ARROW);
         }
-        else if (i >= (ROACHMENU_LIST_MAX - 1) && _draw_end_idx < (_list_cnt - 1))
+        else if (i >= (ROACHMENU_LIST_MAX - 1) && _draw_end_idx < (_list_cnt - 1)) // bottom of screen and stuff below
         {
-            oled.write((char)0x19);
+            oled.write((char)GUISYMB_DOWN_ARROW);
         }
-        if (j >= _draw_start_idx && j <= _draw_end_idx)
+
+        if (j >= _draw_start_idx && j <= _draw_end_idx) // item is within view
         {
-            oled.print(getItemText(j));
+            char* t = getItemText(j);
+            if (t != NULL) {
+                oled.print(t);
+                dbglooped_printf("{%u} ")
+            }
         }
     }
 }
@@ -447,11 +454,12 @@ void RoachMenuLister::onExit(void)
 RoachMenuListItem* RoachMenuLister::getNodeAt(int idx)
 {
     int i = 0;
-    if (_head_node == NULL) {
+    if (_head_node == NULL) { // no nodes at all in list
         return NULL;
     }
+    // iterate through the linked list until the count matches
     RoachMenuListItem* n = _head_node;
-    while (i != idx) {
+    while (i != idx && n != NULL) {
         n = (RoachMenuListItem*)(n->next_node);
         i += 1;
     }
@@ -460,7 +468,7 @@ RoachMenuListItem* RoachMenuLister::getNodeAt(int idx)
 
 void RoachMenuLister::addNode(RoachMenuListItem* item)
 {
-    if (_head_node == NULL) {
+    if (_head_node == NULL) { // first ever item
         _head_node = (RoachMenuListItem*)item;
         _tail_node = (RoachMenuListItem*)item;
     }
@@ -487,9 +495,11 @@ void RoachMenuLister::onButton(uint8_t btn)
     {
         case BTNID_UP:
             _list_idx = (_list_idx > 0) ? (_list_idx - 1) : _list_idx;
+            debug_printf("list idx up %d\r\n", _list_idx);
             break;
         case BTNID_DOWN:
             _list_idx = (_list_idx < (_list_cnt - 1)) ? (_list_idx + 1) : _list_idx;
+            debug_printf("list idx down %d\r\n", _list_idx);
             break;
     }
 }
@@ -499,7 +509,7 @@ RoachMenuCfgLister::RoachMenuCfgLister(uint8_t id, const char* name, const char*
     _struct = struct_ptr;
     _desc_tbl = desc_tbl;
     _list_cnt = roachnvm_cntgroup(desc_tbl);
-    strncpy(_title, name, 30);
+    strncpy0(_title, name, 30);
 }
 
 char* RoachMenuCfgLister::getItemText(int idx)
@@ -520,6 +530,14 @@ void RoachMenuCfgLister::draw_sidebar(void)
 void RoachMenuCfgLister::draw_title(void)
 {
     drawTitleBar((const char*)_title, true, true, true);
+    dbglooped_printf("RoachMenuCfgLister draw_title \"%s\"\r\n", _title);
+}
+
+void RoachMenuCfgLister::draw(void)
+{
+    draw_sidebar();
+    draw_title();
+    RoachMenuLister::draw();
 }
 
 void RoachMenuCfgLister::onButton(uint8_t btn)
@@ -528,17 +546,17 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
     {
         case BTNID_LEFT:
             {
-                if (_list_idx <= 0) {
+                if (_list_idx <= 0) { // at top, left button changes menu
                     _exit = EXITCODE_LEFT;
                     break;
                 }
-                else
+                else // not at top, left button seeks for categories
                 {
                     for (; _list_idx >= 0; _list_idx--)
                     {
-                        if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0)
+                        if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) == 0)
                         {
-                            strncpy(_title, _desc_tbl[_list_idx].name, 30);
+                            strncpy0(_title, _desc_tbl[_list_idx].name, 30);
                             break;
                         }
                     }
@@ -547,17 +565,17 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
             break;
         case BTNID_RIGHT:
             {
-                if (_list_idx >= _list_cnt - 1) {
+                if (_list_idx >= _list_cnt - 1) { // at bottom, right button changes menu
                     _exit = EXITCODE_RIGHT;
                     break;
                 }
-                else
+                else // not at bottom, right button seeks for categories
                 {
                     for (; _list_idx < _list_cnt; _list_idx--)
                     {
-                        if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0)
+                        if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) == 0)
                         {
-                            strncpy(_title, _desc_tbl[_list_idx].name, 30);
+                            strncpy0(_title, _desc_tbl[_list_idx].name, 30);
                             break;
                         }
                     }
@@ -567,10 +585,10 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
         case BTNID_UP:
         case BTNID_DOWN:
             {
-                RoachMenuLister::onButton(btn);
-                if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0)
+                RoachMenuLister::onButton(btn); // this will handle the change of list index
+                if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) == 0) // hit a new category
                 {
-                    strncpy(_title, _desc_tbl[_list_idx].name, 30);
+                    strncpy0(_title, _desc_tbl[_list_idx].name, 30);
                     break;
                 }
             }
@@ -579,7 +597,7 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
             {
                 if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) != 0) // cannot click on a category item
                 {
-                    if (memcmp("func", _desc_tbl[_list_idx].type_code, 5))
+                    if (memcmp("func", _desc_tbl[_list_idx].type_code, 5) == 0)
                     {
                         // TODO: send a command
                     }

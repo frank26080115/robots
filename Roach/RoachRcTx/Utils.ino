@@ -74,6 +74,14 @@ uint8_t switches_getFlags(void)
     return f;
 }
 
+void strncpy0(char* dest, const void* src, size_t n)
+{
+    unsigned int slen = strlen((char*)src);
+    slen = (slen > n && n > 0) ? n : 0;
+    strncpy(dest, (const char*)src, slen);
+    dest[slen] = 0;
+}
+
 void waitFor(uint32_t x)
 {
     uint32_t tstart = millis();

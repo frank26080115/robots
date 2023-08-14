@@ -213,7 +213,10 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
         {
             RoachMenu::onEnter();
             if (RoachUsbMsd_canSave()) {
+                debug_printf("[%u] RoachMenuFuncSyncDownload onEnter rosync_downloadStart\r\n", millis());
+                #ifndef DEVMODE_NO_RADIO
                 rosync_downloadStart();
+                #endif
             }
             else {
                 showError("cannot download\nUSB MSD is on");
@@ -241,7 +244,10 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
                     break;
                 case BTNID_G5:
                     if (RoachUsbMsd_canSave()) {
+                        debug_printf("[%u] RoachMenuFuncSyncDownload onButton BTNID_G5 rosync_downloadStart\r\n", millis());
+                        #ifndef DEVMODE_NO_RADIO
                         rosync_downloadStart();
+                        #endif
                     }
                     else {
                         showError("cannot download\nUSB MSD is on");
@@ -267,7 +273,10 @@ class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
         virtual void onEnter(void)
         {
             RoachMenu::onEnter();
+            debug_printf("[%u] RoachMenuFuncSyncUpload onEnter rosync_uploadStart\r\n", millis());
+            #ifndef DEVMODE_NO_RADIO
             rosync_uploadStart();
+            #endif
         };
 
         virtual void draw_sidebar(void)
@@ -289,7 +298,10 @@ class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
+                    debug_printf("[%u] RoachMenuFuncSyncUpload onButton BTNID_G5 rosync_uploadStart\r\n", millis());
+                    #ifndef DEVMODE_NO_RADIO
                     rosync_uploadStart();
+                    #endif
                     break;
             }
         };
@@ -308,11 +320,13 @@ class RoachMenuFuncUsbMsd : public RoachMenuFunctionItem
             RoachMenu::onEnter();
             if (RoachUsbMsd_hasVbus() && RoachUsbMsd_isUsbPresented() == false)
             {
+                debug_printf("[%u] RoachMenuFuncUsbMsd onEnter RoachUsbMsd_presentUsbMsd\r\n", millis());
                 RoachUsbMsd_presentUsbMsd();
                 showMessage("USB MSD", "connecting");
             }
             else
             {
+                debug_printf("[%u] RoachMenuFuncUsbMsd onEnter unable to USB connect\r\n", millis());
                 showError("unable USB conn");
             }
             _exit = EXITCODE_BACK;
@@ -335,9 +349,13 @@ class RoachMenuFuncUsbMsd : public RoachMenuFunctionItem
 class RoachMenuFuncRegenRf : public RoachMenuFunctionItem
 {
     public:
-        RoachMenuFuncRegenRf(void) : RoachMenuFunctionItem("USB MSD")
+        RoachMenuFuncRegenRf(void) : RoachMenuFunctionItem("regen RF")
         {
         };
+
+        /*
+        there wil
+        */
 
         virtual void draw(void)
         {
@@ -347,20 +365,20 @@ class RoachMenuFuncRegenRf : public RoachMenuFunctionItem
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
             oled.printf("SALT: 0x%08X", _salt);
-            if (RoachUsbMsd_isUsbPresented() == false)
+            if (RoachUsbMsd_canSave())
             {
                 y += ROACHGUI_LINE_HEIGHT;
                 oled.setCursor(0, y);
-                oled.printf("%c ACCEPT+SAVE", 0x1B);
+                oled.printf("%c ACCEPT+SAVE", GUISYMB_LEFT_ARROW);
                 y += ROACHGUI_LINE_HEIGHT;
                 oled.setCursor(0, y);
-                oled.printf("%c NEW FILE", 0x1A);
+                oled.printf("%c NEW FILE", GUISYMB_RIGHT_ARROW);
             }
             else
             {
                 y += ROACHGUI_LINE_HEIGHT;
                 oled.setCursor(0, y);
-                oled.printf("%c ACCEPT", 0x1B);
+                oled.printf("%c ACCEPT", GUISYMB_LEFT_ARROW);
                 y += ROACHGUI_LINE_HEIGHT;
                 oled.setCursor(0, y);
                 oled.printf("WARN: cannot save");
@@ -399,24 +417,27 @@ class RoachMenuFuncRegenRf : public RoachMenuFunctionItem
                 case BTNID_LEFT:
                     nvm_rf.uid  = _uid;
                     nvm_rf.salt = _salt;
-                    if (RoachUsbMsd_isUsbPresented() == false)
+                    if (RoachUsbMsd_canSave())
                     {
+                        debug_printf("[%u] saving new RF params %08X %08X\r\n", millis(), _uid, _salt);
                         if (settings_save() == false) {
                             showError("did not save");
                         }
                     }
                     else
                     {
+                        debug_printf("[%u] cannot save new RF params\r\n", millis());
                         showError("cannot save");
                         settings_markDirty();
                     }
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_RIGHT:
-                    if (RoachUsbMsd_isUsbPresented() == false)
+                    if (RoachUsbMsd_canSave())
                     {
                         char newfilename[32];
                         sprintf(newfilename, "rf_%08X.txt", _uid);
+                        debug_printf("[%u] saving new RF params to %s\r\n", millis(), newfilename);
                         if (settings_saveToFile(newfilename)) {
                             showMessage("saved file", newfilename);
                         }
@@ -426,6 +447,7 @@ class RoachMenuFuncRegenRf : public RoachMenuFunctionItem
                     }
                     else
                     {
+                        debug_printf("[%u] cannot save new RF params\r\n", millis());
                         showError("cannot save");
                     }
                     break;

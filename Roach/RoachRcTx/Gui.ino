@@ -157,9 +157,9 @@ void drawTitleBar(const char* s, bool center, bool line, bool arrows)
     if (arrows)
     {
         oled.setCursor(0, 0);
-        oled.write((char)0x1B);
-        oled.setCursor(SCREEN_WIDTH - 12 - 5, 0);
-        oled.write((char)0x1A);
+        oled.write((char)GUISYMB_LEFT_ARROW);
+        oled.setCursor(SCREEN_WIDTH - 12 - 6, 0);
+        oled.write((char)GUISYMB_RIGHT_ARROW);
     }
     if (line)
     {
