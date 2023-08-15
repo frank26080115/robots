@@ -415,8 +415,13 @@ void roachnvm_debugNvm(Stream* stream, uint8_t* struct_ptr, uint32_t struct_sz, 
         stream->printf("%s = ", desc_itm->name);
         char str[32];
         roachnvm_formatitem(str, struct_ptr, desc_itm);
-        stream->printf("%s\r\n");
+        stream->printf("%s [%d ~ %d ; %d]\r\n", str, desc_itm->limit_min, desc_itm->limit_max, desc_itm->def_val);
     }
+}
+
+void roachnvm_debugDesc(Stream* stream, roach_nvm_gui_desc_t* desc_itm)
+{
+    stream->printf("dbg desc itm - \"%s\" %u %d %d %d\r\n", desc_itm->name, desc_itm->byte_offset, desc_itm->def_val, desc_itm->limit_min, desc_itm->limit_max);
 }
 
 void roachnvm_validateAll(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)

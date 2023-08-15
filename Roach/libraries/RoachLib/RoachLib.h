@@ -38,6 +38,7 @@ void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_
 void roachnvm_writedescfile(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl);
 void roachnvm_setdefaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
 void roachnvm_debugNvm(Stream* stream, uint8_t* struct_ptr, uint32_t struct_sz, roach_nvm_gui_desc_t* desc_tbl);
+void roachnvm_debugDesc(Stream* stream, roach_nvm_gui_desc_t* desc_itm);
 void roachnvm_validateAll(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
 
 int32_t roach_reduce_to_scale(int32_t x);

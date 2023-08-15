@@ -19,6 +19,7 @@ const cmd_def_t cmds[] = {
     { "fakepotw"    , fakepotw_func },
     { "fakeenc"     , fakeenc_func },
     { "hwreport"    , hwreport_func },
+    { "rptenc"      , rptenc_func },
     { "", NULL }, // end of table
 };
 
@@ -209,4 +210,24 @@ void fakeenc_func(void* cmd, char* argstr, Stream* stream)
     int x = atoi(argstr);
     RoachEnc_simulate(x);
     stream->printf("fake encoder %d\r\n", x);
+}
+
+void rptenc_func(void* cmd, char* argstr, Stream* stream)
+{
+    int ar = atoi(argstr);
+    RoachEnc_task();
+    int enc = RoachEnc_get(false);
+    stream->printf("[%u] enc = %d\r\n", millis(), enc);
+    int prev_enc = enc;
+
+    while (ar == 2)
+    {
+        RoachWdt_feed();
+        RoachEnc_task();
+        enc = RoachEnc_get(false);
+        if (enc != prev_enc) {
+            stream->printf("[%u] enc = %d\r\n", millis(), enc);
+        }
+        prev_enc = enc;
+    }
 }

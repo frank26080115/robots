@@ -135,6 +135,7 @@ class RoachMenuCfgItemEditor : public RoachMenu
         virtual void onExit(void);
         virtual void onButton(uint8_t btn);
         virtual void checkButtons(void);
+        void modVal(int x);
 };
 
 class RoachMenuLister : public RoachMenu

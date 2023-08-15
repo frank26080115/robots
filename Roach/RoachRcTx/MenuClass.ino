@@ -244,6 +244,10 @@ void RoachMenuCfgItemEditor::onEnter(void)
     RoachMenu::onEnter();
     RoachEnc_get(true); // clear the counter
     encoder_mode = ENCODERMODE_USEPOT;
+    debug_printf("[%u] RoachMenuCfgItemEditor::onEnter \"%s\"\r\n", millis(), _desc->name);
+    if (_desc->step == 0) {
+        Serial.printf("WARNING: descriptor of \"%s\" step is 0\r\n", _desc->name);
+    }
 }
 
 void RoachMenuCfgItemEditor::taskLP(void)
@@ -296,17 +300,14 @@ void RoachMenuCfgItemEditor::draw_title(void)
 void RoachMenuCfgItemEditor::onButton(uint8_t btn)
 {
     RoachMenu::onButton(btn);
+    int mul = _desc->step != 0 ? _desc->step : 1;
     switch (btn)
     {
         case BTNID_UP:
-            roachnvm_incval((uint8_t*)_struct, _desc, _desc->step);
-            cfg_last_change_time = millis();
-            settings_markDirty();
+            modVal(1);
             break;
         case BTNID_DOWN:
-            roachnvm_incval((uint8_t*)_struct, _desc, -_desc->step);
-            cfg_last_change_time = millis();
-            settings_markDirty();
+            modVal(-1);
             break;
         case BTNID_G6:
             _exit = EXITCODE_BACK;
@@ -317,9 +318,17 @@ void RoachMenuCfgItemEditor::onButton(uint8_t btn)
 void RoachMenuCfgItemEditor::checkButtons(void)
 {
     RoachMenu::checkButtons(); // this will call RoachMenuCfgItemEditor::onButton if needed
-    int x = RoachEnc_get(true);
-    if (x != 0) {
-        roachnvm_incval((uint8_t*)_struct, _desc, -x * _desc->step);
+    modVal(-RoachEnc_get(true));
+}
+
+void RoachMenuCfgItemEditor::modVal(int x)
+{
+    if (x != 0)
+    {
+        debug_printf("[%u] cfg val change \"%s\" by %d , new val = ", millis(), _desc->name, x);
+        int mul = _desc->step != 0 ? _desc->step : 1;
+        roachnvm_incval((uint8_t*)_struct, _desc, x * mul);
+        debug_printf("%d\r\n", roachnvm_getval((uint8_t*)_struct, _desc));
         cfg_last_change_time = millis();
         settings_markDirty();
     }

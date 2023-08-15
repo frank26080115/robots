@@ -189,7 +189,7 @@ int32_t RoachEnc_get(bool clr)
     if (clr) {
         enc_cnt = 0;
     }
-    return enc_cnt;
+    return x;
 }
 
 bool RoachEnc_hasMoved(bool clr)
