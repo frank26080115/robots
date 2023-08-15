@@ -77,7 +77,7 @@ uint8_t switches_getFlags(void)
 void strncpy0(char* dest, const void* src, size_t n)
 {
     unsigned int slen = strlen((char*)src);
-    slen = (slen > n && n > 0) ? n : 0;
+    slen = (slen > n && n > 0) ? n : slen;
     strncpy(dest, (const char*)src, slen);
     dest[slen] = 0;
 }

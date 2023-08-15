@@ -195,3 +195,10 @@ bool roachnvm_fileCopy(const char* fin_name, const char* fout_name)
         }
     }
 }
+
+void settings_initValidate(void)
+{
+    if (nvm_tx.heading_multiplier == 0) {
+        nvm_tx.heading_multiplier = 9;
+    }
+}

@@ -25,13 +25,6 @@ void RoachMenuFileOpenList::onEnter(void)
     buildFileList(NULL);
 }
 
-void RoachMenuFileOpenList::draw(void)
-{
-    draw_sidebar();
-    draw_title();
-    RoachMenuLister::draw();
-}
-
 void RoachMenuFileOpenList::onButton(uint8_t btn)
 {
     RoachMenuLister::onButton(btn);

@@ -270,6 +270,11 @@ void RoachMenuCfgItemEditor::onExit(void)
 void RoachMenuCfgItemEditor::draw(void)
 {
     RoachMenu::draw();
+
+    oled.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+    draw_sidebar();
+    draw_title();
+
     char valstr[64];
     roachnvm_formatitem(valstr, (uint8_t*)_struct, _desc);
     oled.setCursor(0, ROACHGUI_LINE_HEIGHT * 2);
@@ -326,6 +331,8 @@ RoachMenuLister::RoachMenuLister(uint8_t id) : RoachMenu(id)
 
 void RoachMenuLister::draw(void)
 {
+    RoachMenu::draw();
+
     oled.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     draw_title();
     draw_sidebar();
@@ -340,17 +347,17 @@ void RoachMenuLister::draw(void)
     else // the list requires paging
     {
         _draw_start_idx = _list_idx - 3;
-        _draw_end_idx = _list_idx + 3;
+        _draw_end_idx = _draw_start_idx + ROACHMENU_LIST_MAX;
         if (_draw_start_idx < 0) { // selected index is too high up
             _draw_start_idx = 0;
             _draw_end_idx = ROACHMENU_LIST_MAX - 1;
         }
-        else if (_draw_end_idx >= (_list_idx - 1)) { // selected index is too far down
-            _draw_end_idx = _list_idx - 1;
-            _draw_start_idx = _draw_end_idx - (ROACHMENU_LIST_MAX - 1);
+        else if (_draw_end_idx >= _list_cnt) { // selected index is too far down
+            _draw_end_idx = _list_cnt;
+            _draw_start_idx = _draw_end_idx - ROACHMENU_LIST_MAX;
         }
     }
-    int i; // displayed index
+    int i; // displayed index from top of screen
     int j; // item index
     for (i = 0; i < ROACHMENU_LIST_MAX; i++)
     {
@@ -364,9 +371,13 @@ void RoachMenuLister::draw(void)
         {
             oled.write((char)GUISYMB_UP_ARROW);
         }
-        else if (i >= (ROACHMENU_LIST_MAX - 1) && _draw_end_idx < (_list_cnt - 1)) // bottom of screen and stuff below
+        else if (i >= (ROACHMENU_LIST_MAX - 1) && _draw_end_idx < _list_cnt) // bottom of screen and stuff below
         {
             oled.write((char)GUISYMB_DOWN_ARROW);
+        }
+        else
+        {
+            oled.write((char)' ');
         }
 
         if (j >= _draw_start_idx && j <= _draw_end_idx) // item is within view
@@ -374,7 +385,6 @@ void RoachMenuLister::draw(void)
             char* t = getItemText(j);
             if (t != NULL) {
                 oled.print(t);
-                dbglooped_printf("{%u} ")
             }
         }
     }
@@ -530,14 +540,6 @@ void RoachMenuCfgLister::draw_sidebar(void)
 void RoachMenuCfgLister::draw_title(void)
 {
     drawTitleBar((const char*)_title, true, true, true);
-    dbglooped_printf("RoachMenuCfgLister draw_title \"%s\"\r\n", _title);
-}
-
-void RoachMenuCfgLister::draw(void)
-{
-    draw_sidebar();
-    draw_title();
-    RoachMenuLister::draw();
 }
 
 void RoachMenuCfgLister::onButton(uint8_t btn)

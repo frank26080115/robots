@@ -103,6 +103,8 @@ void setup(void)
     PerfCnt_init();
     Serial.println("\r\nRoach RC Transmitter - Hello World!");
 
+    settings_initValidate();
+
     switches_getFlags(); // this call here will get the initial switch states and check if they are safe
 
     // seems like the OLED needs a bit more time to power up
@@ -191,15 +193,8 @@ void ctrler_tasks(void)
 void ctrler_buildPkt(void)
 {
     tx_pkt.throttle = (pots_locked == false) ? pot_throttle.get() : 0;
-    if (encoder_mode == ENCODERMODE_NORMAL)
-    {
-        tx_pkt.steering = (pots_locked == false) ? pot_steering.get() : 0;
-        int h = RoachEnc_get(true);
-        headingx += h * nvm_tx.heading_multiplier;
-        ROACH_WRAP_ANGLE(headingx, ROACH_ANGLE_MULTIPLIER);
-        tx_pkt.heading = headingx;
-    }
-    else if (encoder_mode == ENCODERMODE_USEPOT)
+
+    if (encoder_mode == ENCODERMODE_USEPOT)
     {
         tx_pkt.steering = 0;
         int hx = headingx;
@@ -207,6 +202,15 @@ void ctrler_buildPkt(void)
         ROACH_WRAP_ANGLE(hx, ROACH_ANGLE_MULTIPLIER);
         tx_pkt.heading = hx;
     }
+    else
+    {
+        tx_pkt.steering = (pots_locked == false) ? pot_steering.get() : 0;
+        int h = RoachEnc_get(true);
+        headingx += h * nvm_tx.heading_multiplier;
+        ROACH_WRAP_ANGLE(headingx, ROACH_ANGLE_MULTIPLIER);
+        tx_pkt.heading = headingx;
+    }
+
     tx_pkt.pot_weap = (pots_locked == false) ? pot_weapon.get() : 0;
     tx_pkt.pot_aux  = (pots_locked == false) ? pot_aux.get()    : 0;
 
