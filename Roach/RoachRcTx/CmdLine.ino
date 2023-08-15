@@ -1,5 +1,6 @@
 const cmd_def_t cmds[] = {
     { "factoryreset", factory_reset_func},
+    { "nvmdebug"    , nvmdebug_func},
     { "echo"        , echo_func },
     { "mem"         , memcheck_func },
     { "perf"        , perfcheck_func },
@@ -42,6 +43,11 @@ void factory_reset_func(void* cmd, char* argstr, Stream* stream)
     else {
         stream->println("factory reset failed");
     }
+}
+
+void nvmdebug_func(void* cmd, char* argstr, Stream* stream)
+{
+    settings_debugNvm(stream);
 }
 
 void save_func(void* cmd, char* argstr, Stream* stream)

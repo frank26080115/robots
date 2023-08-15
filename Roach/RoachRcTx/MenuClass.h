@@ -32,6 +32,7 @@ enum
     EXITCODE_DOWN,
     EXITCODE_BACK,
     EXITCODE_HOME,
+    EXITCODE_UNABLE,
 };
 
 enum

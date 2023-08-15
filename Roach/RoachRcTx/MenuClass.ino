@@ -316,7 +316,7 @@ void RoachMenuCfgItemEditor::onButton(uint8_t btn)
 
 void RoachMenuCfgItemEditor::checkButtons(void)
 {
-    RoachMenu::checkButtons();
+    RoachMenu::checkButtons(); // this will call RoachMenuCfgItemEditor::onButton if needed
     int x = RoachEnc_get(true);
     if (x != 0) {
         roachnvm_incval((uint8_t*)_struct, _desc, -x * _desc->step);

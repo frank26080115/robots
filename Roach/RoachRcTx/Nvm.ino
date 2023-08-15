@@ -198,7 +198,17 @@ bool roachnvm_fileCopy(const char* fin_name, const char* fout_name)
 
 void settings_initValidate(void)
 {
-    if (nvm_tx.heading_multiplier == 0) {
-        nvm_tx.heading_multiplier = 9;
-    }
+    roachnvm_validateAll((uint8_t*)&nvm_tx, cfgdesc_ctrler);
+}
+
+void settings_debugNvm(Stream* stream)
+{
+    stream->printf("NVM debug:\r\n");
+    stream->printf("==========\r\n");
+    stream->printf("RF params:\r\n");
+    roachnvm_debugNvm(stream, (uint8_t*)&nvm_rf, sizeof(nvm_rf), cfgdesc_rf);
+    stream->printf("==========\r\n");
+    stream->printf("TX params:\r\n");
+    roachnvm_debugNvm(stream, (uint8_t*)&nvm_tx, sizeof(nvm_tx), cfgdesc_ctrler);
+    stream->printf("==========\r\n");
 }

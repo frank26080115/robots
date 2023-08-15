@@ -14,6 +14,20 @@
 #define roachfileprint write
 #endif
 
+int roachnvm_cntgroup(roach_nvm_gui_desc_t* g)
+{
+    int cnt = 0;
+    while (true)
+    {
+        roach_nvm_gui_desc_t* x = &(g[cnt]);
+        if (x->name == NULL || x->name[0] == 0)
+        {
+            return cnt;
+        }
+        cnt += 1;
+    }
+}
+
 int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
 {
     if (strcmp("hex", desc_itm->type_code) == 0)
@@ -46,7 +60,7 @@ int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
     return 0;
 }
 
-void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
+void roachnvm_setval_inner(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val, bool def_if_wrong)
 {
     if (strcmp("hex", desc_itm->type_code) == 0)
     {
@@ -54,15 +68,33 @@ void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_
         *wptr = (uint32_t)val;
         return;
     }
-    if (desc_itm->type_code[0] == 'u' || desc_itm->type_code[0] == 's')
+
+    char typecode[32];
+    int typecode_len;
+    strcpy(typecode, desc_itm->type_code);
+    typecode_len = strlen(typecode);
+    for (int i = 2; i < typecode_len; i++) {
+        if (typecode[i] == 'x') {
+            typecode[i] = 0;
+            break;
+        }
+    }
+
+    if (typecode[0] == 'u' || typecode[0] == 's')
     {
         int32_t x = val;
 
-        int sz = atoi(&(desc_itm->type_code[1]));
-        if (desc_itm->type_code[0] == 's') {
+        int sz = atoi(&(typecode[1]));
+        if (typecode[0] == 's') {
             sz *= -1;
         }
 
+        if (def_if_wrong)
+        {
+            if (x > desc_itm->limit_max || x < desc_itm->limit_min) {
+                x = desc_itm->def_val;
+            }
+        }
         x = (x > desc_itm->limit_max) ? desc_itm->limit_max : x;
         x = (x < desc_itm->limit_min) ? desc_itm->limit_min : x;
 
@@ -81,12 +113,22 @@ void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_
     }
 }
 
+void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val)
+{
+    roachnvm_setval_inner(struct_ptr, desc_itm, val, false);
+}
+
 int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t x)
 {
     int32_t y = roachnvm_getval(struct_ptr, desc_itm);
     y += x;
     roachnvm_setval(struct_ptr, desc_itm, y);
     return roachnvm_getval(struct_ptr, desc_itm);
+}
+
+void roachnvm_valValidate(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
+{
+    roachnvm_setval_inner(struct_ptr, desc_itm, roachnvm_getval(struct_ptr, desc_itm), true);
 }
 
 bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value)
@@ -309,10 +351,10 @@ void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* d
 
         switch (sz)
         {
-            case  8 : { uint8_t*  wptr = (uint8_t* )&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            case  8 : {  uint8_t* wptr = ( uint8_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
             case  16: { uint16_t* wptr = (uint16_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
             case  32: { uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
-            case -8 : {  int8_t*  wptr = ( int8_t* )&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
+            case -8 : {   int8_t* wptr = (  int8_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
             case -16: {  int16_t* wptr = ( int16_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
             case -32: {  int32_t* wptr = ( int32_t*)&struct_ptr[desc_itm->byte_offset]; x = *wptr; } break;
             default:
@@ -348,6 +390,46 @@ void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_
         roachnvm_formatitem(str, struct_ptr, desc_itm);
         f->roachfileprint(str);
         f->roachfileprint("\r\n");
+    }
+}
+
+void roachnvm_debugNvm(Stream* stream, uint8_t* struct_ptr, uint32_t struct_sz, roach_nvm_gui_desc_t* desc_tbl)
+{
+    int i;
+    for (i = 0; i < struct_sz; i++)
+    {
+        if ((i % 16) == 0 && i != 0) {
+            stream->printf("\r\n");
+        }
+        stream->printf("%02X ", struct_ptr[i]);
+    }
+    stream->printf("\r\n");
+
+    roach_nvm_gui_desc_t* desc_itm;
+    for (i = 0; i < 0xFFFF; i++)
+    {
+        desc_itm = &desc_tbl[i];
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+            break;
+        }
+        stream->printf("%s = ", desc_itm->name);
+        char str[32];
+        roachnvm_formatitem(str, struct_ptr, desc_itm);
+        stream->printf("%s\r\n");
+    }
+}
+
+void roachnvm_validateAll(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
+{
+    int i;
+    roach_nvm_gui_desc_t* desc_itm;
+    for (i = 0; i < 0xFFFF; i++)
+    {
+        desc_itm = &desc_tbl[i];
+        if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
+            break;
+        }
+        roachnvm_valValidate(struct_ptr, desc_itm);
     }
 }
 

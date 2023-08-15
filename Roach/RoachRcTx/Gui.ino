@@ -42,6 +42,7 @@ bool gui_canDisplay(void)
         }
     }
     #else
+    gui_last_draw_time = millis();
     return true;
     #endif
     return false;

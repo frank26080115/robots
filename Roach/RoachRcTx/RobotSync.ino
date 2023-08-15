@@ -29,7 +29,11 @@ uint32_t rosync_uploadIdx = 0, rosync_uploadTotal = 0;
 
 void rosync_task(void)
 {
-    if (rosync_statemachine != ROSYNC_SM_DISCONNECTED && radio.isConnected() == false)
+    if (rosync_statemachine != ROSYNC_SM_DISCONNECTED
+        #ifdef DEVMODE_NO_RADIO
+        && radio.isConnected() == false
+        #endif
+        )
     {
         if (rosync_descDlFile.isOpen()) {
             rosync_descDlFile.close();
@@ -41,6 +45,7 @@ void rosync_task(void)
     switch (rosync_statemachine)
     {
         case ROSYNC_SM_DISCONNECTED:
+            #ifndef DEVMODE_NO_RADIO
             if (radio.isConnected())
             {
                 // the robot has reconnected, the disconnection might've been momentary, so all the previous data is kept and verified
@@ -122,8 +127,10 @@ void rosync_task(void)
                     }
                 }
             }
+            #endif
             break;
         case ROSYNC_SM_DOWNLOADDESC:
+            #ifndef DEVMODE_NO_RADIO
             if (radio.textAvail())
             {
                 radio_binpkt_t pkt;
@@ -140,8 +147,10 @@ void rosync_task(void)
                 }
                 rosync_statemachine = ROSYNC_SM_NODESC_ERR;
             }
+            #endif
             break;
         case ROSYNC_SM_DOWNLOADNVM:
+            #ifndef DEVMODE_NO_RADIO
             if (radio.textAvail())
             {
                 if (rosync_downloadNvmChunk(radio.textReadPtr(false)))
@@ -153,12 +162,15 @@ void rosync_task(void)
             {
                 rosync_statemachine = ROSYNC_SM_NOSYNC_ERR;
             }
+            #endif
             break;
         case ROSYNC_SM_UPLOAD:
+            #ifndef DEVMODE_NO_RADIO
             if (radio.textIsDone())
             {
                 rosync_uploadNextChunk();
             }
+            #endif
             break;
     }
 }
@@ -173,14 +185,18 @@ bool rosync_downloadDescFile(void)
         Serial.printf("ERR[%u]: unable to open or create \"%s\" to be written\r\n", millis(), fname);
         return false;
     }
+    #ifndef DEVMODE_NO_RADIO
     radio.textSendByte(ROACHCMD_SYNC_DOWNLOAD_DESC);
+    #endif
     rosync_statemachine = ROSYNC_SM_DOWNLOADDESC;
     return true;
 }
 
 void rosync_downloadNvm(void)
 {
+    #ifndef DEVMODE_NO_RADIO
     radio.textSendByte(ROACHCMD_SYNC_DOWNLOAD_CONF);
+    #endif
     rosync_nvm_wptr = 0;
     rosync_statemachine = ROSYNC_SM_DOWNLOADNVM;
 }
@@ -194,11 +210,13 @@ bool rosync_downloadStart(void)
         }
         return rosync_downloadDescFile();
     }
+    #ifndef DEVMODE_NO_RADIO
     else if (rosync_nvm_sz > 0 && rosync_nvm != NULL && radio.isConnected())
     {
         rosync_downloadNvm();
         return true;
     }
+    #endif
     return false;
 }
 
@@ -441,7 +459,9 @@ void rosync_uploadChunk(roach_nvm_gui_desc_t* desc)
     int i = sprintf((char*)(pkt.data), "%s=%s\n", desc->name, tmp);
     pkt.addr = 0;
     pkt.len = i;
+    #ifndef DEVMODE_NO_RADIO
     radio.textSendBin(&pkt);
+    #endif
 }
 
 void rosync_uploadNextChunk(void)
@@ -627,7 +647,7 @@ class RobotMenu : public RoachMenu
             else
             {
                 showError("robot not loaded");
-                _exit = EXITCODE_RIGHT;
+                _exit = EXITCODE_UNABLE;
             }
         };
 };

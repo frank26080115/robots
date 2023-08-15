@@ -27,7 +27,9 @@ roach_nvm_gui_desc_t* roachnvm_rx_getAt(int idx);
 
 int32_t roachnvm_getval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm);
 void roachnvm_setval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val);
+void roachnvm_setval_inner(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t val, bool def_if_wrong);
 int32_t roachnvm_incval(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, int32_t x);
+void roachnvm_valValidate(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm);
 bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* name, char* value);
 bool roachnvm_parsecmd(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char* str);
 void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
@@ -35,6 +37,8 @@ void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* d
 void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
 void roachnvm_writedescfile(RoachFile* f, roach_nvm_gui_desc_t* desc_tbl);
 void roachnvm_setdefaults(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
+void roachnvm_debugNvm(Stream* stream, uint8_t* struct_ptr, uint32_t struct_sz, roach_nvm_gui_desc_t* desc_tbl);
+void roachnvm_validateAll(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl);
 
 int32_t roach_reduce_to_scale(int32_t x);
 int32_t roach_reduce_to_scale_2(int32_t x);

@@ -210,6 +210,7 @@ RoachMenu* menuListCur  = NULL;
 
 void menu_run(void)
 {
+    static int prev_ec = 0;
     if (current_menu == NULL)
     {
         current_menu = &menuHome;
@@ -238,13 +239,20 @@ void menu_run(void)
     else if (ec == EXITCODE_LEFT) {
         current_menu = (RoachMenu*)menuListCur->prev_menu;
         menuListCur = current_menu;
+        prev_ec = ec;
     }
     else if (ec == EXITCODE_RIGHT) {
         current_menu = (RoachMenu*)menuListCur->next_menu;
         menuListCur = current_menu;
+        prev_ec = ec;
     }
-    else if (ec == EXITCODE_BACK) {
-        current_menu = (RoachMenu*)menuListCur->next_menu;
+    else if (ec == EXITCODE_BACK || ec == EXITCODE_UNABLE) {
+        if (prev_ec == EXITCODE_LEFT) {
+            current_menu = (RoachMenu*)menuListCur->prev_menu;
+        }
+        else {
+            current_menu = (RoachMenu*)menuListCur->next_menu;
+        }
         menuListCur = current_menu;
     }
     else {
@@ -259,7 +267,7 @@ void menu_setup(void)
 
     menu_install_calibSync();
     menu_install_robot();
-    menu_install(new RoachMenuCfgLister(MENUID_CONFIG_CTRLER, "CONTROLLER", "ctrler", &nvm_tx, cfgdesc_ctrler));
+    menu_install(new RoachMenuCfgLister(MENUID_CONFIG_CTRLER, "CTRL CFG", "ctrler", &nvm_tx, cfgdesc_ctrler));
     menu_install_fileOpener();
 }
 

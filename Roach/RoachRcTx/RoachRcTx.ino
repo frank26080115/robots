@@ -163,11 +163,9 @@ void ctrler_tasks(void)
     #endif
     {
         heartbeat_task();
-        RoachEnc_task();     // transfers hardware values to RAM atomically
+        RoachEnc_task();     // transfers hardware values to RAM automically
         nrf5rand_task();     // collect random numbers from RNG
-        #ifndef DEVMODE_NO_RADIO
         rosync_task();       // checks for robot synchronization
-        #endif
         RoachUsbMsd_task();  // handles tasks for USB flash mass storage
         cmdline.task();      // handles command line
 
