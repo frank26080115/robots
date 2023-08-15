@@ -1,6 +1,5 @@
 void hw_bringup(void)
 {
-    uint32_t now;
     pinMode(ROACHHW_PIN_LED_RED, OUTPUT);
     Serial.begin(115200);
 
@@ -47,60 +46,66 @@ void hw_bringup(void)
     Serial.println("\r\nRoach RC Transmitter - HW Bringup!");
     while (true)
     {
-        static uint32_t lt = 0;
-        static uint32_t pb = 0;
-        now = millis();
-
-        bool need_show = false;
-        if ((now - lt) >= 200)
-        {
-            need_show = true;
-        }
-
-        RoachButton_allTask();
-        RoachPot_allTask();
-        RoachEnc_task();
-
-        uint32_t b = RoachButton_isAnyHeld();
-        if (b != pb)
-        {
-            need_show = true;
-            pb = b;
-        }
-
-        if (RoachEnc_hasMoved(true))
-        {
-            need_show = true;
-        }
-
-        if (need_show)
-        {
-            lt = now;
-            Serial.printf("[%u]: 0x%08X, %d, ", now, b, RoachEnc_get(false));
-
-            int i;
-            #if 1
-            for (i = 0; i < POT_CNT_MAX; i++)
-            {
-                int x = RoachPot_getRawAtIdx(i);
-                if (x >= 0) {
-                    Serial.printf("%d, ", x);
-                }
-                else {
-                    break;
-                }
-            }
-            #else
-            Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_THROTTLE));
-            Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_STEERING));
-            Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_WEAPON));
-            Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_AUX));
-            Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_BATTERY));
-            #endif
-            Serial.printf("\r\n");
-        }
-
-        digitalWrite(ROACHHW_PIN_LED_RED, ((now % 500) <= 100));
-        yield();
+        hw_report();
     }
+}
+
+void hw_report(void)
+{
+    uint32_t now;
+    static uint32_t lt = 0;
+    static uint32_t pb = 0;
+    now = millis();
+
+    bool need_show = false;
+    if ((now - lt) >= 200)
+    {
+        need_show = true;
+    }
+
+    RoachButton_allTask();
+    RoachPot_allTask();
+    RoachEnc_task();
+
+    uint32_t b = RoachButton_isAnyHeld();
+    if (b != pb)
+    {
+        need_show = true;
+        pb = b;
+    }
+
+    if (RoachEnc_hasMoved(true))
+    {
+        need_show = true;
+    }
+
+    if (need_show)
+    {
+        lt = now;
+        Serial.printf("[%u]: 0x%08X, %d, ", now, b, RoachEnc_get(false));
+
+        int i;
+        #if 1
+        for (i = 0; i < POT_CNT_MAX; i++)
+        {
+            int x = RoachPot_getRawAtIdx(i);
+            if (x >= 0) {
+                Serial.printf("%d, ", x);
+            }
+            else {
+                break;
+            }
+        }
+        #else
+        Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_THROTTLE));
+        Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_STEERING));
+        Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_WEAPON));
+        Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_AUX));
+        Serial.printf("%d, ", analogRead(ROACHHW_PIN_POT_BATTERY));
+        #endif
+        Serial.printf("\r\n");
+    }
+
+    digitalWrite(ROACHHW_PIN_LED_RED, ((now % 500) <= 100));
+    yield();
 }

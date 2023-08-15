@@ -6,7 +6,12 @@ RoachMenuFileOpenList::RoachMenuFileOpenList() : RoachMenuLister(MENUID_CONFIG_F
 
 void RoachMenuFileOpenList::draw_sidebar(void)
 {
-    drawSideBar("EXIT", "OPEN", true);
+    if (_list_cnt > 0) {
+        drawSideBar("EXIT", "OPEN", true);
+    }
+    else {
+        drawSideBar("EXIT", "", true);
+    }
 }
 
 void RoachMenuFileOpenList::draw_title(void)
@@ -22,6 +27,7 @@ void RoachMenuFileOpenList::draw_title(void)
 void RoachMenuFileOpenList::onEnter(void)
 {
     RoachMenuLister::onEnter();
+    _list_cnt = 0;
     buildFileList(NULL);
 }
 
@@ -92,16 +98,10 @@ void RoachMenuFileSaveList::draw_title(void)
 //    return getNodeAt(idx);
 //}
 
-void RoachMenuFileSaveList::draw(void)
-{
-    draw_sidebar();
-    draw_title();
-    RoachMenuLister::draw();
-}
-
 void RoachMenuFileSaveList::onEnter(void)
 {
     RoachMenuLister::onEnter();
+    _list_cnt = 0;
     if (RoachUsbMsd_canSave())
     {
         RoachMenuFileItem* n = new RoachMenuFileItem("NEW FILE");
@@ -109,6 +109,7 @@ void RoachMenuFileSaveList::onEnter(void)
         _tail_node = (RoachMenuListItem*)n;
         _list_cnt++;
         buildFileList(_filter[0] != 0 ? _filter : NULL);
+        debug_printf("[%u] RoachMenuFileSaveList onEnter %u entries\r\n", millis(), _list_cnt);
     }
     else
     {
@@ -116,7 +117,9 @@ void RoachMenuFileSaveList::onEnter(void)
         _head_node = (RoachMenuListItem*)n;
         _tail_node = (RoachMenuListItem*)n;
         _list_cnt++;
+        debug_printf("[%u] ERR RoachMenuFileSaveList onEnter cannot save\r\n", millis());
     }
+    _delete_on_exit = true;
 }
 
 void RoachMenuFileSaveList::onButton(uint8_t btn)

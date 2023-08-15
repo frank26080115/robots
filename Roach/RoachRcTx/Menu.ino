@@ -231,7 +231,7 @@ void menu_run(void)
     else if (current_menu == &menuHome && ec == EXITCODE_LEFT) {
         current_menu = &menuInfo;
     }
-    else if ((current_menu == &menuHome || current_menu == &menuInfo) && ec == EXITCODE_LEFT) {
+    else if ((current_menu == &menuHome || current_menu == &menuInfo) && ec == EXITCODE_RIGHT) {
         current_menu = (RoachMenu*)menuListCur;
         menuListCur = current_menu;
     }
@@ -269,9 +269,12 @@ void menu_install(RoachMenu* m)
         menuListHead = m;
         menuListTail = m;
         menuListCur  = m;
+        m->next_menu = m;
+        m->prev_menu = m;
     }
     else
     {
+        m->prev_menu = menuListTail;
         menuListTail->next_menu = m;
         menuListTail            = m;
         menuListHead->prev_menu = m;

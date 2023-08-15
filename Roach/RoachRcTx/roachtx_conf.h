@@ -19,7 +19,7 @@
 #define DEVMODE_NO_RADIO
 //#define DEVMODE_WAIT_SERIAL
 #define DEVMODE_SUBMENU_FOREVER
-#define DEVMODE_SLOW_LOOP         200
+//#define DEVMODE_SLOW_LOOP         200
 
 //#define debug_printf(...)            // do nothing
 #define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)

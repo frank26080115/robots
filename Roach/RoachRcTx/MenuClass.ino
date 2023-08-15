@@ -359,7 +359,7 @@ void RoachMenuLister::draw(void)
     }
     int i; // displayed index from top of screen
     int j; // item index
-    for (i = 0; i < ROACHMENU_LIST_MAX; i++)
+    for (i = 0; i < ROACHMENU_LIST_MAX && i < _list_cnt; i++)
     {
         j = _draw_start_idx + i;
         oled.setCursor(0, ROACHGUI_LINE_HEIGHT * (i + 2));
@@ -431,7 +431,11 @@ void RoachMenuLister::buildFileList(const char* filter)
                     _tail_node->next_node = (void*)n;
                     _tail_node = (RoachMenuListItem*)n;
                 }
+
+                debug_printf("[%u] buildFileList added \"%s\" -> %u\r\n", millis(), sfname, _list_cnt);
+
                 _list_cnt += 1;
+                _delete_on_exit = true;
             }
         }
         fatfile.close();
@@ -445,19 +449,28 @@ void RoachMenuLister::buildFileList(const char* filter)
         _tail_node->next_node = (void*)nc;
         _tail_node = (RoachMenuListItem*)nc;
     }
+    debug_printf("[%u] buildFileList added CANCEL -> %u\r\n", millis(), _list_cnt);
+
     _list_cnt++;
+    _delete_on_exit = true;
 }
 
 void RoachMenuLister::onExit(void)
 {
     RoachMenu::onExit();
-    if (_head_node == NULL) {
-        return;
-    }
-    while (_head_node != NULL) {
-        RoachMenuListItem* n = (RoachMenuListItem*)_head_node->next_node;
-        delete _head_node;
-        _head_node = n;
+    if (_delete_on_exit)
+    {
+        if (_head_node == NULL) {
+            return;
+        }
+        while (_head_node != NULL) {
+            RoachMenuListItem* n = (RoachMenuListItem*)_head_node->next_node;
+            delete _head_node;
+            _head_node = n;
+        }
+        _head_node = NULL;
+        _tail_node = NULL;
+        _list_cnt = 0;
     }
 }
 
@@ -505,11 +518,11 @@ void RoachMenuLister::onButton(uint8_t btn)
     {
         case BTNID_UP:
             _list_idx = (_list_idx > 0) ? (_list_idx - 1) : _list_idx;
-            debug_printf("list idx up %d\r\n", _list_idx);
+            debug_printf("list idx up %d/%d\r\n", _list_idx, _list_cnt);
             break;
         case BTNID_DOWN:
             _list_idx = (_list_idx < (_list_cnt - 1)) ? (_list_idx + 1) : _list_idx;
-            debug_printf("list idx down %d\r\n", _list_idx);
+            debug_printf("list idx down %d/%d\r\n", _list_idx, _list_cnt);
             break;
     }
 }
@@ -573,13 +586,21 @@ void RoachMenuCfgLister::onButton(uint8_t btn)
                 }
                 else // not at bottom, right button seeks for categories
                 {
+                    bool found = false;
                     for (; _list_idx < _list_cnt; _list_idx--)
                     {
                         if (memcmp("cat", _desc_tbl[_list_idx].type_code, 4) == 0)
                         {
+                            found = true;
                             strncpy0(_title, _desc_tbl[_list_idx].name, 30);
                             break;
                         }
+                    }
+                    if (found == false)
+                    {
+                        _list_idx = _list_cnt - 1;
+                        _exit = EXITCODE_RIGHT;
+                        break;
                     }
                 }
             }

@@ -20,10 +20,7 @@ enum
     MENUID_CONFIG_CALIBSYNC,      // options for calibration and synchronization
     MENUID_CONFIG_FILELOAD,       // choose to load a file
     MENUID_CONFIG_ROBOT,
-    MENUID_CONFIG_DRIVE,          // edit parameters about drive train
-    MENUID_CONFIG_WEAP,           // edit parameters about the weapon
     MENUID_CONFIG_CTRLER,         // edit parameters about the controller
-    MENUID_CONFIG_IMU,            // edit parameters for the IMU (orientation, PID, timeout, etc)
 };
 
 enum
@@ -153,6 +150,7 @@ class RoachMenuLister : public RoachMenu
         uint8_t _list_cnt, _list_idx;
         RoachMenuListItem* _head_node = NULL;
         RoachMenuListItem* _tail_node = NULL;
+        bool _delete_on_exit = false;
         virtual void onEnter(void);
         void buildFileList(const char* filter);
         RoachMenuListItem* getNodeAt(int idx);
@@ -178,7 +176,6 @@ class RoachMenuFileSaveList : public RoachMenuLister
 {
     public:
         RoachMenuFileSaveList(const char* filter);
-        virtual void draw(void);
     protected:
         char _filter[16];
         char _newfilename[32];

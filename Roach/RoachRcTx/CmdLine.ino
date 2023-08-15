@@ -17,10 +17,21 @@ const cmd_def_t cmds[] = {
     { "fakepots"    , fakepots_func },
     { "fakepotw"    , fakepotw_func },
     { "fakeenc"     , fakeenc_func },
+    { "hwreport"    , hwreport_func },
     { "", NULL }, // end of table
 };
 
 RoachCmdLine cmdline(&Serial, (cmd_def_t*)cmds, false, (char*)">>>", (char*)"???", true, 512);
+
+void hwreport_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("HW report loop\r\n");
+    while (true)
+    {
+        RoachWdt_feed();
+        hw_report();
+    }
+}
 
 void factory_reset_func(void* cmd, char* argstr, Stream* stream)
 {
