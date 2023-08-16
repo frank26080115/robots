@@ -114,11 +114,11 @@ void RoachButton::handleIsr(void)
     _last_change_time = now;
     if (digitalRead(_pin) == LOW)
     {
-        _last_down_time = now;
         if ((now - _last_up_time) >= _db && (now - _last_down_time) >= _db)
         {
             _pressed = true;
         }
+        _last_down_time = now;
     }
     else
     {
@@ -132,28 +132,36 @@ bool RoachButton::hasPressed(bool clr)
     uint32_t now = millis();
     if (_disabled)
     {
+        // if disabled-until-lift
         if (digitalRead(_pin) != LOW)
         {
+            // detect the lift
             _disabled = false;
         }
         else
         {
+            // still disabled
             _pressed = false;
             __enable_irq();
             return false;
         }
     }
+
     bool x = _pressed;
     if (_rep != 0 && x == false && digitalRead(_pin) == LOW)
     {
-        if ((now - _last_down_time) >= _rep) {
-            x = true;
-            _last_down_time = now;
+        // repeat is configured, the flag is gone, but the button is held
+        if ((now - _last_down_time) >= _rep) { // passed the repeat time
+            x = true; // signal a press
+            _last_down_time = now; // setup next repeat
         }
     }
+
+    // clear if user wants to
     if (clr) {
         _pressed = false;
     }
+
     __enable_irq();
     return x;
 }
