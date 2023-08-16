@@ -5,8 +5,11 @@
 
 // configure which IMU to use here:
 
+#if defined(ARDUINO_NRF52840_ITSYBITSY)
 #define ROACHIMU_USE_BNO085
-//#define ROACHIMU_USE_LSM6DS3
+#elif defined(SEEED_XIAO_NRF52840_SENSE)
+#define ROACHIMU_USE_LSM6DS3
+#endif
 
 //#define ROACHIMU_AUTO_MATH
 

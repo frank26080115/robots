@@ -4,8 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#if defined(ARDUINO_NRF52840_ITSYBITSY)
 #define BOARD_IS_ITSYBITSY
-//#define BOARD_IS_XIAOBLE
+#elif defined(SEEED_XIAO_NRF52840_SENSE)
+#define BOARD_IS_XIAOBLE
+#endif
 
 #ifdef BOARD_IS_ITSYBITSY
 
@@ -32,6 +35,8 @@
 #define DETCORDHW_PIN_LED_B 12
 
 // note: RoachIMU_LSM has pin definitions for IMU already, it's on an internal bus
+#define DETCORDHW_PIN_I2C_SDA 17
+#define DETCORDHW_PIN_I2C_SCL 16
 
 #define DETCORDHW_PIN_SERVO_WEAP  4
 #define DETCORDHW_PIN_SERVO_DRV_R 5
