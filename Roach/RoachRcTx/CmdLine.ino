@@ -20,6 +20,7 @@ const cmd_def_t cmds[] = {
     { "fakeenc"     , fakeenc_func },
     { "hwreport"    , hwreport_func },
     { "rptenc"      , rptenc_func },
+    { "rptbtnisr"   , rptbtnisr_func },
     { "", NULL }, // end of table
 };
 
@@ -56,7 +57,7 @@ void factory_reset_func(void* cmd, char* argstr, Stream* stream)
 void nvmdebug_func(void* cmd, char* argstr, Stream* stream)
 {
     settings_debugNvm(stream);
-    settings_debugListFiles();
+    settings_debugListFiles(stream);
 }
 
 void save_func(void* cmd, char* argstr, Stream* stream)
@@ -238,4 +239,18 @@ void rptenc_func(void* cmd, char* argstr, Stream* stream)
         }
         prev_enc = enc;
     }
+}
+
+void rptbtnisr_func(void* cmd, char* argstr, Stream* stream)
+{
+    #ifdef ROACHBUTTON_TRACK_ISR_RATE
+    stream->printf("[%u] RoachButton ISR    rate %u    total %u\r\n", millis(), RoachButton_getIsrRate(), RoachButton_getIsrTotal());
+    #else
+    stream->println("ERROR: ROACHBUTTON_TRACK_ISR_RATE is not configured");
+    #endif
+}
+
+void rptrosync_func(void* cmd, char* argstr, Stream* stream)
+{
+    rosync_debugState(stream);
 }

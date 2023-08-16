@@ -210,6 +210,7 @@ bool roachnvm_fileCopy(const char* fin_name, const char* fout_name)
         {
             fin.close();
             fout.close();
+            debug_printf("[%u] roachnvm_fileCopy \"%s\" -> \"%s\"\r\n", millis(), fin_name, fout_name);
             return true;
         }
     }
@@ -232,15 +233,15 @@ void settings_debugNvm(Stream* stream)
     stream->printf("==========\r\n");
 }
 
-void settings_debugListFiles(void)
+void settings_debugListFiles(Stream* stream)
 {
-    Serial.println("settings_debugListFiles");
+    stream->println("settings_debugListFiles");
     if (!fatroot.open("/"))
     {
-        Serial.println("open root failed");
+        stream->println("open root failed");
         return;
     }
-    Serial.println("open root success");
+    stream->println("open root success");
     int i = 1;
     while (fatfile.openNext(&fatroot, O_RDONLY))
     {
@@ -248,11 +249,11 @@ void settings_debugListFiles(void)
         {
             char sfname[64];
             fatfile.getName7(sfname, 62);
-            debug_printf("%d: \"%s\"\r\n", i, sfname);
+            stream->printf("%d: \"%s\"\r\n", i, sfname);
             i++;
         }
         fatfile.close();
     }
     fatroot.close();
-    Serial.println("==========");
+    stream->println("==========");
 }

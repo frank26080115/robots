@@ -93,9 +93,17 @@ void roachrobot_sendChunkNvm(void)
         return;
     }
     tx_pkt.typecode = ROACHCMD_SYNC_DOWNLOAD_CONF;
+    tx_pkt.addr = roachrobot_downloadIdx;
     int dlen = rosync_nvm_sz - roachrobot_downloadIdx;
     dlen = dlen > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : dlen;
-    tx_pkt.len = dlen > 0 ? dlen : 0;
+    if (tx_pkt.addr > 0)  {
+        tx_pkt.len = dlen > 0 ? dlen : 0;
+    }
+    else {
+        // first packet must indicate the size of the memory
+        // the controller uses this to malloc() the memory
+        tx_pkt.len = rosync_nvm_sz;
+    }
     if (tx_pkt.len > 0)
     {
         memcpy(tx_pkt.data, &(rosync_nvm[roachrobot_downloadIdx]), tx_pkt.len);
@@ -117,6 +125,7 @@ void roachrobot_sendChunkDesc(void)
         return;
     }
     tx_pkt.typecode = ROACHCMD_SYNC_DOWNLOAD_DESC;
+    tx_pkt.addr = roachrobot_downloadIdx;
     int dlen = cfg_desc_sz - roachrobot_downloadIdx;
     dlen = dlen > NRFRR_PAYLOAD_SIZE2 ? NRFRR_PAYLOAD_SIZE2 : dlen;
     tx_pkt.len = dlen > 0 ? dlen : 0;

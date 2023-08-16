@@ -35,9 +35,12 @@ void rosync_task(void)
         #endif
         )
     {
+        debug_printf("[%u] rosync disconnected", millis());
         if (rosync_descDlFile.isOpen()) {
+            debug_printf(", desc file closed");
             rosync_descDlFile.close();
         }
+        debug_printf("\r\n");
 
         rosync_statemachine = ROSYNC_SM_DISCONNECTED;
     }
@@ -50,15 +53,17 @@ void rosync_task(void)
             {
                 // the robot has reconnected, the disconnection might've been momentary, so all the previous data is kept and verified
 
-                if (telem_pkt.chksum_desc != rosync_checksum_desc)
+                if (telem_pkt.chksum_desc != rosync_checksum_desc && telem_pkt.chksum_desc != 0)
                 {
                     // robot is not recognized
+                    debug_printf("[%u] rosync new robot not recognized (0x%04X != 0x%04X)\r\n", millis(), telem_pkt.chksum_desc, rosync_checksum_desc);
 
                     // if the user is in the menu, we cannot do anything yet
                     // because rosync_loadDescFileId calls delete on rosync_menu
                     if (rosync_menu != NULL) {
                         if (rosync_menu->isRunning()) {
                             rosync_menu->interrupt(EXITCODE_BACK);
+                            debug_printf("[%u] rosync need to interrupt rosync_menu\r\n", millis());
                             break;
                         }
                     }
@@ -67,26 +72,32 @@ void rosync_task(void)
                     if (rosync_loadDescFileId(telem_pkt.chksum_desc))
                     {
                         rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
+                        debug_printf("[%u] rosync loaded all files for robot\r\n", millis());
                         uint32_t c = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
                         if (c == telem_pkt.chksum_nvm)
                         {
                             // in sync
                             rosync_checksum_nvm = c;
                             rosync_statemachine = ROSYNC_SM_ALLGOOD;
+                            debug_printf("[%u] rosync robot NVM is in sync with local NVM\r\n", millis());
                         }
                         else
                         {
                             rosync_statemachine = ROSYNC_SM_NOSYNC;
+                            debug_printf("[%u] rosync robot NVM is NOT in sync\r\n", millis());
                         }
                     }
                     else
                     {
+                        debug_printf("[%u] rosync failed to load desc file for robot\r\n", millis());
                         rosync_statemachine = ROSYNC_SM_NODESC;
                     }
                 }
-                else
+                else if (rosync_checksum_desc != 0)
                 {
                     // robot is recognized
+                    debug_printf("[%u] rosync new robot is recognized (0x%04X)\r\n", millis(), rosync_checksum_desc);
+
                     // check if NVM is synchronized
                     if (telem_pkt.chksum_nvm != rosync_checksum_nvm)
                     {
@@ -97,6 +108,7 @@ void rosync_task(void)
                             if (rosync_menu != NULL) {
                                 if (rosync_menu->isRunning()) {
                                     rosync_menu->interrupt(EXITCODE_BACK);
+                                    debug_printf("[%u] rosync need to interrupt rosync_menu\r\n", millis());
                                     break;
                                 }
                             }
@@ -104,27 +116,37 @@ void rosync_task(void)
                             if (rosync_loadDescFileId(telem_pkt.chksum_desc) == false)
                             {
                                 rosync_statemachine = ROSYNC_SM_NODESC;
+                                debug_printf("[%u] rosync failed to load desc file for robot\r\n", millis());
                                 break;
                             }
                             // at this point in the code, rosync_nvm is not null
                             rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
+                            debug_printf("[%u] rosync loaded all files for robot\r\n", millis());
                         }
-                        // at this point in the code, rosync_nvm is not null
+                        // at this point in the code, rosync_nvm is not null and rosync_desc_tbl should not be null
                         uint32_t c = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
                         if (c == telem_pkt.chksum_nvm)
                         {
                             rosync_checksum_nvm = c;
                             rosync_statemachine = ROSYNC_SM_ALLGOOD;
+                            debug_printf("[%u] rosync robot NVM is in sync with local NVM\r\n", millis());
                         }
                         else
                         {
                             rosync_statemachine = ROSYNC_SM_NOSYNC;
+                            debug_printf("[%u] rosync robot NVM is NOT in sync\r\n", millis());
                         }
                     }
                     else
                     {
                         rosync_statemachine = ROSYNC_SM_ALLGOOD;
+                        debug_printf("[%u] rosync new robot NVM is already in sync with local NVM\r\n", millis());
                     }
+                }
+                else
+                {
+                    // TODO: what happens if robot does not report a descriptor?
+                    // right now, do nothing, there won't be anything to sync
                 }
             }
             #endif
@@ -133,15 +155,14 @@ void rosync_task(void)
             #ifndef DEVMODE_NO_RADIO
             if (radio.textAvail())
             {
-                radio_binpkt_t pkt;
-                radio.textReadBin(&pkt, false);
-                if (rosync_downloadDescChunk(&pkt))
+                if (rosync_downloadDescChunk(radio.textReadPtr(false)))
                 {
-                    radio.textReadPtr(true);
+                    radio.textReadPtr(true); // clear the buffer for other tasks
                 }
             }
-            if ((millis() - rosync_lastRxTime) >= 1000)
+            if ((millis() - rosync_lastRxTime) >= 1000) // timeout
             {
+                debug_printf("[%u] ERR: rosync ROSYNC_SM_DOWNLOADDESC timed out\r\n", millis());
                 if (rosync_descDlFile.isOpen()) {
                     rosync_descDlFile.close();
                 }
@@ -155,18 +176,19 @@ void rosync_task(void)
             {
                 if (rosync_downloadNvmChunk(radio.textReadPtr(false)))
                 {
-                    radio.textReadPtr(true);
+                    radio.textReadPtr(true); // clear the buffer for other tasks
                 }
             }
-            if ((millis() - rosync_lastRxTime) >= 1000)
+            if ((millis() - rosync_lastRxTime) >= 1000) // timeout
             {
+                debug_printf("[%u] ERR: rosync ROSYNC_SM_DOWNLOADNVM timed out\r\n", millis());
                 rosync_statemachine = ROSYNC_SM_NOSYNC_ERR;
             }
             #endif
             break;
         case ROSYNC_SM_UPLOAD:
             #ifndef DEVMODE_NO_RADIO
-            if (radio.textIsDone())
+            if (radio.textIsDone()) // if not busy
             {
                 rosync_uploadNextChunk();
             }
@@ -189,6 +211,7 @@ bool rosync_downloadDescFile(void)
     radio.textSendByte(ROACHCMD_SYNC_DOWNLOAD_DESC);
     #endif
     rosync_statemachine = ROSYNC_SM_DOWNLOADDESC;
+    debug_printf("[%u] rosync_downloadDescFile started, file: \"%s\"\r\n", millis(), fname);
     return true;
 }
 
@@ -199,24 +222,30 @@ void rosync_downloadNvm(void)
     #endif
     rosync_nvm_wptr = 0;
     rosync_statemachine = ROSYNC_SM_DOWNLOADNVM;
+    debug_printf("[%u] rosync_downloadNvm started\r\n", millis());
 }
 
 bool rosync_downloadStart(void)
 {
-    if (rosync_statemachine == ROSYNC_SM_NODESC || rosync_statemachine == ROSYNC_SM_NODESC_ERR)
+    if (rosync_statemachine == ROSYNC_SM_NODESC || rosync_statemachine == ROSYNC_SM_NODESC_ERR) // descriptor must be downloaded first
     {
         if (rosync_descDlFile.isOpen()) {
+            debug_printf("[%u] WARNING: rosync_downloadStart previous file needed to be closed\r\n", millis());
             rosync_descDlFile.close();
         }
         return rosync_downloadDescFile();
     }
     #ifndef DEVMODE_NO_RADIO
-    else if (rosync_nvm_sz > 0 && rosync_nvm != NULL && radio.isConnected())
+    else if (rosync_nvm_sz > 0 && rosync_nvm != NULL && radio.isConnected()) // there is room allocated to download
     {
         rosync_downloadNvm();
         return true;
     }
     #endif
+    else
+    {
+        Serial.printf("[%u] ERROR: rosync_downloadStart unable to start download\r\n", millis());
+    }
     return false;
 }
 
@@ -227,6 +256,7 @@ bool rosync_downloadDescChunk(radio_binpkt_t* pkt)
         int i, dlen = pkt->len;
         if (dlen == 0) // indicate end of transfer
         {
+            debug_printf("[%u] rosync_downloadDescChunk end of transfer\r\n", millis());
             rosync_descDlFile.close();
             if (rosync_loadDescFileId(telem_pkt.chksum_desc))
             {
@@ -235,20 +265,24 @@ bool rosync_downloadDescChunk(radio_binpkt_t* pkt)
                     rosync_loadNvmFile(ROACH_STARTUP_CONF_NAME);
                     if (rosync_checksum_nvm == telem_pkt.chksum_nvm)
                     {
+                        debug_printf("NVM in sync\r\n");
                         rosync_statemachine = ROSYNC_SM_ALLGOOD;
                     }
                     else
                     {
+                        debug_printf("not in sync, starting sync\r\n");
                         rosync_downloadNvm();
                     }
                 }
                 else
                 {
+                    debug_printf("NVM already in sync\r\n");
                     rosync_statemachine = ROSYNC_SM_ALLGOOD;
                 }
             }
             else
             {
+                Serial.printf("[%u] ERROR: rosync_downloadDescChunk unable to read the file that was just written\r\n", millis());
                 rosync_statemachine = ROSYNC_SM_NODESC_ERR;
             }
             return true;
@@ -262,25 +296,36 @@ bool rosync_downloadDescChunk(radio_binpkt_t* pkt)
             rosync_descDlFileSize += 1;
         }
         rosync_lastRxTime = millis();
+
+        debug_printf("[%u] rosync_downloadDescChunk %d %d\r\n", rosync_lastRxTime, dlen, rosync_descDlFileSize);
+
         return true;
+    }
+    else
+    {
+        debug_printf("[%u] ERROR: rosync_downloadDescChunk unknown pkt->typecode 0x%02X\r\n", millis(), pkt->typecode);
     }
     return false;
 }
 
 bool rosync_downloadNvmChunk(radio_binpkt_t* pkt)
 {
-    if (rosync_nvm == NULL)
+    if (rosync_nvm == NULL) // unknown robot
     {
         if (pkt->typecode == ROACHCMD_SYNC_DOWNLOAD_CONF && pkt->addr == 0 && pkt->len > 0)
         {
+            // the first ever transmission will indicate how long the actual structure is
             rosync_nvm = (uint8_t*)malloc(pkt->len);
             rosync_nvm_sz = pkt->len;
+            debug_printf("[%u] rosync_downloadNvmChunk allocated memory for rosync_nvm %u\r\n", millis(), rosync_nvm_sz);
         }
         else
         {
+            Serial.printf("[%u] ERROR: rosync_downloadNvmChunk rosync_nvm is NULL, but robot did not indicate how much memory to allocate (%u %u %u)\r\n", millis(), pkt->typecode, pkt->addr, pkt->len);
             return false;
         }
     }
+    // note: rosync_nvm is free'ed when a new descriptor file is loaded
 
     bool ret = false;
     bool done = false;
@@ -303,17 +348,26 @@ bool rosync_downloadNvmChunk(radio_binpkt_t* pkt)
             done = true;
         }
         rosync_lastRxTime = millis();
+        debug_printf("[%u] rosync_downloadNvmChunk %d %d\r\n", rosync_lastRxTime, dlen, rosync_nvm_wptr);
+    }
+    else
+    {
+        debug_printf("[%u] ERROR: rosync_downloadNvmChunk unknown pkt->typecode 0x%02X\r\n", millis(), pkt->typecode);
     }
 
     if (done)
     {
+        debug_printf("[%u] rosync_downloadNvmChunk end of transfer", millis());
+
         rosync_checksum_nvm = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
         if (rosync_checksum_nvm == telem_pkt.chksum_nvm)
         {
+            debug_printf(", robot is in sync\r\n");
             rosync_statemachine = ROSYNC_SM_ALLGOOD;
         }
         else
         {
+            debug_printf(", robot is NOT in sync (0x%04X != 0x%04X)\r\n", rosync_checksum_nvm, telem_pkt.chksum_nvm);
             rosync_statemachine = ROSYNC_SM_NOSYNC_ERR;
         }
     }
@@ -335,32 +389,40 @@ bool rosync_loadDescFile(const char* fname, uint32_t id)
         Serial.printf("ERR[%u]: tried loading robot desc file \"%s\" but file does not exist\r\n", millis(), fname);
         return false;
     }
+    debug_printf("[%u] rosync_loadDescFile succesful open \"%s\" 0x%08X\r\n", millis(), fname, id);
     return rosync_loadDescFileObj(&f, id);
 }
 
 bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
 {
+    // the descriptor of the robot is stored as a file on the flash
+    // load that into RAM
+
     if (rosync_menu != NULL)
     {
         if (rosync_menu->isRunning()) {
             // there shouldn't actually be a way to reach here
+            Serial.printf("[%u] ERROR: rosync_loadDescFileObj but rosync_menu is still running\r\n", millis());
             rosync_menu->interrupt(EXITCODE_BACK);
             return false;
         }
 
         delete rosync_menu;
         rosync_menu = NULL;
+        debug_printf("[%u] rosync_loadDescFileObj deleted rosync_menu\r\n", millis());
     }
 
     if (rosync_desc_tbl != NULL)
     {
         free(rosync_desc_tbl);
         rosync_desc_tbl = NULL;
+        debug_printf("[%u] rosync_loadDescFileObj deleted rosync_desc_tbl\r\n", millis());
     }
     if (rosync_nvm != NULL)
     {
         free(rosync_nvm);
         rosync_nvm = NULL;
+        debug_printf("[%u] rosync_loadDescFileObj deleted rosync_nvm\r\n", millis());
     }
     uint32_t sz = f->fileSize();
     rosync_desc_tbl = (roach_nvm_gui_desc_t*)malloc(sz);
@@ -372,6 +434,7 @@ bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
     }
 
     f->close();
+    debug_printf("[%u] rosync_loadDescFileObj finished loading the file (%u)\r\n", millis(), sz);
 
     uint32_t chksum_desc = roach_crcCalc((uint8_t*)rosync_desc_tbl, sz, NULL);
     if (chksum_desc != id && id != 0) {
@@ -383,15 +446,17 @@ bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
         return false;
     }
 
-    int sum = 0;
+    int highest_addr = 0;
     for (i = 0; ; i++)
     {
         roach_nvm_gui_desc_t* d = &rosync_desc_tbl[i];
-        sum = d->byte_offset > sum ? d->byte_offset : sum;
+        highest_addr = d->byte_offset > highest_addr ? d->byte_offset : highest_addr;
     }
-    sum += 4; // just in case
-    rosync_nvm_sz = sum;
-    rosync_nvm = (uint8_t*)malloc(sum);
+    highest_addr += 4; // just in case
+    rosync_nvm_sz = highest_addr;
+    rosync_nvm = (uint8_t*)malloc(highest_addr);
+
+    debug_printf("[%u] rosync_loadDescFileObj allocated rosync_nvm by estimate (%u)\r\n", millis(), highest_addr);
 
     if (rosync_nvm == NULL) {
         Serial.printf("ERR[%u]: unable to allocate memory for rosync_nvm\r\n", millis());
@@ -411,9 +476,10 @@ bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
     }
 
     rosync_checksum_desc = chksum_desc;
-    roachnvm_setdefaults(rosync_nvm, rosync_desc_tbl);
+    roachnvm_setdefaults(rosync_nvm, rosync_desc_tbl); // the contents have not been sync'ed yet, but the UI still needs some valid data
     rosync_checksum_nvm = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
     rosync_markOnlyFile();
+    debug_printf("[%u] rosync_loadDescFileObj all done (0x%04X 0x%04X))\r\n", millis(), rosync_checksum_desc, rosync_checksum_nvm);
     return true;
 }
 
@@ -435,6 +501,8 @@ bool rosync_loadNvmFile(const char* fname)
         return false;
     }
 
+    debug_printf("[%u] rosync_loadNvmFile succesful open \"%s\"\r\n", millis(), fname_buf);
+
     roachnvm_readfromfile(&f, (uint8_t*)rosync_nvm, rosync_desc_tbl);
 
     f.close();
@@ -448,6 +516,7 @@ void rosync_uploadStart(void)
     rosync_statemachine = ROSYNC_SM_UPLOAD;
     rosync_uploadIdx = 0;
     rosync_uploadTotal = roachnvm_getDescCnt(rosync_desc_tbl);
+    debug_printf("[%u] rosync_uploadStart about to send %u items\r\n", millis(), rosync_uploadTotal);
 }
 
 void rosync_uploadChunk(roach_nvm_gui_desc_t* desc)
@@ -462,12 +531,14 @@ void rosync_uploadChunk(roach_nvm_gui_desc_t* desc)
     #ifndef DEVMODE_NO_RADIO
     radio.textSendBin(&pkt);
     #endif
+    debug_printf("[%u] rosync_uploadNextChunk sent {%u} \"%s=%s\"\r\n", millis(), rosync_uploadIdx, desc->name, tmp);
 }
 
 void rosync_uploadNextChunk(void)
 {
     roach_nvm_gui_desc_t* desc = &rosync_desc_tbl[rosync_uploadIdx];
-    if (desc->name[0] == 0) {
+    if (desc->name == NULL || desc->name[0] == 0) {
+        debug_printf("[%u] rosync_uploadNextChunk finished %u\r\n", millis(), rosync_uploadIdx);
         rosync_statemachine = ROSYNC_SM_UPLOAD_DONE;
         return;
     }
@@ -494,16 +565,21 @@ bool rosync_markOnlyFile(void)
             if (strncmp("rdesc", sfname, 5) == 0)
             {
                 cnt++;
-                strncpy(sfname_only, sfname, 62);
+                strncpy0(sfname_only, sfname, 62);
+                debug_printf("[%u] rosync_markOnlyFile found file \"%s\" {%u}\r\n", millis(), sfname, cnt);
             }
             else if (strcmp(ROACH_STARTUP_DESC_NAME, sfname) == 0)
             {
+                debug_printf("[%u] rosync_markOnlyFile found startup file \"%s\" {%u}\r\n", millis(), sfname, cnt);
                 has_startup = true;
             }
         }
     }
+    fatfile.close();
+    fatroot.close();
     if (has_startup == false || cnt == 1)
     {
+        debug_printf("[%u] rosync_markOnlyFile is marking the only file \"%s\" as the startup file\r\n", millis(), sfname_only);
         return rosync_markStartupFile(sfname_only);
     }
     return false;
@@ -522,6 +598,44 @@ bool rosync_loadStartup(void)
 bool rosync_isSynced(void)
 {
     return rosync_statemachine == ROSYNC_SM_ALLGOOD;
+}
+
+void rosync_debugState(Stream* stream)
+{
+    stream->printf("[%u] rosync_debugState\r\n", millis());
+    stream->printf("state machine = %u\r\n", rosync_statemachine);
+    stream->printf("rosync_checksum_nvm = 0x%04X\r\n", rosync_checksum_nvm);
+    stream->printf("rosync_checksum_desc = 0x%04X\r\n", rosync_checksum_desc);
+
+    if (rosync_menu == NULL) {
+        stream->printf("rosync_menu = NULL\r\n");
+    }
+    else {
+        if (rosync_menu->isRunning()) {
+            stream->printf("rosync_menu is running\r\n");
+        }
+        else {
+            stream->printf("rosync_menu is allocated but not running\r\n");
+        }
+    }
+
+    if (rosync_desc_tbl == NULL) {
+        stream->printf("rosync_desc_tbl = NULL\r\n");
+    }
+    else {
+        stream->printf("rosync_desc_tbl has %u items\r\n", roachnvm_getDescCnt(rosync_desc_tbl));
+    }
+
+    if (rosync_nvm == NULL) {
+        stream->printf("rosync_nvm = NULL\r\n");
+    }
+    else {
+        stream->printf("rosync_nvm size %u, chksum 0x%04X, wptr %d\r\n", rosync_nvm_sz, rosync_checksum_nvm, rosync_nvm_wptr);
+    }
+
+    stream->printf("rosync_descDlFileSize = %u\r\n", rosync_descDlFileSize);
+    stream->printf("rosync_uploadIdx = %u ; rosync_uploadTotal = %u\r\n", rosync_uploadIdx, rosync_uploadTotal);
+    stream->printf("=========\r\n");
 }
 
 void rosync_draw(void)
