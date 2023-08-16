@@ -455,6 +455,7 @@ void RoachMenuLister::buildFileList(const char* filter)
         }
         fatfile.close();
     }
+    fatroot.close();
 
     addCancelNode();
     _delete_on_exit = true;

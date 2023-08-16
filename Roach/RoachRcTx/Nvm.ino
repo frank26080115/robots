@@ -253,5 +253,6 @@ void settings_debugListFiles(void)
         }
         fatfile.close();
     }
+    fatroot.close();
     Serial.println("==========");
 }
