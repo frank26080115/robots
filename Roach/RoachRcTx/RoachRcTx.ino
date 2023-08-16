@@ -50,10 +50,10 @@ RoachButton btn_right  = RoachButton(ROACHHW_PIN_BTN_RIGHT);
 RoachButton btn_center = RoachButton(ROACHHW_PIN_BTN_CENTER);
 RoachButton btn_g5     = RoachButton(ROACHHW_PIN_BTN_G5);
 RoachButton btn_g6     = RoachButton(ROACHHW_PIN_BTN_G6);
-RoachButton btn_sw1    = RoachButton(ROACHHW_PIN_BTN_SW1);
-RoachButton btn_sw2    = RoachButton(ROACHHW_PIN_BTN_SW2);
-RoachButton btn_sw3    = RoachButton(ROACHHW_PIN_BTN_SW3);
-RoachButton btn_d7     = RoachButton(ROACHHW_PIN_BTN_D7);
+RoachButton btn_sw1    = RoachButton(ROACHHW_PIN_BTN_SW1, true, 0, 50);
+RoachButton btn_sw2    = RoachButton(ROACHHW_PIN_BTN_SW2, true, 0, 50);
+RoachButton btn_sw3    = RoachButton(ROACHHW_PIN_BTN_SW3, true, 0, 50);
+RoachButton btn_d7     = RoachButton(ROACHHW_PIN_BTN_D7 , true, 0, 50);
 
 #ifdef ROACHHW_PIN_BTN_SW4
 // ran out of pins, switch 4 does not exist
