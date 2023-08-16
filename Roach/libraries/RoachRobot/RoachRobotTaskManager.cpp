@@ -29,8 +29,9 @@ void rtmgr_init(uint32_t intv, uint32_t timeout)
     statemachine = RTMGR_STATE_START;
 }
 
-void rtmgr_task(uint32_t now)
+bool rtmgr_task(uint32_t now)
 {
+    bool has_called = false;
     bool has_cmd;
     if (statemachine == RTMGR_STATE_RUN || statemachine == RTMGR_STATE_SIM)
     {
@@ -39,6 +40,7 @@ void rtmgr_task(uint32_t now)
             last_time = now;
             last_rx = (has_cmd || statemachine == RTMGR_STATE_SIM) ? now : last_rx;
             rtmgr_taskPeriodic(has_cmd);
+            has_called = true;
         }
     }
 
@@ -60,6 +62,7 @@ void rtmgr_task(uint32_t now)
                     statemachine = RTMGR_STATE_PREFAIL;
                     debug_printf("[%u] rtmgr_onPreFailed\r\n", now);
                     rtmgr_onPreFailed();
+                    has_called = true;
                     break;
                 }
             }
@@ -72,6 +75,7 @@ void rtmgr_task(uint32_t now)
                 rtmgr_onSafe(need_full_init);
                 need_full_init = false;
                 statemachine = RTMGR_STATE_RUN;
+                has_called = true;
                 break;
             }
             else
@@ -81,6 +85,7 @@ void rtmgr_task(uint32_t now)
                     if ((now - last_time) >= task_interval) {
                         last_time = now;
                         rtmgr_taskPreFailed();
+                        has_called = true;
                     }
                 }
                 else
@@ -89,6 +94,7 @@ void rtmgr_task(uint32_t now)
                     rtmgr_onPostFailed();
                     statemachine = RTMGR_STATE_POSTFAIL;
                     need_full_init = true;
+                    has_called = true;
                 }
             }
             break;
@@ -98,6 +104,7 @@ void rtmgr_task(uint32_t now)
             {
                 debug_printf("[%u] rtmgr_onSafe from post\r\n", now);
                 rtmgr_onSafe(need_full_init);
+                has_called = true;
                 need_full_init = false;
                 statemachine = RTMGR_STATE_RUN;
                 break;
@@ -107,6 +114,7 @@ void rtmgr_task(uint32_t now)
                 if ((now - last_time) >= task_interval) {
                     last_time = now;
                     rtmgr_taskPostFailed();
+                    has_called = true;
                 }
             }
             break;
@@ -116,11 +124,13 @@ void rtmgr_task(uint32_t now)
             {
                 debug_printf("[%u] rtmgr_onSafe from init state\r\n", now);
                 rtmgr_onSafe(need_full_init);
+                has_called = true;
                 need_full_init = false;
                 statemachine = RTMGR_STATE_RUN;
             }
             break;
     }
+    return has_called;
 }
 
 void rtmgr_permEnd(void)

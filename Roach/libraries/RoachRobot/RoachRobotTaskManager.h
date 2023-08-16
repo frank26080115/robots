@@ -19,8 +19,8 @@ extern void rtmgr_taskPeriodic(bool has_cmd);  // called repeatedly at the reque
 // timeout is the timeout since the last radio message, set to 0 to use radio.isConnected instead
 void rtmgr_init(uint32_t intv, uint32_t timeout);
 
-// call this task periodically from the application loop, supply current time in milliseconds
-void rtmgr_task(uint32_t now);
+// call this task periodically from the application loop, supply current time in milliseconds, returns true if a task is actually called
+bool rtmgr_task(uint32_t now);
 
 // end the task manager permanently, goes through the entire failsafe sequence
 void rtmgr_permEnd(void);

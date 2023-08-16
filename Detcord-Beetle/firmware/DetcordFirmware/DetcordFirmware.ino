@@ -101,10 +101,22 @@ void setup()
 
 void loop()
 {
+    #ifdef DEVMODE_PERIODIC_DEBUG
+    static uint32_t last_debug_time = 0;
+    #endif
     uint32_t now = millis();
     RoachWdt_feed();
     robot_tasks(now); // short tasks
-    rtmgr_task(now); // this will: call 10ms periodic task, and handle failsafe events
+    if (rtmgr_task(now)) // this will: call 10ms periodic task, and handle failsafe events
+    {
+        #ifdef DEVMODE_PERIODIC_DEBUG
+        if ((now - last_debug_time) >= DEVMODE_PERIODIC_DEBUG)
+        {
+            last_debug_time = now;
+            Serial.printf("LOG[%u]: ", now);
+        }
+        #endif
+    }
 }
 
 void robot_tasks(uint32_t now) // short tasks

@@ -8,4 +8,6 @@
 //#define debug_printf(...)            // do nothing
 #define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
 
+#define DEVMODE_PERIODIC_DEBUG 100
+
 #endif
