@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+//#define ROACHBUTTON_TRACK_ISR_RATE // used for debugging
+
 class RoachButton
 {
     public:
@@ -35,5 +37,10 @@ void RoachButton_allTask(void);
 void RoachButton_clearAll(void);
 uint32_t RoachButton_hasAnyPressed(void);
 uint32_t RoachButton_isAnyHeld(void);
+
+#ifdef ROACHBUTTON_TRACK_ISR_RATE
+uint32_t RoachButton_getIsrRate(void);
+uint32_t RoachButton_getIsrTotal(void);
+#endif
 
 #endif

@@ -36,6 +36,13 @@ static voidFuncPtr _pin_irq_ptr[ROACHBTN_CNT_MAX] =
     _pin_irqn_8, _pin_irqn_9, _pin_irqn_10, _pin_irqn_11
 };
 
+#ifdef ROACHBUTTON_TRACK_ISR_RATE
+static volatile uint32_t isr_total = 0;
+static volatile uint32_t isr_rate_cnt = 0;
+static uint32_t isr_rate = 0;
+static uint32_t isr_rate_time = 0;
+#endif
+
 RoachButton::RoachButton(int pin, bool intr_mode, int rep, int db)
 {
     _intr_mode = intr_mode;
@@ -81,6 +88,19 @@ void RoachButton::task(void)
             _init_high_cnt += 1;
         }
     }
+
+    #ifdef ROACHBUTTON_TRACK_ISR_RATE
+    if (_intr_mode)
+    {
+        uint32_t now = millis();
+        if ((now - isr_rate_time) >= 1000)
+        {
+            isr_rate = isr_rate_cnt;
+            isr_rate_cnt = 0;
+            isr_rate_time = now;
+        }
+    }
+    #endif
 }
 
 void RoachButton::poll(void)
@@ -105,6 +125,10 @@ void RoachButton::poll(void)
 
 static void _pin_irq(uint8_t id)
 {
+    #ifdef ROACHBUTTON_TRACK_ISR_RATE
+    isr_total++;
+    isr_rate_cnt++;
+    #endif
     roachbtn_insttbl[id]->handleIsr();
 }
 
@@ -255,3 +279,15 @@ uint32_t RoachButton_isAnyHeld(void)
     }
     return x;
 }
+
+#ifdef ROACHBUTTON_TRACK_ISR_RATE
+uint32_t RoachButton_getIsrRate(void)
+{
+    return isr_rate;
+}
+
+uint32_t RoachButton_getIsrTotal(void)
+{
+    return isr_total;
+}
+#endif
