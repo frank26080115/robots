@@ -151,6 +151,21 @@ void ctrler_tasks(void)
     PerfCnt_task();
     RoachWdt_feed();
     RoachButton_allTask();
+
+    #ifdef DEVMODE_DEBUG_BUTTONS
+    static uint32_t prev_btns = 0;
+    uint32_t cur_btns = RoachButton_hasAnyPressed();
+    if (cur_btns != prev_btns) {
+        if (cur_btns != 0) {
+            debug_printf("[%u] btn press detected 0x%04X\r\n", millis(), cur_btns);
+        }
+        else {
+            debug_printf("[%u] btn all released detected 0x%04X\r\n", millis(), cur_btns);
+        }
+        prev_btns = cur_btns;
+    }
+    #endif
+
     RoachPot_allTask(); // polls ADCs non-blocking
     // TODO: buttons are using interrupts only, no tasks, but check reliability
     nbtwi_task(); // send any queued data to OLED
@@ -194,19 +209,19 @@ void ctrler_buildPkt(void)
 
     if (encoder_mode == ENCODERMODE_USEPOT)
     {
-        tx_pkt.steering = 0;
+        tx_pkt.steering = 0; // pot has been repurposed, do not use steering override
         int hx = headingx;
-        hx += roach_value_map((pots_locked == false) ? pot_steering.get() : 0, 0, ROACH_SCALE_MULTIPLIER, 0, (90 * ROACH_ANGLE_MULTIPLIER), false);
-        ROACH_WRAP_ANGLE(hx, ROACH_ANGLE_MULTIPLIER);
-        tx_pkt.heading = hx;
+        hx += roach_value_map((pots_locked == false) ? pot_steering.get() : 0, 0, ROACH_SCALE_MULTIPLIER, 0, (90 * ROACH_ANGLE_MULTIPLIER * 100), false);
+        ROACH_WRAP_ANGLE(hx, ROACH_ANGLE_MULTIPLIER * 100);
+        tx_pkt.heading = roach_div_rounded(hx, 100);
     }
     else
     {
         tx_pkt.steering = (pots_locked == false) ? pot_steering.get() : 0;
         int h = RoachEnc_get(true);
         headingx += h * nvm_tx.heading_multiplier;
-        ROACH_WRAP_ANGLE(headingx, ROACH_ANGLE_MULTIPLIER);
-        tx_pkt.heading = headingx;
+        ROACH_WRAP_ANGLE(headingx, ROACH_ANGLE_MULTIPLIER * 100);
+        tx_pkt.heading = roach_div_rounded(headingx, 100);
     }
 
     tx_pkt.pot_weap = (pots_locked == false) ? pot_weapon.get() : 0;

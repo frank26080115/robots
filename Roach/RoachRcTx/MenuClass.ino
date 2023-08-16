@@ -410,6 +410,8 @@ void RoachMenuLister::buildFileList(const char* filter)
     if (!fatroot.open("/"))
     {
         Serial.println("open root failed");
+        addCancelNode();
+        _delete_on_exit = true;
         return;
     }
     while (fatfile.openNext(&fatroot, O_RDONLY))
@@ -446,9 +448,20 @@ void RoachMenuLister::buildFileList(const char* filter)
                 _list_cnt += 1;
                 _delete_on_exit = true;
             }
+            else
+            {
+                debug_printf("[%u] buildFileList ignored \"%s\"\r\n", millis(), sfname);
+            }
         }
         fatfile.close();
     }
+
+    addCancelNode();
+    _delete_on_exit = true;
+}
+
+void RoachMenuLister::addCancelNode(void)
+{
     RoachMenuFileItem* nc = new RoachMenuFileItem("CANCEL");
     if (_head_node == NULL) {
         _head_node = (RoachMenuListItem*)nc;
@@ -459,9 +472,7 @@ void RoachMenuLister::buildFileList(const char* filter)
         _tail_node = (RoachMenuListItem*)nc;
     }
     debug_printf("[%u] buildFileList added CANCEL -> %u\r\n", millis(), _list_cnt);
-
     _list_cnt++;
-    _delete_on_exit = true;
 }
 
 void RoachMenuLister::onExit(void)

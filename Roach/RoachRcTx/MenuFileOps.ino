@@ -66,6 +66,12 @@ void RoachMenuFileOpenList::onButton(uint8_t btn)
                 _exit = EXITCODE_BACK;
                 break;
             }
+            case BTNID_LEFT:
+                _exit = EXITCODE_LEFT;
+                break;
+            case BTNID_RIGHT:
+                _exit = EXITCODE_RIGHT;
+                break;
             case BTNID_G6:
                 _exit = EXITCODE_HOME;
                 break;

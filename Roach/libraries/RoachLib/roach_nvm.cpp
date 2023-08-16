@@ -14,6 +14,11 @@
 #define roachfileprint write
 #endif
 
+#ifndef debug_printf
+//#define debug_printf(...)            // do nothing
+#define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
+#endif
+
 int roachnvm_cntgroup(roach_nvm_gui_desc_t* g)
 {
     int cnt = 0;
@@ -165,14 +170,25 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
         value = &value[1];
     }
 
-    if (strcmp("hex", desc_itm->type_code) == 0)
+    char typecode[32];
+    int typecode_len;
+    strcpy(typecode, desc_itm->type_code);
+    typecode_len = strlen(typecode);
+    for (int i = 2; i < typecode_len; i++) {
+        if (typecode[i] == 'x') {
+            typecode[i] = 0;
+            break;
+        }
+    }
+
+    if (strcmp("hex", typecode) == 0)
     {
         uint32_t x = strtoul(value, NULL, 16);
         uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset];
         *wptr = x;
         ret = true;
     }
-    else if (desc_itm->type_code[0] == 'u' || desc_itm->type_code[0] == 's')
+    else if (typecode[0] == 'u' || typecode[0] == 's')
     {
         uint32_t m = 1;
         if (desc_itm->type_code[3] == 'x')
@@ -194,8 +210,8 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
             flt *= m;
             x = (int32_t)lround(flt);
         }
-        int sz = atoi(&(desc_itm->type_code[1]));
-        if (desc_itm->type_code[0] == 's') {
+        int sz = atoi(&(typecode[1]));
+        if (typecode[0] == 's') {
             sz *= -1;
         }
 
@@ -205,10 +221,10 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
         ret = true;
         switch (sz)
         {
-            case  8 : { uint8_t*  wptr = (uint8_t* )&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            case  8 : {  uint8_t* wptr = ( uint8_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
             case  16: { uint16_t* wptr = (uint16_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
             case  32: { uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
-            case -8 : {  int8_t*  wptr = ( int8_t* )&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
+            case -8 : {   int8_t* wptr = (  int8_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
             case -16: {  int16_t* wptr = ( int16_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
             case -32: {  int32_t* wptr = ( int32_t*)&struct_ptr[desc_itm->byte_offset]; *wptr = x; } break;
             default:
@@ -325,12 +341,23 @@ void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc
 
 void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
 {
-    if (strcmp("hex", desc_itm->type_code) == 0)
+    char typecode[32];
+    int typecode_len;
+    strcpy(typecode, desc_itm->type_code);
+    typecode_len = strlen(typecode);
+    for (int i = 2; i < typecode_len; i++) {
+        if (typecode[i] == 'x') {
+            typecode[i] = 0;
+            break;
+        }
+    }
+
+    if (strcmp("hex", typecode) == 0)
     {
         uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset];
         sprintf(str, "0x%08X", *wptr);
     }
-    else if (desc_itm->type_code[0] == 'u' || desc_itm->type_code[0] == 's')
+    else if (typecode[0] == 'u' || typecode[0] == 's')
     {
         uint32_t m = 1;
         int32_t x;
@@ -344,8 +371,8 @@ void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* d
             m = atoi(&(desc_itm->type_code[3]));
         }
 
-        int sz = atoi(&(desc_itm->type_code[1]));
-        if (desc_itm->type_code[0] == 's') {
+        int sz = atoi(&(typecode[1]));
+        if (typecode[0] == 's') {
             sz *= -1;
         }
 
@@ -377,6 +404,7 @@ void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* d
 void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
     int i;
+    char str[32];
     roach_nvm_gui_desc_t* desc_itm;
     for (i = 0; i < 0xFFFF; i++)
     {
@@ -384,10 +412,12 @@ void roachnvm_writetofile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_
         if (desc_itm->name == NULL || desc_itm->name[0] == 0) {
             break;
         }
+
+        debug_printf("\t{%d} %s = ", i, desc_itm->name);
         f->roachfileprint(desc_itm->name);
         f->roachfileprint('=');
-        char str[32];
         roachnvm_formatitem(str, struct_ptr, desc_itm);
+        debug_printf("%s\r\n", str);
         f->roachfileprint(str);
         f->roachfileprint("\r\n");
     }

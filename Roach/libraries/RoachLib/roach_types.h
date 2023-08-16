@@ -143,7 +143,7 @@ typedef struct
 
     roach_nvm_pot_t pot_throttle;
     roach_nvm_pot_t pot_steering;
-    int32_t heading_multiplier;   // need to multiply encoder ticks into heading angle, range -1800 to 1800 (deg * ROACH_ANGLE_MULTIPLIER), for 400 tick encoder, 1800 / 200 = 9
+    int32_t heading_multiplier;   // need to multiply encoder ticks into heading angle, range -1800 to 1800 (deg * ROACH_ANGLE_MULTIPLIER), for 400 tick encoder, 3600 / (400 * 4) = 
 
     roach_nvm_pot_t pot_weapon;
     roach_nvm_pot_t pot_aux;

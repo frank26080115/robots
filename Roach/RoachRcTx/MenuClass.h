@@ -158,6 +158,7 @@ class RoachMenuLister : public RoachMenu
         RoachMenuListItem* getNodeAt(int idx);
         void addNode(RoachMenuListItem*);
         virtual void onButton(uint8_t btn);
+        void addCancelNode(void);
 
 };
 

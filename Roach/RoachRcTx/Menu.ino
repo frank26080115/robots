@@ -61,14 +61,17 @@ class RoachMenuHome : public RoachMenu
             oled.printf("%c%-4d %c%d", tx_pkt.throttle >= 0 ? 0x18 : 0x19, abs(tx_pkt.throttle), tx_pkt.steering < 0 ? 0x1B : 0x1A, abs(tx_pkt.steering));
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            if (radio.isConnected() && telem_pkt.heading == 0x7FFF) {
-                oled.printf("IMUFAIL");
+            if (radio.isConnected() && (uint16_t)(telem_pkt.heading) == (uint16_t)ROACH_HEADING_INVALID_HASFAILED) {
+                oled.printf("IMU-FAIL");
+            }
+            else if (radio.isConnected() && (uint16_t)(telem_pkt.heading) == (uint16_t)ROACH_HEADING_INVALID_NOTREADY) {
+                oled.printf("IMU-NRDY");
             }
             else if (radio.isConnected()) {
-                oled.printf("H:%-4d  %d", roach_div_rounded(tx_pkt.heading, 100), telem_pkt.heading);
+                oled.printf("H:%-4d  %d", roach_div_rounded(tx_pkt.heading, ROACH_ANGLE_MULTIPLIER), telem_pkt.heading);
             }
             else {
-                oled.printf("H:%-4d", roach_div_rounded(tx_pkt.heading, 100));
+                oled.printf("H:%-4d", roach_div_rounded(tx_pkt.heading, ROACH_ANGLE_MULTIPLIER));
             }
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
@@ -176,7 +179,7 @@ class RoachMenuInfo : public RoachMenu
 
         virtual void draw_sidebar(void)
         {
-            drawSideBar("CONF", "PAGE", true);
+            drawSideBar("CONF", "LOAD", true);
         };
 
         virtual void draw_title(void)
@@ -214,6 +217,7 @@ void menu_run(void)
     if (current_menu == NULL)
     {
         current_menu = &menuHome;
+        menuListCur = menuListHead;
         Serial.println("current menu is null, assigning home screen");
     }
     Serial.printf("[%u]: running menu screen ID=%d\r\n", millis(), current_menu->getId());
@@ -222,6 +226,7 @@ void menu_run(void)
     Serial.printf("[%u]: menu exited to top level, exitcode=%d\r\n", millis(), ec);
     if (ec == EXITCODE_HOME) {
         current_menu = &menuHome;
+        menuListCur = menuListHead;
     }
     else if (ec == EXITCODE_BACK && current_menu->parent_menu != NULL) {
         current_menu = (RoachMenu*)current_menu->parent_menu;
@@ -283,6 +288,7 @@ void menu_install(RoachMenu* m)
     else
     {
         m->prev_menu = menuListTail;
+        m->next_menu = menuListHead;
         menuListTail->next_menu = m;
         menuListTail            = m;
         menuListHead->prev_menu = m;

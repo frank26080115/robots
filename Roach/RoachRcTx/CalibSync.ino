@@ -7,6 +7,8 @@ class RoachMenuFuncCalibGyro : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            draw_title();
+            draw_sidebar();
             oled.setCursor(0, 30);
             oled.print("message sent");
         };
@@ -56,6 +58,8 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            draw_title();
+            draw_sidebar();
             int y = 11;
             oled.setCursor(0, y);
             oled.printf("T: %d", pot_throttle.cfg->center);
@@ -131,6 +135,8 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            draw_title();
+            draw_sidebar();
             int y = 11;
             oled.setCursor(0, y);
             oled.printf("T: %d <> %d", pot_throttle.cfg->limit_min, pot_throttle.cfg->limit_max);
@@ -205,6 +211,8 @@ class RoachMenuFuncSyncDownload : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            draw_title();
+            draw_sidebar();
             rosync_draw();
         };
 
@@ -266,6 +274,8 @@ class RoachMenuFuncSyncUpload : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            draw_title();
+            draw_sidebar();
             rosync_draw();
         };
 
@@ -359,6 +369,8 @@ class RoachMenuFuncRegenRf : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            draw_title();
+            draw_sidebar();
             int y = 0;
             oled.setCursor(0, y);
             oled.printf("UID : 0x%08X", _uid);

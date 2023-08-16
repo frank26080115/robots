@@ -38,17 +38,25 @@ void hwreport_func(void* cmd, char* argstr, Stream* stream)
 void factory_reset_func(void* cmd, char* argstr, Stream* stream)
 {
     settings_factoryReset();
-    if (settings_save()) {
-        stream->println("factory reset performed");
+    if (atoi(argstr) == 2)
+    {
+        if (settings_save()) {
+            stream->println("factory reset performed and saved");
+        }
+        else {
+            stream->println("factory reset saving failed");
+        }
     }
-    else {
-        stream->println("factory reset failed");
+    else
+    {
+        stream->println("factory reset performed");
     }
 }
 
 void nvmdebug_func(void* cmd, char* argstr, Stream* stream)
 {
     settings_debugNvm(stream);
+    settings_debugListFiles();
 }
 
 void save_func(void* cmd, char* argstr, Stream* stream)
