@@ -14,6 +14,7 @@ const cmd_def_t cmds[] = {
     { "conttx"      , conttx_func },
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
+    { "nvmdebug"    , nvmdebug_func},
     { "save"        , save_func },
     { "esclink"     , esclink_func },
     { "readbatt"    , readbatt_func },
@@ -36,12 +37,25 @@ RoachCmdLine cmdline(&Serial, (cmd_def_t*)cmds, false, (char*)">>>", (char*)"???
 void factory_reset_func(void* cmd, char* argstr, Stream* stream)
 {
     settings_factoryReset();
-    if (settings_save()) {
+    if (atoi(argstr) == 2)
+    {
+        if (settings_save()) {
+            stream->println("factory reset performed and saved");
+        }
+        else {
+            stream->println("factory reset saving failed");
+        }
+    }
+    else
+    {
         stream->println("factory reset performed");
     }
-    else {
-        stream->println("factory reset failed");
-    }
+}
+
+void nvmdebug_func(void* cmd, char* argstr, Stream* stream)
+{
+    settings_debugNvm(stream);
+    settings_debugListFiles(stream);
 }
 
 void save_func(void* cmd, char* argstr, Stream* stream)

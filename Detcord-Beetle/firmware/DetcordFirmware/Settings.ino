@@ -90,3 +90,45 @@ void roachrobot_onUpdateCfg(void)
     // implemented for call from within RoachRobotSync.cpp
     // TODO: if there are any objects that need to be updated when new settings are written
 }
+
+void settings_initValidate(void)
+{
+    roachnvm_validateAll((uint8_t*)&nvm_tx, cfgdesc_ctrler);
+}
+
+void settings_debugNvm(Stream* stream)
+{
+    stream->printf("NVM debug:\r\n");
+    stream->printf("==========\r\n");
+    stream->printf("RF params:\r\n");
+    roachnvm_debugNvm(stream, (uint8_t*)&nvm_rf, sizeof(nvm_rf), cfgdesc_rf);
+    stream->printf("==========\r\n");
+    stream->printf("Robot params [%u]:\r\n", sizeof(nvm));
+    roachnvm_debugNvm(stream, (uint8_t*)&nvm, sizeof(nvm), detcord_cfg_desc);
+    stream->printf("==========\r\n");
+}
+
+void settings_debugListFiles(Stream* stream)
+{
+    stream->println("settings_debugListFiles");
+    if (!fatroot.open("/"))
+    {
+        stream->println("open root failed");
+        return;
+    }
+    stream->println("open root success");
+    int i = 1;
+    while (fatfile.openNext(&fatroot, O_RDONLY))
+    {
+        if (fatfile.isDir() == false)
+        {
+            char sfname[64];
+            fatfile.getName7(sfname, 62);
+            stream->printf("%d: \"%s\"\r\n", i, sfname);
+            i++;
+        }
+        fatfile.close();
+    }
+    fatroot.close();
+    stream->println("==========");
+}
