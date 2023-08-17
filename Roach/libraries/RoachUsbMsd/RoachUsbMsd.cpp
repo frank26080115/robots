@@ -2,6 +2,7 @@
 
 #include "SPI.h"
 #include "SdFat.h"
+
 #include "Adafruit_SPIFlash.h"
 #include "Adafruit_TinyUSB.h"
 
@@ -44,13 +45,20 @@ static uint8_t rusbmsd_statemachine = 0;
 static uint32_t rusbmsd_disconnect_time = 0;
 static bool rusbmsd_wanted = false;
 static bool fs_need_reinit = false; // if the computer changed the file system, re-initializing the cache is required
+static bool flash_failed;
+static uint32_t jedec_id;
 
-void RoachUsbMsd_begin(void)
+bool RoachUsbMsd_begin(void)
 {
-    flash.begin();
+    Serial.begin(115200);
+
+    flash_failed = (flash.begin() == false);
+    jedec_id = flash.getJEDECID();
+
     fs_formatted = fatfs.begin(&flash);
     fs_need_reinit = false;
-    Serial.begin(115200);
+
+    return flash_failed == false;
 }
 
 void RoachUsbMsd_actuallyBegin(void)
@@ -66,6 +74,10 @@ void RoachUsbMsd_actuallyBegin(void)
 
 void RoachUsbMsd_task(void)
 {
+    if (flash_failed) {
+        return;
+    }
+
     if (rusbmsd_statemachine == RUSBMSD_SM_INVISIBLE)
     {
         // do not check fs_formatted == false here, it will make the system too slow, as it probably failed previously
@@ -152,6 +164,9 @@ void RoachUsbMsd_task(void)
 
 void RoachUsbMsd_presentUsbMsd(void)
 {
+    if (flash_failed) {
+        return;
+    }
     if (RoachUsbMsd_hasVbus() == false) {
         return;
     }
@@ -235,6 +250,16 @@ uint64_t RoachUsbMsd_getFreeSpace(void)
     x = fatfs.freeClusterCount();
     x *= fatfs.sectorsPerCluster()/2;
     return x;
+}
+
+uint32_t RoachUsbMsd_getFlashSize(void)
+{
+    return flash.size();
+}
+
+uint32_t RoachUsbMsd_getJedecId(void)
+{
+    return jedec_id;
 }
 
 static int32_t msc_read_cb(uint32_t lba, void* buffer, uint32_t bufsize)

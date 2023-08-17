@@ -22,7 +22,7 @@ File contents:
     {
         "build": {
             "arduino":{
-                "ldscript": "nrf52840_s140_v6.ld"
+                "ldscript": "nrf52840_s140_v7.ld"
             },
             "core": "nRF5",
             "cpu": "cortex-m4",
@@ -132,6 +132,12 @@ Such that these exists:
  * `.....\framework-arduinoadafruitnrf52\variants\Seeed_XIAO_nRF52840`
  * `.....\framework-arduinoadafruitnrf52\variants\Seeed_XIAO_nRF52840_Sense`
 
+## Install new linker script: nrf52840_s140_v7.ld
+
+In the extracted contents of `nrf52-1.1.1.tar.bz2`, look for `....\nrf52-1.1.1.tar\Adafruit_nRF52_Arduino-1.1.1\cores\nRF5\linker\nrf52840_s140_v7.ld`
+
+Copy to `....\framework-arduinoadafruitnrf52\cores\nRF5\linker\nrf52840_s140_v7.ld`
+
 ## Edit: boards.txt
 
 Path example: `C:\Users\frank\.platformio\packages\framework-arduinoadafruitnrf52\boards.txt`
@@ -195,3 +201,26 @@ Insert this content somewhere:
     xiaoblesense.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
     xiaoblesense.menu.debug_output.rtt=Segger RTT
     xiaoblesense.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+## Adding QSPI flash IC to `Adafruit_SPIFlash` library
+
+The flash IC used on the XIAO is not supported by `Adafruit_SPIFlash`, but it can be added easily
+
+The definition of the flash IC is
+
+    #define P25Q16H                                                                \ // added for XIAO BLE Sense
+    {                                                                              \
+        .total_size = 2L*1024L*1024L,                                              \ // 2MB
+        .start_up_time_us = 12000, .manufacturer_id = 0x85,                        \
+        .memory_type = 0x60, .capacity = 0x15, .max_clock_speed_mhz = 104,         \
+        .quad_enable_bit_mask = 0x02, .has_sector_protection = false,              \
+        .supports_fast_read = true, .supports_qspi = true,                         \
+        .supports_qspi_writes = true, .write_status_register_split = false,        \
+        .single_status_byte = false, .is_fram = false,                             \
+    }
+
+Add that to the bottom of `.....\libraries\Adafruit_SPIFlash\src\flash_devices.h`
+
+In the file `.....\libraries\Adafruit_SPIFlash\src\Adafruit_SPIFlashBase.cpp` , look for `static const SPIFlash_Device_t possible_devices[] = {`
+
+Add `P25Q16H` to the bottom of `possible_devices`

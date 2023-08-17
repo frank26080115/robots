@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-void RoachUsbMsd_begin(void);                 // note: also starts the serial port
+bool RoachUsbMsd_begin(void);                 // note: also starts the serial port
 void RoachUsbMsd_task(void);                  // does house keeping, schedules connections and disconnections
 void RoachUsbMsd_presentUsbMsd(void);         // call to start USB flash drive
 void RoachUsbMsd_unpresent(void);             // call to stop  USB flash drive
@@ -13,7 +13,9 @@ bool RoachUsbMsd_hasChange(bool clr);         // checks if the PC has modified a
 bool RoachUsbMsd_hasVbus(void);               // checks if VBUS is available
 bool RoachUsbMsd_canSave(void);               // checks if other firmware code is allowed to write things to file
 uint32_t RoachUsbMsd_lastActivityTime(void);  // last time stamp of write activity from USB
-uint64_t RoachUsbMsd_getFreeSpace(void);      // gets the free space inside the flash
+uint64_t RoachUsbMsd_getFreeSpace(void);      // gets the free space inside the file system volume
+uint32_t RoachUsbMsd_getFlashSize(void);      // gets the free space inside the flash IC
+uint32_t RoachUsbMsd_getJedecId(void);        // gets the JEDEC ID of the flash IC
 
 #ifdef __cplusplus
 extern "C" {
