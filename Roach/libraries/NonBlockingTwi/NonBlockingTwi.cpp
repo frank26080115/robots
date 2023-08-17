@@ -39,6 +39,7 @@ static volatile uint32_t xfer_err_last = 0;
 static volatile uint32_t xfer_time = 0;
 static volatile uint32_t xfer_time_est = 0;
 static volatile uint32_t idle_timestamp = 0;
+static volatile uint32_t taskstop_time = 0;
 static int err_cnt = 0;
 
 // implement a FIFO with a linked list
@@ -320,6 +321,7 @@ static void nbtwi_runStateMachine(void)
             NRF_TWIM0->ERRORSRC = xfer_err;
             NRF_TWIM0->TASKS_STOP = 0x1UL;
             nbtwi_statemachine = NBTWI_SM_ERROR;
+            taskstop_time = millis();
         }
         else
         {
@@ -348,6 +350,7 @@ static void nbtwi_runStateMachine(void)
             NRF_TWIM0->ERRORSRC = xfer_err;
             NRF_TWIM0->TASKS_STOP = 0x1UL;
             nbtwi_statemachine = NBTWI_SM_ERROR;
+            taskstop_time = millis();
         }
         else
         {
@@ -358,6 +361,7 @@ static void nbtwi_runStateMachine(void)
                 {
                     NRF_TWIM0->TASKS_STOP = 0x1UL;
                     nbtwi_statemachine = NBTWI_SM_STOP;
+                    taskstop_time = millis();
                 }
                 else
                 {
@@ -370,6 +374,7 @@ static void nbtwi_runStateMachine(void)
                 NRF_TWIM0->EVENTS_LASTRX = 0;
                 NRF_TWIM0->TASKS_STOP = 0x1UL;
                 nbtwi_statemachine = NBTWI_SM_STOP;
+                taskstop_time = millis();
                 nbtwi_handleResult();
             }
             else
@@ -383,6 +388,7 @@ static void nbtwi_runStateMachine(void)
         NRF_TWIM0->TASKS_STOP = 0x1UL;
         xfer_err = 0xFF00;
         nbtwi_statemachine = NBTWI_SM_ERROR;
+        taskstop_time = millis();
     }
     if (nbtwi_statemachine == NBTWI_SM_SUSPEND)
     {
@@ -399,6 +405,13 @@ static void nbtwi_runStateMachine(void)
         if (NRF_TWIM0->EVENTS_STOPPED)
         {
             NRF_TWIM0->EVENTS_STOPPED = 0;
+            xfer_err_last = (nbtwi_statemachine == NBTWI_SM_ERROR) ? xfer_err : 0;
+            nbtwi_statemachine = NBTWI_SM_IDLE;
+            xfer_done = true;
+            idle_timestamp = millis();
+        }
+        else if ((millis() - taskstop_time) >= 10 && taskstop_time > 0)
+        {
             xfer_err_last = (nbtwi_statemachine == NBTWI_SM_ERROR) ? xfer_err : 0;
             nbtwi_statemachine = NBTWI_SM_IDLE;
             xfer_done = true;
@@ -525,10 +538,6 @@ bool nbtwi_isBusy(void)
 
 void nbtwi_transfer(void)
 {
-    #ifdef NBTWI_ENABLE_DEBUG
-    Serial.printf("nbtwi_transfer\r\n");
-    #endif
-
     while (nbtwi_isBusy()) {
         nbtwi_task();
         yield();
@@ -547,4 +556,21 @@ bool nbtwi_hasError(bool clr)
 int nbtwi_lastError(void)
 {
     return xfer_err_last;
+}
+
+uint8_t nbtwi_scan(uint8_t start)
+{
+    uint16_t i;
+    for (i = start; i <= 0xFF; i++)
+    {
+        Serial.printf("scan 0x%02X\r\n", i);
+        xfer_err = 0;
+        err_cnt = 0;
+        nbtwi_write((uint8_t)i, (uint8_t*)&i, 1, false);
+        nbtwi_transfer();
+        if (err_cnt == 0 && xfer_err == 0) {
+            return i;
+        }
+    }
+    return 0;
 }

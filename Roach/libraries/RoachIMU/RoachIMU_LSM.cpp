@@ -71,7 +71,8 @@ void RoachIMU_LSM::begin(void)
         digitalWrite(pin_pwr, HIGH);
     }
 
-    state_machine = ROACHIMU_SM_SETUP;
+    state_machine = ROACHIMU_SM_PWR;
+    pwr_time = millis();
     init_idx = 0;
 }
 
@@ -83,6 +84,12 @@ void RoachIMU_LSM::task(void)
 
     switch (state_machine)
     {
+        case ROACHIMU_SM_PWR:
+            if ((millis() - pwr_time) >= 100) {
+                state_machine = ROACHIMU_SM_SETUP;
+                init_idx = 0;
+            }
+            break;
         case ROACHIMU_SM_SETUP:
             {
                 has_new = false;

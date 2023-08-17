@@ -18,15 +18,16 @@
 #define ROACHIMU_BUFF_TX_SIZE 512
 #define ROACHIMU_BUFF_RX_SIZE 512
 
-#define ROACHIMU_DEF_PIN_SDA 17
-#define ROACHIMU_DEF_PIN_SCL 16
-#define ROACHIMU_DEF_PIN_PWR 15
-#define ROACHIMU_DEF_PIN_INT 18
+#define ROACHIMU_DEF_PIN_SDA     PIN_WIRE1_SDA
+#define ROACHIMU_DEF_PIN_SCL     PIN_WIRE1_SCL
+#define ROACHIMU_DEF_PIN_PWR     PIN_LSM6DS3TR_C_POWER
+#define ROACHIMU_DEF_PIN_INT     PIN_LSM6DS3TR_C_INT1
 
 #define ROACHIMU_EXTRA_DATA
 
 enum
 {
+    ROACHIMU_SM_PWR,
     ROACHIMU_SM_SETUP,
     ROACHIMU_SM_SETUP_WAIT,
     ROACHIMU_SM_RUN,
@@ -62,6 +63,7 @@ class RoachIMU_LSM : public RoachIMU_Common
         uint8_t init_idx;
         uint32_t sample_time, read_time, error_time;
         int pin_irq, pin_pwr;
+        uint32_t pwr_time;
 };
 
 #endif
