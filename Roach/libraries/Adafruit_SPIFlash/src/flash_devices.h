@@ -526,7 +526,8 @@ typedef struct {
   }
 
 // added for XIAO BLE Sense
-
+// 2MB
+// JEDEC ID 0x856015
 #define P25Q16H                                                                \
   {                                                                            \
     .total_size = 2L*1024L*1024L,                                              \

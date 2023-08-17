@@ -202,15 +202,15 @@ Insert this content somewhere:
     xiaoblesense.menu.debug_output.rtt=Segger RTT
     xiaoblesense.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
-## Adding QSPI flash IC to `Adafruit_SPIFlash` library
+## Adding QSPI flash IC to Adafruit_SPIFlash library
 
 The flash IC used on the XIAO is not supported by `Adafruit_SPIFlash`, but it can be added easily
 
 The definition of the flash IC is
 
-    #define P25Q16H                                                                \ // added for XIAO BLE Sense
+    #define P25Q16H                                                                \
     {                                                                              \
-        .total_size = 2L*1024L*1024L,                                              \ // 2MB
+        .total_size = 2L*1024L*1024L,                                              \
         .start_up_time_us = 12000, .manufacturer_id = 0x85,                        \
         .memory_type = 0x60, .capacity = 0x15, .max_clock_speed_mhz = 104,         \
         .quad_enable_bit_mask = 0x02, .has_sector_protection = false,              \
