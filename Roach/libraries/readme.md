@@ -99,3 +99,6 @@ Project Roach - List of Libraries
     * meaning the OLED screen updates are happening asynchronously
     * typical full screen refresh takes 23ms, this modified library makes sure this time is not wasted
     * the radio must transmit two messages during this 23ms!
+  * Adafruit_SPIFlash
+    * this is a modified version of the original Adafruit_SPIFlash library
+    * added support for the flash IC P25Q16H, which is used on the Seeeduino XIAO BLE
