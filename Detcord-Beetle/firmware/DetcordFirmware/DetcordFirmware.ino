@@ -295,6 +295,23 @@ void rtmgr_onSafe(bool full_init)
     pid.reset();
 }
 
+void calibgyro_func(void* cmd, char* argstr, Stream* stream)
+{
+    if (atoi(argstr) == 123) {
+        if (imu.calib != NULL) {
+            Serial.printf("[%u] IMU calib = [ %d , %d , %d ]\r\n", millis(), imu.calib->x, imu.calib->y, imu.calib->z);
+        }
+        else {
+            Serial.printf("[%u] IMU has no calibration data yet\r\n", millis());
+        }
+        return;
+    }
+    imu.tare();
+    heading_mgr.setReset();
+    pid.reset();
+    Serial.printf("[%u] IMU tare start\r\n", millis());
+}
+
 void robot_force_servos_on(void)
 {
     force_servo_outputs = true;

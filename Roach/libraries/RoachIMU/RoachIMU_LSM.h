@@ -35,6 +35,15 @@ enum
     ROACHIMU_SM_ERROR,
 };
 
+typedef struct
+{
+    int32_t x;
+    int32_t y;
+    int32_t z;
+}
+__attribute__ ((packed))
+imu_lsm_cal_t;
+
 class RoachIMU_LSM : public RoachIMU_Common
 {
     public:
@@ -47,16 +56,13 @@ class RoachIMU_LSM : public RoachIMU_Common
         virtual void task(void);
 
         void tare(void);
+        imu_lsm_cal_t* calib = NULL;
 
     protected:
         virtual void writeEuler(euler_t*);
 
     private:
         RoachMahony* ahrs;
-        #if defined(ESP32)
-        nbe_i2c_t nbe_i2c;
-        #elif defined(NRF52840_XXAA)
-        #endif
         uint8_t i2c_addr;
         uint8_t tx_buff[64];
         uint8_t rx_buff[64];
@@ -64,6 +70,10 @@ class RoachIMU_LSM : public RoachIMU_Common
         uint32_t sample_time, read_time, error_time;
         int pin_irq, pin_pwr;
         uint32_t pwr_time;
+
+        // these are for calibration
+        uint32_t tare_time = 0, tare_cnt = 0;
+        int32_t tare_x, tare_y, tare_z;
 };
 
 #endif

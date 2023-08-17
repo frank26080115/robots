@@ -41,6 +41,8 @@ typedef struct
 __attribute__ ((packed))
 lsm_data_t;
 
+#define ROACHIMU_TARE_CNT 16
+
 void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees);
 
 static RoachIMU_LSM* instance = NULL;
@@ -211,6 +213,38 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
     int32_t gyro_x32 = pkt->gyro_x;
     int32_t gyro_y32 = pkt->gyro_y;
     int32_t gyro_z32 = pkt->gyro_z;
+
+    if (tare_time != 0) // calibration active
+    {
+        tare_x += gyro_x32;
+        tare_y += gyro_y32;
+        tare_z += gyro_z32;
+        tare_cnt++;
+        if (tare_cnt >= ROACHIMU_TARE_CNT
+         // || (millis() - tare_time) >= 1000
+         )
+        {
+            tare_time = 0; // stop calibration
+            if (calib == NULL) { // if missing, create new
+                calib = (imu_lsm_cal_t*)malloc(sizeof(imu_lsm_cal_t));
+            }
+            if (calib != NULL) {
+                calib->x = (tare_x + (tare_cnt / 2)) / tare_cnt;
+                calib->y = (tare_y + (tare_cnt / 2)) / tare_cnt;
+                calib->z = (tare_z + (tare_cnt / 2)) / tare_cnt;
+            }
+        }
+    }
+
+    // apply calibration if available
+    if (calib != NULL)
+    {
+        gyro_x32 -= calib->x;
+        gyro_y32 -= calib->y;
+        gyro_z32 -= calib->z;
+    }
+
+    // convert to units used by AHRS
     gyro_x32 *= 7;
     gyro_y32 *= 7;
     gyro_z32 *= 7;
@@ -229,6 +263,16 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
     eu->roll  = ahrs->roll  * RAD_TO_DEG;
     eu->pitch = ahrs->pitch * RAD_TO_DEG;
     eu->yaw   = ahrs->yaw   * RAD_TO_DEG;
+}
+
+void RoachIMU_LSM::tare(void)
+{
+    // start calibration
+    tare_time = millis();
+    tare_cnt = 0;
+    tare_x = 0;
+    tare_y = 0;
+    tare_z = 0;
 }
 
 #endif
