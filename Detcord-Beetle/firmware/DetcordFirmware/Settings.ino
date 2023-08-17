@@ -93,7 +93,7 @@ void roachrobot_onUpdateCfg(void)
 
 void settings_initValidate(void)
 {
-    roachnvm_validateAll((uint8_t*)&nvm_tx, cfgdesc_ctrler);
+    roachnvm_validateAll((uint8_t*)&nvm, detcord_cfg_desc);
 }
 
 void settings_debugNvm(Stream* stream)

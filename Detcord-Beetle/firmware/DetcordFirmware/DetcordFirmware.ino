@@ -24,6 +24,7 @@
 #include <AsyncAdc.h>
 #include <nRF5Rand.h>
 #include <NonBlockingTwi.h>
+#include <Wire.h>
 
 FatFile fatroot;
 FatFile fatfile;
@@ -68,15 +69,22 @@ RoachRgbLed    hb_rgb = RoachRgbLed();
 
 void setup()
 {
+    #ifdef DEVMODE_WAIT_SERIAL_INIT
+    Serial.begin(19200);
+    while (Serial.available() == 0) {
+        Serial.printf("Detcord FW waiting for input\r\n");
+    }
+    #endif
+
     hb_red.begin();
     hb_rgb.begin();
 
-    settings_init();
-    RoachUsbMsd_begin(); // this also starts the serial port
+    bool flash_ok = RoachUsbMsd_begin(); // this also starts the serial port
     if (RoachUsbMsd_hasVbus())
     {
         RoachUsbMsd_presentUsbMsd();
     }
+    settings_init();
 
     battery.alt_filter = ROACH_FILTER_DEFAULT;
     battery.begin();
@@ -95,7 +103,14 @@ void setup()
 
     rtmgr_init(10, 1000);
 
-    debug_printf("Detcord finished setup()\r\n");
+    #ifdef DEVMODE_WAIT_SERIAL_RUN
+    while (cmdline.has_interaction() == false) {
+        Serial.printf("Detcord FW waiting for input\r\n");
+        waitFor(100);
+    }
+    #endif
+
+    debug_printf("Detcord finished setup(), flash = %u\r\n", flash_ok);
     debug_printf("RF params: 0x%08X    0x%08X    0x%08X\r\n", nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 }
 

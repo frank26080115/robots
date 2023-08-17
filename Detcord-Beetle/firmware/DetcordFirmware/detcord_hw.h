@@ -35,8 +35,8 @@
 #define DETCORDHW_PIN_LED_B 12
 
 // note: RoachIMU_LSM has pin definitions for IMU already, it's on an internal bus
-#define DETCORDHW_PIN_I2C_SDA 17
-#define DETCORDHW_PIN_I2C_SCL 16
+#define DETCORDHW_PIN_I2C_SDA PIN_WIRE1_SDA
+#define DETCORDHW_PIN_I2C_SCL PIN_WIRE1_SCL
 
 #define DETCORDHW_PIN_SERVO_WEAP  4
 #define DETCORDHW_PIN_SERVO_DRV_R 5
@@ -44,6 +44,8 @@
 #define DETCORDHW_PIN_ADC_BATT    A3
 
 #define DETCORDHW_BATT_ADC_4200MV 800
+
+// note: flash IC has JEDEC ID 0x856015
 
 #endif
 

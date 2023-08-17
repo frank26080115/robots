@@ -8,7 +8,9 @@ const cmd_def_t cmds[] = {
     { "mem"         , memcheck_func },
     { "perf"        , perfcheck_func },
     { "reboot"      , reboot_func },
+    { "dfu"         , dfuenter_func },
     { "debug"       , debug_func },
+    { "fscheck"     , fscheck_func },
     { "usbmsd"      , usbmsd_func },
     { "unusbmsd"    , unusbmsd_func },
     { "conttx"      , conttx_func },
@@ -80,6 +82,16 @@ void reboot_func(void* cmd, char* argstr, Stream* stream)
     NVIC_SystemReset();
 }
 
+void fscheck_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("flash JEDEC ID 0x%08X\r\n", RoachUsbMsd_getJedecId());
+    stream->printf("FS can save? %u\r\n", RoachUsbMsd_canSave());
+    stream->printf("flash size = %u\r\n", RoachUsbMsd_getFlashSize());
+    if (RoachUsbMsd_canSave()) {
+        stream->printf("FS free space = %u\r\n", RoachUsbMsd_getFreeSpace());
+    }
+}
+
 void usbmsd_func(void* cmd, char* argstr, Stream* stream)
 {
     stream->printf("presenting USB MSD\r\n");
@@ -92,6 +104,18 @@ void unusbmsd_func(void* cmd, char* argstr, Stream* stream)
     stream->printf("disconnecting USB MSD\r\n");
     waitFor(300);
     RoachUsbMsd_unpresent();
+}
+
+void dfuenter_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("ENTERING DFU\r\n");
+    waitFor(200);
+    if (atoi(argstr) == 2) {
+        enterUf2Dfu();
+    }
+    else {
+        enterSerialDfu();
+    }
 }
 
 void memcheck_func(void* cmd, char* argstr, Stream* stream)
