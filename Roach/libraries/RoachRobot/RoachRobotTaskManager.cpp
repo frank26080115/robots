@@ -128,6 +128,15 @@ bool rtmgr_task(uint32_t now)
                 need_full_init = false;
                 statemachine = RTMGR_STATE_RUN;
             }
+            else
+            {
+                if ((now - last_time) >= task_interval)
+                {
+                    last_time = now;
+                    rtmgr_taskPreStart();
+                    has_called = true;
+                }
+            }
             break;
     }
     return has_called;

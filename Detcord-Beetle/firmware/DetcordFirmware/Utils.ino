@@ -6,6 +6,7 @@ void waitFor(uint32_t x)
     {
         yield();
         RoachWdt_feed();
+        robot_lowPriorityTasks();
         robot_tasks(now);
     }
 }

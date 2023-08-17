@@ -45,8 +45,6 @@
 
 #define DETCORDHW_BATT_ADC_4200MV 800
 
-// note: flash IC has JEDEC ID 0x856015
-
 #endif
 
 #endif

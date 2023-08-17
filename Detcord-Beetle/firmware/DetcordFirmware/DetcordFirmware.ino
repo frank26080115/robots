@@ -33,11 +33,14 @@ extern RoachCmdLine cmdline;
 RoachServo drive_left (DETCORDHW_PIN_SERVO_DRV_L);
 RoachServo drive_right(DETCORDHW_PIN_SERVO_DRV_R);
 #ifdef USE_DSHOT
-    nRF52Dshot
+    nRF52Dshot weapon(DETCORDHW_PIN_SERVO_WEAP, 9);
+    // interval is set to 9ms, but the weapon task is placed in a low priority task that's called every 10ms, so it will force a send every single time
 #else
-    RoachServo
+    RoachServo weapon(DETCORDHW_PIN_SERVO_WEAP);
 #endif
-    weapon(DETCORDHW_PIN_SERVO_WEAP);
+
+bool servos_has_inited = false;
+bool force_servo_outputs = false;
 
 #ifdef ROACHIMU_USE_BNO085
 RoachIMU_BNO imu(5000, 0, ROACHIMU_ORIENTATION_XYZ, BNO08x_I2CADDR_DEFAULT, DETCORDHW_PIN_IMU_RST);
@@ -67,12 +70,18 @@ RoachHeartbeat hb_red = RoachHeartbeat(hb_cb);
 RoachRgbLed    hb_rgb = RoachRgbLed();
 #endif
 
+#ifdef DEVMODE_PERIODIC_DEBUG
+detcord_runtime_log_t dbglog;
+bool log_active = true;
+#endif
+
 void setup()
 {
     #ifdef DEVMODE_WAIT_SERIAL_INIT
     Serial.begin(19200);
     while (Serial.available() == 0) {
         Serial.printf("Detcord FW waiting for input\r\n");
+        delay(100);
     }
     #endif
 
@@ -109,43 +118,47 @@ void setup()
         waitFor(100);
     }
     #endif
-
-    debug_printf("Detcord finished setup(), flash = %u\r\n", flash_ok);
-    debug_printf("RF params: 0x%08X    0x%08X    0x%08X\r\n", nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 }
 
 void loop()
 {
-    #ifdef DEVMODE_PERIODIC_DEBUG
-    static uint32_t last_debug_time = 0;
-    #endif
     uint32_t now = millis();
     RoachWdt_feed();
     robot_tasks(now); // short tasks
     if (rtmgr_task(now)) // this will: call 10ms periodic task, and handle failsafe events
     {
+        // if return true, then run low priority tasks
+        robot_lowPriorityTasks();
+
         #ifdef DEVMODE_PERIODIC_DEBUG
-        if ((now - last_debug_time) >= DEVMODE_PERIODIC_DEBUG)
-        {
-            last_debug_time = now;
-            Serial.printf("LOG[%u]: ", now);
+        if (log_active) {
+            //logger_gather();
+            logger_report(now);
         }
         #endif
     }
 }
 
-void robot_tasks(uint32_t now) // short tasks
+void robot_tasks(uint32_t now) // short but high priority tasks
 {
     radio.task();
     nbtwi_task();
     imu.task();
-    RoachUsbMsd_task();
     cmdline.task();
-    heartbeat_task();
     RoachPot_allTask();
-    settings_task();
     #ifdef PERFCNT_ENABLED
     PerfCnt_task();
+    #endif
+}
+
+void robot_lowPriorityTasks(void)
+{
+    heartbeat_task();
+    settings_task();
+    RoachUsbMsd_task();
+    RoSync_task();
+    #ifdef USE_DSHOT
+    weapon.task();
     #endif
 }
 
@@ -154,6 +167,10 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
     if (has_cmd) {
         radio.read((uint8_t*)&rx_pkt);
     }
+
+    #ifdef DEVMODE_PERIODIC_DEBUG
+    dbglog.has_cmd = has_cmd ? 1 : 0;
+    #endif
 
     int32_t gyro_corr = 0;
     if ((rx_pkt.flags & ROACHPKTFLAG_GYROACTIVE) != 0)
@@ -179,16 +196,18 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
     }
 
     mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
-    drive_left.writeMicroseconds(mixer.getLeft());
+    drive_left.writeMicroseconds (mixer.getLeft ());
     drive_right.writeMicroseconds(mixer.getRight());
 
     if ((rx_pkt.flags & ROACHPKTFLAG_WEAPON) != 0)
     {
+        weapon.
         #ifdef USE_DSHOT
-        weapon.setThrottle(RoachServo_calc(rx_pkt.pot_weap, &(nvm.weapon)));
+            setThrottle(
         #else
-        weapon.writeMicroseconds(RoachServo_calc(rx_pkt.pot_weap, &(nvm.weapon)));
+            writeMicroseconds(
         #endif
+                RoachServo_calc(rx_pkt.pot_weap, &(nvm.weapon)));
     }
     else
     {
@@ -198,19 +217,21 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         weapon.writeMicroseconds(nvm.weapon.limit_min);
         #endif
     }
-    #ifdef USE_DSHOT
-    weapon.task();
-    #endif
 
     if (has_cmd)
     {
-        RoSync_task(); // there's no point in calling this from robot_tasks, the radio telemetry transmissions only happen on successful reception
+        RoSync_task(); // there's no point in calling this too often, the radio telemetry transmissions only happen on successful reception
         roachrobot_pipeCmdLine();
 
         telem_pkt.battery = roach_value_map(battery.getAdcFiltered(), 0, DETCORDHW_BATT_ADC_4200MV, 0, 4200, false);
         telem_pkt.heading = (imu.isReady() == false) ? ROACH_HEADING_INVALID_NOTREADY : ((imu.hasFailed()) ? ROACH_HEADING_INVALID_HASFAILED : ((uint16_t)lround(imu.heading * ROACH_ANGLE_MULTIPLIER)));
         roachrobot_telemTask(millis()); // this will fill out common fields in the telem packet and then send it off
     }
+}
+
+void rtmgr_taskPreStart(void)
+{
+
 }
 
 void rtmgr_onPreFailed(void)
@@ -229,31 +250,38 @@ void rtmgr_onPreFailed(void)
 
 void rtmgr_taskPreFailed(void)
 {
-    #ifdef USE_DSHOT
-    weapon.task();
+    #ifdef DEVMODE_PERIODIC_DEBUG
+    dbglog.has_cmd = -1;
     #endif
-    RoSync_task();
 }
 
 void rtmgr_onPostFailed(void)
 {
-    drive_left.detach();
-    drive_right.detach();
-    weapon.detach();
+    if (force_servo_outputs == false) // prevent failsafe from kicking on if we are doing signal testing
+    {
+        drive_left .detach();
+        drive_right.detach();
+        weapon     .detach();
+        servos_has_inited = false;
+    }
 }
 
 void rtmgr_taskPostFailed(void)
 {
-    RoSync_task();
+    #ifdef DEVMODE_PERIODIC_DEBUG
+    dbglog.has_cmd = -1;
+    #endif
 }
 
 void rtmgr_onSafe(bool full_init)
 {
-    if (full_init)
+    // ignore full_init
+    if (servos_has_inited == false)
     {
         drive_left.begin();
         drive_right.begin();
         weapon.begin();
+        servos_has_inited = true;
     }
     mixer.mix(0, 0, 0);
     drive_left.writeMicroseconds(mixer.getLeft());
@@ -265,4 +293,60 @@ void rtmgr_onSafe(bool full_init)
     #endif
     heading_mgr.setReset();
     pid.reset();
+}
+
+void robot_force_servos_on(void)
+{
+    force_servo_outputs = true;
+    rtmgr_onSafe(true);
+}
+
+void logger_gather(void)
+{
+    #ifdef DEVMODE_PERIODIC_DEBUG
+    dbglog.cur_heading = heading_mgr.getCurHeading();
+    dbglog.tgt_heading = heading_mgr.getTgtHeading();
+    dbglog.gyro_corr   = pid.getLastOutput();
+    dbglog.drv_left    = drive_left .readMicroseconds();
+    dbglog.drv_right   = drive_right.readMicroseconds();
+
+    dbglog.weapon = weapon.
+    #ifdef USE_DSHOT
+        readThrottle
+    #else
+        readMicroseconds
+    #endif
+        ();
+
+    dbglog.throttle    = rx_pkt.throttle;
+    dbglog.steering    = rx_pkt.steering;
+    dbglog.battery     = telem_pkt.battery;
+    dbglog.rssi        = telem_pkt.rssi;
+    dbglog.loss_rate   = telem_pkt.loss_rate;
+    dbglog.imu_heading = telem_pkt.heading;
+    #ifndef DEVMODE_NO_RADIO
+    dbglog.session_id  = radio.getSessionId();
+    #endif
+    #endif
+}
+
+void logger_report(uint32_t now)
+{
+    #ifdef DEVMODE_PERIODIC_DEBUG
+    static uint32_t last_debug_time = 0;
+
+    if ((now - last_debug_time) >= DEVMODE_PERIODIC_DEBUG)
+    {
+        last_debug_time = now;
+        logger_gather();
+        Serial.printf("LOG[%u]:, ", now);
+        int16_t* log_ptr = (int16_t*)&dbglog;
+        int log_cnt = sizeof(dbglog)/sizeof(int16_t);
+        int log_i;
+        for (log_i = 0; log_i < log_cnt; log_i++) {
+            Serial.printf("%d , ", log_ptr[log_i]);
+        }
+        Serial.printf("\r\n");
+    }
+    #endif
 }

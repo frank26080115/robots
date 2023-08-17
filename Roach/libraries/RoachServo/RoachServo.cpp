@@ -159,8 +159,9 @@ int RoachServo::read() // return the value as degrees
 int RoachServo::readMicroseconds()
 {
     if (this->pwm) {
-        uint8_t pin = servos[this->servoIndex].Pin.nbr;
-        return this->pwm->readPin(pin)*DUTY_CYCLE_RESOLUTION;
+        //uint8_t pin = servos[this->servoIndex].Pin.nbr;
+        //return this->pwm->readPin(pin)*DUTY_CYCLE_RESOLUTION;
+        return (this->currentUsX100 + 50) / 100;
     }
     return 0;
 }

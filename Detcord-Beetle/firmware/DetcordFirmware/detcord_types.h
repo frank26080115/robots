@@ -34,13 +34,22 @@ detcord_nvm_t;
 
 typedef struct
 {
+    int16_t has_cmd;
+    int16_t throttle;
+    int16_t steering;
+    int16_t imu_heading;
+    int16_t tgt_heading;
+    int16_t cur_heading;
     int16_t drv_left;
     int16_t drv_right;
     int16_t weapon;
-    int16_t heading;
+    int16_t gyro_corr;
+    int16_t battery;
+    int16_t rssi;
+    int16_t loss_rate;
+    int16_t session_id;
 }
 PACK_STRUCT
 detcord_runtime_log_t;
-
 
 #endif

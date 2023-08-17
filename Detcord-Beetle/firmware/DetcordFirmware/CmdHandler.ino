@@ -24,12 +24,18 @@ const cmd_def_t cmds[] = {
     { "rtmgrsim"    , rtmgrsim_func },
     { "rtmgrend"    , rtmgrend_func },
 
+    { "forceservos" , forceservos_func },
+
     { "cfgwrite"    , roachrobot_handleUploadLine },
     { "filesave"    , roachrobot_handleFileSave },
     { "fileload"    , roachrobot_handleFileLoad },
 
     { "cfgfile"     , cfgfile_func },
     { "dbgcfg"      , dbgcfg_func },
+
+    #ifdef DEVMODE_PERIODIC_DEBUG
+    { "logenable"   , logenable_func },
+    #endif
 
     { "", NULL }, // end of table
 };
@@ -218,4 +224,28 @@ void dbgcfg_func(void* cmd, char* argstr, Stream* stream)
     stream->printf("\tDesc checksum: 0x%08X\r\n", rosync_checksum_desc);
     stream->printf("\tDesc size (bytes): %u\r\n", cfg_desc_sz);
     stream->printf("\tDesc size (items): %u\r\n", roachnvm_cntgroup(cfg_desc));
+}
+
+#ifdef DEVMODE_PERIODIC_DEBUG
+extern bool log_active;
+void logenable_func(void* cmd, char* argstr, Stream* stream)
+{
+    log_active = atoi(argstr);
+    stream->printf("toggling log: %u\r\n", log_active);
+}
+#endif
+
+extern bool force_servo_outputs;
+void forceservos_func(void* cmd, char* argstr, Stream* stream)
+{
+    bool x = atoi(argstr);
+    if (x != force_servo_outputs)
+    {
+        if (x)
+        {
+            robot_force_servos_on();
+        }
+        force_servo_outputs = x;
+    }
+    stream->printf("force servo outputs: %u\r\n", force_servo_outputs);
 }

@@ -1,7 +1,7 @@
 #include "nRF52Dshot.h"
 #include <RoachLib.h>
 
-nRF52Dshot::nRF52Dshot(int pin, uint8_t speed, uint32_t interval, NRF_PWM_Type* p_pwm, int8_t pwm_out)
+nRF52Dshot::nRF52Dshot(int pin, uint32_t interval, uint8_t speed, NRF_PWM_Type* p_pwm, int8_t pwm_out)
 {
     _pin = pin;
     _speed = speed;
@@ -137,6 +137,7 @@ void nRF52Dshot::detach(void)
     #endif
     pinMode(_pin, INPUT);
     _active = false;
+    _throttle = 0;
 }
 
 void nRF52Dshot::pwmConfig(void)

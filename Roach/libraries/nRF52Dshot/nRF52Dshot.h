@@ -41,7 +41,7 @@ enum
 class nRF52Dshot
 {
     public:
-        nRF52Dshot(int pin, uint8_t speed = DSHOT_SPEED_600, uint32_t interval = 10, NRF_PWM_Type* p_pwm = NULL, int8_t pwm_out = -1);
+        nRF52Dshot(int pin, uint32_t interval = 10, uint8_t speed = DSHOT_SPEED_600, NRF_PWM_Type* p_pwm = NULL, int8_t pwm_out = -1);
         void begin(void);
         void detach();                                    // release pin, to be used for serial port later
         void task(void);                                  // automatically sends packets at regular intervals
@@ -51,6 +51,7 @@ class nRF52Dshot
         void pwmConfig(void);                             // configures the PWM generator
         uint16_t convertPpm(uint16_t ppm);                // convert a 1000-2000 PPM value to 48 to 2047 for DSHOT (or 48 to 4095 for DSHOT1200)
         void writeMicroseconds(uint16_t us);              // compatible with the Servo library, units 1000-2000
+        inline uint16_t readThrottle(void) { return (_throttle & 0xFFF0) >> 4; };
 
     private:
         int _pin; uint8_t _speed; uint32_t _interval; bool _active;

@@ -11,7 +11,7 @@ extern void rtmgr_onPostFailed(void);          // called once, after 200ms since
 extern void rtmgr_taskPostFailed(void);        // called repeatedly after rtmgr_onPostFailed, at periodic interval
 extern void rtmgr_onSafe(bool full_init);      // called once, upon returning from a failsafe state (and also upon radio connection)
 extern void rtmgr_taskPeriodic(bool has_cmd);  // called repeatedly at the requested time interval, has_cmd means the radio has a command
-
+extern void rtmgr_taskPreStart(void);          // called repeatedly at the requested time interval, before anything
 
 // these functions are called by the application code
 

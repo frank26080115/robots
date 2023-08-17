@@ -75,7 +75,7 @@ int32_t RoachPID::compute(int32_t cur, int32_t tgt)
     last_diff = _diff;
 
     int32_t actual_out = roach_reduce_to_scale(_output = (_p + _i + _d));
-    return roach_value_clamp_abs(actual_out, cfg->output_limit);
+    return _last_out = roach_value_clamp_abs(actual_out, cfg->output_limit);
 }
 
 void RoachPID::debug(void)
