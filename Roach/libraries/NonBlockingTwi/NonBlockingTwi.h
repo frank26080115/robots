@@ -26,6 +26,8 @@ void nbtwi_transfer(void);
 void nbtwi_forceStop(void);
 
 uint8_t nbtwi_scan(uint8_t start);
+uint16_t nbtwi_getTimeoutLocation(void);
+uint16_t nbtwi_getTimeoutFlags(void);
 
 #ifdef __cplusplus
 }

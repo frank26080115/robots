@@ -43,6 +43,8 @@ static volatile uint32_t xfer_time = 0;
 static volatile uint32_t xfer_time_est = 0;
 static volatile uint32_t idle_timestamp = 0;
 static volatile uint32_t taskstop_time = 0;
+static volatile uint16_t timeout_location;
+static volatile uint16_t timeout_flags;
 static int err_cnt = 0;
 
 // implement a FIFO with a linked list
@@ -305,7 +307,7 @@ static void nbtwi_handleResult(void)
     }
 }
 
-static void nbtwi_checkTimeout(void)
+static void nbtwi_checkTimeout(uint16_t location)
 {
     uint32_t now = millis();
     if (xfer_time_est != 0 && (now - xfer_time) >= xfer_time_est)
@@ -314,6 +316,23 @@ static void nbtwi_checkTimeout(void)
         Serial.printf("nbtwi timeout %u\r\n", xfer_time_est);
         #endif
         nbtwi_statemachine = NBTWI_SM_TIMEOUT;
+
+        // track where the timeout happened and what state the TWIM is in
+        // for debugging purposes
+        timeout_location = location;
+        if (nbtwi_isTx) {
+            timeout_location |= 0x8000;
+        }
+        timeout_flags = 0
+            | (((NRF_TWIM0->EVENTS_STOPPED   != 0) ? 1 : 0) << 0)
+            | (((NRF_TWIM0->EVENTS_ERROR     != 0) ? 1 : 0) << 1)
+            | (((NRF_TWIM0->EVENTS_SUSPENDED != 0) ? 1 : 0) << 2)
+            | (((NRF_TWIM0->EVENTS_RXSTARTED != 0) ? 1 : 0) << 3)
+            | (((NRF_TWIM0->EVENTS_TXSTARTED != 0) ? 1 : 0) << 4)
+            | (((NRF_TWIM0->EVENTS_LASTRX    != 0) ? 1 : 0) << 5)
+            | (((NRF_TWIM0->EVENTS_LASTTX    != 0) ? 1 : 0) << 6)
+        ;
+        
     }
 }
 
@@ -391,7 +410,7 @@ static void nbtwi_runStateMachine(void)
             }
             else
             {
-                nbtwi_checkTimeout();
+                nbtwi_checkTimeout(__LINE__);
             }
         }
     }
@@ -423,7 +442,9 @@ static void nbtwi_runStateMachine(void)
                     nbtwi_statemachine = NBTWI_SM_SUSPEND;
                 }
             }
-            else if (nbtwi_isTx == false && NRF_TWIM0->EVENTS_LASTRX)
+            else if (nbtwi_isTx == false && (NRF_TWIM0->EVENTS_LASTRX != 0
+                || NRF_TWIM0->RXD.AMOUNT >= NRF_TWIM0->RXD.MAXCNT // this fixed an issue where the transactions will timeout
+            ))
             {
                 NRF_TWIM0->EVENTS_LASTRX = 0;
                 NRF_TWIM0->TASKS_STOP = 0x1UL;
@@ -433,7 +454,7 @@ static void nbtwi_runStateMachine(void)
             }
             else
             {
-                nbtwi_checkTimeout();
+                nbtwi_checkTimeout(__LINE__);
             }
         }
     }
@@ -452,6 +473,10 @@ static void nbtwi_runStateMachine(void)
             nbtwi_statemachine = NBTWI_SM_IDLE;
             xfer_done = true;
             idle_timestamp = millis();
+        }
+        else
+        {
+            nbtwi_checkTimeout(__LINE__);
         }
     }
     if (nbtwi_statemachine == NBTWI_SM_STOP || nbtwi_statemachine == NBTWI_SM_ERROR)
@@ -558,7 +583,7 @@ void nbtwi_task(void)
                 nbtwi_isTx = false;
             }
             xfer_time = millis();
-            xfer_time_est = ((tx_head->len + 1) * 9 * 4) / spd_khz;
+            xfer_time_est = ((tx_head->len + 1) * 9 * 6) / spd_khz;
             xfer_time_est = (xfer_time_est < 5) ? 5 : xfer_time_est;
             nbtwi_statemachine = NBTWI_SM_STARTED;
 
@@ -627,6 +652,16 @@ void nbtwi_forceStop(void)
         free(tx_head);
         tx_head = next;
     }
+}
+
+uint16_t nbtwi_getTimeoutLocation(void)
+{
+    return timeout_location;
+}
+
+uint16_t nbtwi_getTimeoutFlags(void)
+{
+    return timeout_flags;
 }
 
 uint8_t nbtwi_scan(uint8_t start)

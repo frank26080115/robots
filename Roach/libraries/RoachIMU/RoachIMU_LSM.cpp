@@ -198,8 +198,9 @@ void RoachIMU_LSM::task(void)
                     #else
                     tx_buff[0] = LSM6DS3_REG_OUTX_L_G;
                     #endif
-                    nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 1, false);
-                    state_machine = ROACHIMU_SM_RUN_WAIT1;
+                    nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 1, true);
+                    nbtwi_read(i2c_addr, sizeof(lsm_data_t));
+                    state_machine = ROACHIMU_SM_RUN_WAIT2;
                 }
             }
             break;
@@ -243,7 +244,7 @@ void RoachIMU_LSM::task(void)
                     if ((millis() - sample_time) >= 200)
                     {
                         nbtwi_hasError(true);
-                        dbgerr_printf("RoachIMU READ I2C ERROR 0x%04X\r\n", nbtwi_lastError());
+                        dbgerr_printf("RoachIMU READ I2C ERROR 0x%04X from state %u at loc 0x%04X flags 0x%04X\r\n", nbtwi_lastError(), state_machine, nbtwi_getTimeoutLocation(), nbtwi_getTimeoutFlags());
                         total_fails++;
                         if (fail_cnt < 2)
                         {
@@ -362,6 +363,7 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
         }
         else if (mlsuc == false)
         {
+            #if 0
             dbgcalib_printf("[%u] IMU not motionless %u %d %d %d %d %d %d\r\n", millis(), motionless->getLastReason()
             , pkt->accel_x
             , pkt->accel_y
@@ -370,6 +372,7 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
             , pkt->gyro_y
             , pkt->gyro_z
             );
+            #endif
         }
     }
 
