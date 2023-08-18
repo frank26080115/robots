@@ -5,6 +5,7 @@
 
 #include <RoachLib.h>
 #include "RoachMahony.h"
+#include "RoachMotionless.h"
 
 #if defined(ESP32)
 #error ESP32 not supported for LSM6DS3
@@ -70,6 +71,8 @@ class RoachIMU_LSM : public RoachIMU_Common
 
     private:
         RoachMahony* ahrs;
+        RoachMotionless* motionless;
+
         uint8_t i2c_addr;
         uint8_t tx_buff[64];
         uint8_t rx_buff[64];

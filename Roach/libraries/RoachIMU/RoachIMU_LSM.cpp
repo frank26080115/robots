@@ -16,7 +16,7 @@ static const uint8_t lsm6ds3_init_table[][2] =
 {
     { LSM6DS3_REG_CTRL4_C , 0x08 }, // enable DA timer
     { LSM6DS3_REG_CTRL8_XL, 0x09 }, // set the accel filter to ODR/4
-    { LSM6DS3_REG_CTRL1_XL, 0x48 }, // set the accelerometer control register to work at 104 Hz, 4 g
+    { LSM6DS3_REG_CTRL1_XL, 0x44 }, // set the accelerometer control register to work at 104 Hz, 16 g
     { LSM6DS3_REG_CTRL7_G , 0x00 }, // set gyroscope power mode to high performance and bandwidth to 16 MHz
     { LSM6DS3_REG_CTRL2_G , 0x4C }, // set the gyroscope control register to work at 104 Hz, 2000 dps and in bypass mode
 
@@ -65,6 +65,21 @@ RoachIMU_LSM::RoachIMU_LSM(int orientation, int dev_addr, int pwr_pin, int irq_p
     instance = this;
     is_ready = false;
     ahrs = new RoachMahony();
+    motionless = new RoachMotionless(
+        200,         // instantaneous acceleration limit
+        0,           // limit on the sum of deltas
+        12,          // limit on each individual delta
+        16,          // limit on difference between min and max
+        2250,        // instantaneous 3 axis acceleration magnitude limit
+        32,          // instantaneous gyro limit
+        0,           // limit on the sum of deltas
+        4,           // limit on each individual delta
+        8,           // limit on difference between min and max
+        50 * 100,    // time to hold still
+        500,         // minimum samples required
+        3000,        // time window millis minimum
+        20000        // time window millis maximum
+    );
 }
 
 void RoachIMU_LSM::begin(void)
@@ -114,6 +129,7 @@ void RoachIMU_LSM::task(void)
                     state_machine = ROACHIMU_SM_RUN;
                     sample_time = millis();
                     debug_printf("RoachIMU SETUP done -> RUN\r\n");
+                    motionless->begin(sample_time);
                     break;
                 }
                 nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 2, false);
@@ -323,6 +339,37 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
                 ahrs->reset();
                 need_cal = true;
             }
+        }
+    }
+    else if (tare_time == 0 && calib == NULL && motionless->isDone() == false)
+    {
+        bool mlsuc = motionless->update(millis(), pkt->gyro_x, pkt->gyro_y, pkt->gyro_z, pkt->accel_x, pkt->accel_y, pkt->accel_z);
+        if (motionless->isDone())
+        {
+            if (calib == NULL) { // if missing, create new
+                calib = (imu_lsm_cal_t*)malloc(sizeof(imu_lsm_cal_t));
+            }
+            if (calib != NULL) {
+                int32_t cx, cy, cz;
+                motionless->getAverageGyro(&cx, &cy, &cz);
+                calib->x = cx;
+                calib->y = cy;
+                calib->z = cz;
+                dbgcalib_printf("IMU motionless calib done [ %d , %d , %d ] \r\n", calib->x, calib->y, calib->z);
+                ahrs->reset();
+                need_cal = true;
+            }
+        }
+        else if (mlsuc == false)
+        {
+            dbgcalib_printf("[%u] IMU not motionless %u %d %d %d %d %d %d\r\n", millis(), motionless->getLastReason()
+            , pkt->accel_x
+            , pkt->accel_y
+            , pkt->accel_z
+            , pkt->gyro_x
+            , pkt->gyro_y
+            , pkt->gyro_z
+            );
         }
     }
 
