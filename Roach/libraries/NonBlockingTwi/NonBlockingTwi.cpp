@@ -27,7 +27,7 @@ enum
     NBTWI_SM_FORCESTOP_WAIT2,
 };
 
-static uint32_t pin_scl, pin_sda;
+static uint32_t pin_scl, pin_sda, freq, pin_params;
 static uint8_t* tx_buff = NULL;
 static uint32_t tx_buff_sz = 0;
 
@@ -61,7 +61,7 @@ nbtwi_node_t;
 
 enum
 {
-    NBTWI_FLAG_RWMASK   = 0x03,
+    NBTWI_FLAG_RWMASK   = 0x01,
     NBTWI_FLAG_WRITE    = 0,
     NBTWI_FLAG_READ     = 1,
     //NBTWI_FLAG_RESULT   = 2,
@@ -83,19 +83,16 @@ static volatile uint32_t* pincfg_reg(uint32_t pin)
 
 void nbtwi_init(int scl, int sda, int bufsz, bool highspeed)
 {
-    *pincfg_reg(g_ADigitalPinMap[pin_scl = scl]) = ((uint32_t)GPIO_PIN_CNF_DIR_Input        << GPIO_PIN_CNF_DIR_Pos)
+    *pincfg_reg(g_ADigitalPinMap[pin_scl = scl]) = pin_params =
+                                                   ((uint32_t)GPIO_PIN_CNF_DIR_Input        << GPIO_PIN_CNF_DIR_Pos)
                                                  | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect    << GPIO_PIN_CNF_INPUT_Pos)
                                                  | ((uint32_t)GPIO_PIN_CNF_PULL_Pullup      << GPIO_PIN_CNF_PULL_Pos)
                                                  | ((uint32_t)GPIO_PIN_CNF_DRIVE_S0D1       << GPIO_PIN_CNF_DRIVE_Pos)
                                                  | ((uint32_t)GPIO_PIN_CNF_SENSE_Disabled   << GPIO_PIN_CNF_SENSE_Pos);
 
-    *pincfg_reg(g_ADigitalPinMap[pin_sda = sda]) = ((uint32_t)GPIO_PIN_CNF_DIR_Input        << GPIO_PIN_CNF_DIR_Pos)
-                                                 | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect    << GPIO_PIN_CNF_INPUT_Pos)
-                                                 | ((uint32_t)GPIO_PIN_CNF_PULL_Pullup      << GPIO_PIN_CNF_PULL_Pos)
-                                                 | ((uint32_t)GPIO_PIN_CNF_DRIVE_S0D1       << GPIO_PIN_CNF_DRIVE_Pos)
-                                                 | ((uint32_t)GPIO_PIN_CNF_SENSE_Disabled   << GPIO_PIN_CNF_SENSE_Pos);
+    *pincfg_reg(g_ADigitalPinMap[pin_sda = sda]) = pin_params;
 
-    NRF_TWIM0->FREQUENCY = highspeed ? TWIM_FREQUENCY_FREQUENCY_K400 : TWIM_FREQUENCY_FREQUENCY_K100;
+    NRF_TWIM0->FREQUENCY = freq = (highspeed ? TWIM_FREQUENCY_FREQUENCY_K400 : TWIM_FREQUENCY_FREQUENCY_K100);
     NRF_TWIM0->ENABLE    = (TWIM_ENABLE_ENABLE_Enabled << TWIM_ENABLE_ENABLE_Pos);
     NRF_TWIM0->PSEL.SCL  = g_ADigitalPinMap[pin_scl];
     NRF_TWIM0->PSEL.SDA  = g_ADigitalPinMap[pin_sda];
@@ -118,6 +115,18 @@ void nbtwi_init(int scl, int sda, int bufsz, bool highspeed)
     #ifdef NBTWI_ENABLE_DEBUG
     Serial.println("NonBlockingTwi begin");
     #endif
+}
+
+void nbtwi_reinit(void)
+{
+    *pincfg_reg(g_ADigitalPinMap[pin_scl]) = pin_params;
+    *pincfg_reg(g_ADigitalPinMap[pin_sda]) = pin_params;
+    NRF_TWIM0->FREQUENCY = freq;
+    NRF_TWIM0->PSEL.SCL  = g_ADigitalPinMap[pin_scl];
+    NRF_TWIM0->PSEL.SDA  = g_ADigitalPinMap[pin_sda];
+    NRF_TWIM0->TXD.PTR   = (uint32_t)(tx_buff);
+    NRF_TWIM0->RXD.PTR   = (uint32_t)(tx_buff);
+    NRF_TWIM0->ENABLE    = (TWIM_ENABLE_ENABLE_Enabled << TWIM_ENABLE_ENABLE_Pos);
 }
 
 void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len, bool no_stop)
@@ -331,8 +340,13 @@ static void nbtwi_checkTimeout(uint16_t location)
             | (((NRF_TWIM0->EVENTS_TXSTARTED != 0) ? 1 : 0) << 4)
             | (((NRF_TWIM0->EVENTS_LASTRX    != 0) ? 1 : 0) << 5)
             | (((NRF_TWIM0->EVENTS_LASTTX    != 0) ? 1 : 0) << 6)
+            | (((NRF_TWIM0->RXD.AMOUNT >= NRF_TWIM0->RXD.MAXCNT) ? 1 : 0) << 7)
         ;
-        
+
+        if (timeout_flags == 0x80)
+        {
+            nbtwi_statemachine = NBTWI_SM_FORCESTOP;
+        }
     }
 }
 
@@ -353,7 +367,7 @@ static void nbtwi_runStateMachine(void)
             nbtwi_statemachine = NBTWI_SM_FORCESTOP_WAIT2;
             
         }
-        else if ((millis() - taskstop_time) >= 200 && taskstop_time > 0)
+        else if ((millis() - taskstop_time) >= 1 && taskstop_time > 0)
         {
             nbtwi_statemachine = NBTWI_SM_FORCESTOP_WAIT2;
             xfer_done = true;
@@ -368,18 +382,26 @@ static void nbtwi_runStateMachine(void)
             NRF_TWIM0->EVENTS_LASTTX    = 0;
             NRF_TWIM0->EVENTS_LASTRX    = 0;
             NRF_TWIM0->EVENTS_SUSPENDED = 0;
+            NRF_TWIM0->PSEL.SCL         = 0xFFFFFFFF;
+            NRF_TWIM0->PSEL.SDA         = 0xFFFFFFFF;
             NRF_TWIM0->ENABLE           = 0;
+            pinMode(pin_sda, OUTPUT);
+            pinMode(pin_scl, OUTPUT);
+            digitalWrite(pin_sda, HIGH);
+            digitalWrite(pin_scl, HIGH);
             taskstop_time = millis();
         }
         return;
     }
     else if (nbtwi_statemachine == NBTWI_SM_FORCESTOP_WAIT2)
     {
-        if ((millis() - taskstop_time) >= 25)
+        if ((millis() - taskstop_time) >= 1)
         {
-            NRF_TWIM0->ENABLE = (TWIM_ENABLE_ENABLE_Enabled << TWIM_ENABLE_ENABLE_Pos);
+            nbtwi_reinit();
             xfer_done = true;
             idle_timestamp = millis();
+            taskstop_time  = idle_timestamp;
+            xfer_err_last  = xfer_err = 0xF000;
             nbtwi_statemachine = NBTWI_SM_IDLE;
         }
         return;
@@ -442,9 +464,7 @@ static void nbtwi_runStateMachine(void)
                     nbtwi_statemachine = NBTWI_SM_SUSPEND;
                 }
             }
-            else if (nbtwi_isTx == false && (NRF_TWIM0->EVENTS_LASTRX != 0
-                || NRF_TWIM0->RXD.AMOUNT >= NRF_TWIM0->RXD.MAXCNT // this fixed an issue where the transactions will timeout
-            ))
+            else if (nbtwi_isTx == false && NRF_TWIM0->EVENTS_LASTRX != 0)
             {
                 NRF_TWIM0->EVENTS_LASTRX = 0;
                 NRF_TWIM0->TASKS_STOP = 0x1UL;
@@ -572,20 +592,25 @@ void nbtwi_task(void)
             NRF_TWIM0->RXD.MAXCNT     = (tx_head->len);
             NRF_TWIM0->TASKS_RESUME   = 0x1UL;
             nbtwi_curFlags = tx_head->flags;
+            xfer_time = millis();
+            xfer_time_est = ((tx_head->len + 1) * 9 * 6) / spd_khz;
+            xfer_time_est = (xfer_time_est < 5) ? 5 : xfer_time_est;
             if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE)
             {
                 NRF_TWIM0->TASKS_STARTTX  = 0x1UL;
                 nbtwi_isTx = true;
+                nbtwi_statemachine = NBTWI_SM_STARTED;
             }
             else if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_READ)
             {
                 NRF_TWIM0->TASKS_STARTRX  = 0x1UL;
                 nbtwi_isTx = false;
+                nbtwi_statemachine = NBTWI_SM_STARTED;
             }
-            xfer_time = millis();
-            xfer_time_est = ((tx_head->len + 1) * 9 * 6) / spd_khz;
-            xfer_time_est = (xfer_time_est < 5) ? 5 : xfer_time_est;
-            nbtwi_statemachine = NBTWI_SM_STARTED;
+            else
+            {
+                Serial.printf("ERROR [%u] NBTWI did not actually start transaction\r\n", millis());
+            }
 
             #ifdef NBTWI_ENABLE_DEBUG
             if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE)
@@ -598,14 +623,17 @@ void nbtwi_task(void)
             }
             #endif
 
-            if (tx_tail == tx_head)
+            if (nbtwi_statemachine == NBTWI_SM_STARTED)
             {
-                tx_tail = NULL;
+                if (tx_tail == tx_head)
+                {
+                    tx_tail = NULL;
+                }
+                nbtwi_node_t* next = (nbtwi_node_t*)(tx_head->next);
+                free(tx_head->data);
+                free(tx_head);
+                tx_head = next;
             }
-            nbtwi_node_t* next = (nbtwi_node_t*)(tx_head->next);
-            free(tx_head->data);
-            free(tx_head);
-            tx_head = next;
         }
     }
 }

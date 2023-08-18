@@ -183,8 +183,9 @@ void readbatt_func(void* cmd, char* argstr, Stream* stream)
 
 void readimu_func(void* cmd, char* argstr, Stream* stream)
 {
+    uint32_t first_t = millis();
     uint32_t last_t = 0;
-    bool forever = atoi(argstr);
+    int forever = atoi(argstr);
     do
     {
         uint32_t now = millis();
@@ -210,8 +211,11 @@ void readimu_func(void* cmd, char* argstr, Stream* stream)
             stream->printf("\r\n");
             last_t = now;
         }
+        if ((now - first_t) >= (forever * 1000)) {
+            break;
+        }
     }
-    while (forever);
+    while (1);
 }
 
 void rtmgrsim_func(void* cmd, char* argstr, Stream* stream)

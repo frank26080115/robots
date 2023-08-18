@@ -16,9 +16,9 @@ static const uint8_t lsm6ds3_init_table[][2] =
 {
     { LSM6DS3_REG_CTRL4_C , 0x08 }, // enable DA timer
     { LSM6DS3_REG_CTRL8_XL, 0x09 }, // set the accel filter to ODR/4
-    { LSM6DS3_REG_CTRL1_XL, 0x44 }, // set the accelerometer control register to work at 104 Hz, 16 g
+    { LSM6DS3_REG_CTRL1_XL, 0x54 }, // set the accelerometer control register to work at 208 Hz, 16 g
     { LSM6DS3_REG_CTRL7_G , 0x00 }, // set gyroscope power mode to high performance and bandwidth to 16 MHz
-    { LSM6DS3_REG_CTRL2_G , 0x4C }, // set the gyroscope control register to work at 104 Hz, 2000 dps and in bypass mode
+    { LSM6DS3_REG_CTRL2_G , 0x5C }, // set the gyroscope control register to work at 208 Hz, 2000 dps and in bypass mode
 
     { LSM6DS3_REG_CTRL3_C , 0x44 }, // enable BDU block update, enable auto-inc address, interrupt pin active-high push-pull
 
@@ -31,7 +31,7 @@ static const uint8_t lsm6ds3_init_table[][2] =
     { LSM6DS3_REG_ORIENT_CFG_G, 0x00 }, // dataready in latched mode
     { LSM6DS3_REG_INT1_CTRL, 0x08 },    // interrupt on FIFO threshold
     #else
-    { LSM6DS3_REG_INT1_CTRL, 0x02 },    // interrupt on gyro data
+    //{ LSM6DS3_REG_INT1_CTRL, 0x02 },    // interrupt on gyro data // commented out, reliability issues when interrupt is being used
     #endif
 
     { 0xFF, 0xFF }, // end of table
@@ -110,7 +110,7 @@ void RoachIMU_LSM::task(void)
     switch (state_machine)
     {
         case ROACHIMU_SM_PWR:
-            if ((millis() - pwr_time) >= 25) {
+            if ((millis() - pwr_time) >= 15) {
                 state_machine = ROACHIMU_SM_SETUP;
                 init_idx = 0;
                 debug_printf("RoachIMU entering SETUP state\r\n");
@@ -241,7 +241,7 @@ void RoachIMU_LSM::task(void)
                 }
                 if (suc == false)
                 {
-                    if ((millis() - sample_time) >= 200)
+                    if ((millis() - sample_time) >= 200 || (nbtwi_isBusy() == false && nbtwi_lastError() == 0xF000))
                     {
                         nbtwi_hasError(true);
                         dbgerr_printf("RoachIMU READ I2C ERROR 0x%04X from state %u at loc 0x%04X flags 0x%04X\r\n", nbtwi_lastError(), state_machine, nbtwi_getTimeoutLocation(), nbtwi_getTimeoutFlags());
@@ -267,7 +267,7 @@ void RoachIMU_LSM::task(void)
                 dbgerr_printf("RoachIMU too many errors\r\n");
                 state_machine = ROACHIMU_SM_I2CRESET;
                 pwr_time = millis();
-                nbtwi_forceStop();
+                //nbtwi_forceStop(); // commented out, the nbtwi state machine will automatically do its own reset
             }
             break;
         case ROACHIMU_SM_I2CRESET:
@@ -288,7 +288,7 @@ void RoachIMU_LSM::task(void)
             break;
         case ROACHIMU_SM_PWROFF:
             {
-                if ((millis() - pwr_time) >= 25) {
+                if ((millis() - pwr_time) >= 15) {
                     pwr_time = millis();
                     XiaoBleSenseLsm_powerOn(pin_pwr);
                     state_machine = ROACHIMU_SM_PWR;

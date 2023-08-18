@@ -46,7 +46,8 @@ bool force_servo_outputs = false;
 RoachIMU_BNO imu(5000, 0, ROACHIMU_ORIENTATION_XYZ, BNO08x_I2CADDR_DEFAULT, DETCORDHW_PIN_IMU_RST);
 #endif
 #ifdef ROACHIMU_USE_LSM6DS3
-RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ);
+//RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ);
+RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ, LSM6DS3_I2CADDR_DEFAULT, ROACHIMU_DEF_PIN_PWR, -1);
 #endif
 
 RoachPID pid;
@@ -77,6 +78,10 @@ bool log_active = true;
 
 void setup()
 {
+    sd_softdevice_disable();
+    // hmmm, the radio initialization also disables softdevice
+    // but if this is at the top of setup(), then the IMU seems drastically more reliable
+
     #ifdef DEVMODE_WAIT_SERIAL_INIT
     Serial.begin(19200);
     while (Serial.available() == 0) {
@@ -90,7 +95,9 @@ void setup()
 
     bool flash_ok = RoachUsbMsd_begin(); // this also starts the serial port
     settings_init();
-    #ifndef DEVMODE_AVOID_USBMSD
+    #if !defined(DEVMODE_AVOID_USBMSD) && !defined(BOARD_IS_XIAOBLE)
+    // XIAO has VBUS connected to the external power
+    // so it is literally impossible to tell if the VBUS is from a computer or from a battery
     if (RoachUsbMsd_hasVbus())
     {
         RoachUsbMsd_presentUsbMsd();
@@ -185,7 +192,7 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
     int32_t gyro_corr = 0;
     if ((rx_pkt.flags & ROACHPKTFLAG_GYROACTIVE) != 0)
     {
-        if (imu.isReady() == false || imu.hasFailed()) {
+        if (imu.isReady() == false || imu.hasFailed() || imu.getErrorOccured(true)) {
             heading_mgr.setReset();
             pid.reset();
         }
