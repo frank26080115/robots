@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-//#define NBTWI_ENABLE_DEBUG
+#define NBTWI_ENABLE_DEBUG
 
 #ifdef NBTWI_ENABLE_DEBUG
 extern uint32_t getFreeRam(void);
@@ -68,6 +68,8 @@ static nbtwi_node_t* tx_tail = NULL;
 static nbtwi_node_t* rx_head = NULL;
 static nbtwi_node_t* rx_tail = NULL;
 
+static uint32_t spd_khz;
+
 static volatile uint32_t* pincfg_reg(uint32_t pin)
 {
     NRF_GPIO_Type * port = nrf_gpio_pin_port_decode(&pin);
@@ -92,6 +94,8 @@ void nbtwi_init(int scl, int sda, int bufsz, bool highspeed)
     NRF_TWIM0->ENABLE    = (TWIM_ENABLE_ENABLE_Enabled << TWIM_ENABLE_ENABLE_Pos);
     NRF_TWIM0->PSEL.SCL  = g_ADigitalPinMap[pin_scl];
     NRF_TWIM0->PSEL.SDA  = g_ADigitalPinMap[pin_sda];
+
+    spd_khz = highspeed ? 400 : 100;
 
     if (bufsz == 0) {
         bufsz = 1024;
@@ -489,9 +493,9 @@ void nbtwi_task(void)
 
             NRF_TWIM0->ADDRESS        = tx_head->i2c_addr;
             NRF_TWIM0->EVENTS_STOPPED = 0x0UL;
-            NRF_TWIM0->TASKS_RESUME   = 0x1UL;
             NRF_TWIM0->TXD.MAXCNT     = (tx_head->len);
             NRF_TWIM0->RXD.MAXCNT     = (tx_head->len);
+            NRF_TWIM0->TASKS_RESUME   = 0x1UL;
             nbtwi_curFlags = tx_head->flags;
             if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE)
             {
@@ -504,7 +508,7 @@ void nbtwi_task(void)
                 nbtwi_isTx = false;
             }
             xfer_time = millis();
-            xfer_time_est = ((tx_head->len + 1) * 9 * 4) / 400;
+            xfer_time_est = ((tx_head->len + 1) * 9 * 4) / spd_khz;
             xfer_time_est = (xfer_time_est < 5) ? 5 : xfer_time_est;
             nbtwi_statemachine = NBTWI_SM_STARTED;
 

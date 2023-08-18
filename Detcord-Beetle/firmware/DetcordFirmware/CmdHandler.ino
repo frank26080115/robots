@@ -188,6 +188,11 @@ void readimu_func(void* cmd, char* argstr, Stream* stream)
     {
         nbtwi_task();
         imu.task();
+        #ifndef ROACHIMU_AUTO_MATH
+        if (imu.hasNew(false)) {
+            imu.doMath();
+        }
+        #endif
         stream->printf("[%u] ROLL: %4.1f    PITCH: %4.1f    YAW: %4.1f\r\n", millis(), imu.euler.roll, imu.euler.pitch, imu.euler.yaw);
         if (forever) {
             waitFor(250);

@@ -10,6 +10,8 @@ extern "C" {
 
 extern uint32_t nbtwi_delay;
 
+// note: i2c_addr specified as 7-bit right-adjusted
+
 void nbtwi_init(int pin_scl, int pin_sda, int bufsz, bool highspeed = true);
 void nbtwi_write(uint8_t i2c_addr, uint8_t* data, int len, bool no_stop);
 void nbtwi_writec(uint8_t i2c_addr, uint8_t c, uint8_t* data, int len);

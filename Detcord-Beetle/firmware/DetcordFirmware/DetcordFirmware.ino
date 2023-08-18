@@ -89,14 +89,21 @@ void setup()
     hb_rgb.begin();
 
     bool flash_ok = RoachUsbMsd_begin(); // this also starts the serial port
+    settings_init();
+    #ifndef DEVMODE_AVOID_USBMSD
     if (RoachUsbMsd_hasVbus())
     {
         RoachUsbMsd_presentUsbMsd();
     }
-    settings_init();
+    #endif
 
     battery.alt_filter = ROACH_FILTER_DEFAULT;
     battery.begin();
+
+    #ifdef BOARD_IS_XIAOBLE
+    pinMode(ROACHIMU_DEF_PIN_PWR, OUTPUT);
+    digitalWrite(ROACHIMU_DEF_PIN_PWR, HIGH);
+    #endif
 
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
     imu.begin();
@@ -117,6 +124,10 @@ void setup()
         Serial.printf("Detcord FW waiting for input\r\n");
         waitFor(100);
     }
+    #endif
+
+    #if defined(DEVMODE_WAIT_SERIAL_RUN) || defined(DEVMODE_WAIT_SERIAL_INIT)
+    Serial.printf("Detcord Setup Finished\r\n");
     #endif
 }
 

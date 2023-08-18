@@ -5,10 +5,14 @@
 #include "RoachIMU_LSM.h"
 #include "lsm_reg.h"
 
+//#define debug_printf(...)            // do nothing
+#define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
+
 static const uint8_t lsm6ds3_init_table[][2] = 
 {
-    { LSM6DS3_REG_CTRL8_XL, 0x09 }, // set the accel ODR config register to ODR/4
-    { LSM6DS3_REG_CTRL1_XL, 0x4C }, // set the accelerometer control register to work at 104 Hz, 4 g,and in bypass mode and enable ODR/4
+    { LSM6DS3_REG_CTRL4_C , 0x08 }, // enable DA timer
+    { LSM6DS3_REG_CTRL8_XL, 0x09 }, // set the accel filter to ODR/4
+    { LSM6DS3_REG_CTRL1_XL, 0x4C }, // set the accelerometer control register to work at 104 Hz, 8 g
     { LSM6DS3_REG_CTRL7_G , 0x00 }, // set gyroscope power mode to high performance and bandwidth to 16 MHz
     { LSM6DS3_REG_CTRL2_G , 0x4A }, // set the gyroscope control register to work at 104 Hz, 2000 dps and in bypass mode
 
@@ -90,10 +94,12 @@ void RoachIMU_LSM::task(void)
             if ((millis() - pwr_time) >= 100) {
                 state_machine = ROACHIMU_SM_SETUP;
                 init_idx = 0;
+                debug_printf("RoachIMU entering SETUP state\r\n");
             }
             break;
         case ROACHIMU_SM_SETUP:
             {
+                fail_cnt = 0;
                 has_new = false;
                 tx_buff[0] = lsm6ds3_init_table[init_idx][0];
                 tx_buff[1] = lsm6ds3_init_table[init_idx][1];
@@ -101,10 +107,13 @@ void RoachIMU_LSM::task(void)
                 {
                     is_ready = true;
                     state_machine = ROACHIMU_SM_RUN;
+                    sample_time = millis();
+                    debug_printf("RoachIMU SETUP done -> RUN\r\n");
                     break;
                 }
                 nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 2, false);
                 state_machine = ROACHIMU_SM_SETUP_WAIT;
+                debug_printf("RoachIMU SETUP sending %u\r\n", init_idx);
             }
             break;
         case ROACHIMU_SM_SETUP_WAIT:
@@ -112,9 +121,11 @@ void RoachIMU_LSM::task(void)
                 if (nbtwi_isBusy() == false)
                 {
                     if (nbtwi_hasError(true) == false) {
+                        debug_printf("RoachIMU SETUP sent %u\r\n", init_idx);
                         init_idx++;
                     }
                     else {
+                        debug_printf("RoachIMU SETUP I2C error\r\n");
                         init_idx = 0;
                         if (fail_cnt > 0)
                         {
@@ -136,11 +147,23 @@ void RoachIMU_LSM::task(void)
                     if (digitalRead(pin_irq) != LOW && can_read)
                     {
                         to_read = true;
+                        debug_printf("RoachIMU READ from INT\r\n");
+                    }
+                    else
+                    {
+                        to_read = (now - sample_time) >= sample_interval;
+                        if (to_read)
+                        {
+                            debug_printf("RoachIMU READ from INT (timeout)\r\n");
+                        }
                     }
                 }
                 else
                 {
                     to_read = (now - sample_time) >= sample_interval;
+                    if (to_read) {
+                        debug_printf("RoachIMU READ from TIME\r\n");
+                    }
                 }
 
                 if (to_read)
@@ -151,30 +174,50 @@ void RoachIMU_LSM::task(void)
                     #else
                     tx_buff[0] = LSM6DS3_REG_OUTX_L_G;
                     #endif
-                    nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 1, true);
-                    nbtwi_read(i2c_addr, sizeof(lsm_data_t));
-                    state_machine = ROACHIMU_SM_RUN_WAIT;
+                    nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 1, false);
+                    state_machine = ROACHIMU_SM_RUN_WAIT1;
                 }
             }
             break;
-        case ROACHIMU_SM_RUN_WAIT:
+        case ROACHIMU_SM_RUN_WAIT1:
+        case ROACHIMU_SM_RUN_WAIT2:
             {
-                if (nbtwi_isBusy() == false)
+                bool suc = false;
+                if (state_machine == ROACHIMU_SM_RUN_WAIT1)
                 {
-                    if (nbtwi_hasError(true) == false)
+                    if (nbtwi_isBusy() == false)
+                    {
+                        if (nbtwi_hasError(true) == false)
+                        {
+                            debug_printf("RoachIMU READ addr sent\r\n");
+                            nbtwi_read(i2c_addr, sizeof(lsm_data_t));
+                            state_machine = ROACHIMU_SM_RUN_WAIT2;
+                            suc = true;
+                        }
+                    }
+                }
+                else if (state_machine == ROACHIMU_SM_RUN_WAIT2)
+                {
+                    if (nbtwi_hasResult())
                     {
                         total_cnt++;
                         fail_cnt = 0;
                         state_machine = ROACHIMU_SM_RUN;
 
                         nbtwi_readResult((uint8_t*)rx_buff, sizeof(lsm_data_t), true);
+                        debug_printf("RoachIMU RX'ed data\r\n");
                         has_new = true;
                         #ifdef ROACHIMU_AUTO_MATH
                         doMath();
                         #endif
+                        suc = true;
                     }
-                    else
+                }
+                if (suc == false)
+                {
+                    if ((millis() - sample_time) >= 1000)
                     {
+                        debug_printf("RoachIMU READ I2C ERROR\r\n");
                         total_fails++;
                         if (fail_cnt < 5)
                         {
