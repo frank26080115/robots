@@ -26,6 +26,8 @@
 
 #define DETCORDHW_BATT_ADC_4200MV 800
 
+#define DETCORDHW_I2C_FAST true
+
 #endif
 
 #ifdef BOARD_IS_XIAOBLE
@@ -44,6 +46,8 @@
 #define DETCORDHW_PIN_ADC_BATT    A3
 
 #define DETCORDHW_BATT_ADC_4200MV 800
+
+#define DETCORDHW_I2C_FAST false
 
 #endif
 

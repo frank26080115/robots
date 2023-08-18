@@ -2,8 +2,7 @@ void hwbringup_imuScan(void)
 {
     Serial.begin(19200);
 
-    pinMode(ROACHIMU_DEF_PIN_PWR, OUTPUT);
-    digitalWrite(ROACHIMU_DEF_PIN_PWR, HIGH);
+    XiaoBleSenseLsm_powerOn(ROACHIMU_DEF_PIN_PWR);
 
     while (true)
     {
@@ -18,12 +17,15 @@ void hwbringup_imuScan(void)
     pinMode(PIN_WIRE1_SDA, INPUT);
     pinMode(PIN_WIRE1_SCL, INPUT);
     delay(1);
-    if (digitalRead(PIN_WIRE1_SDA) == LOW || digitalRead(PIN_WIRE1_SCL) == LOW)
+    while (digitalRead(PIN_WIRE1_SDA) == LOW || digitalRead(PIN_WIRE1_SCL) == LOW)
     {
         Serial.println("ERROR: I2C PIN(S) LOW");
+        pinMode(ROACHIMU_DEF_PIN_PWR, OUTPUT);
+        digitalWrite(ROACHIMU_DEF_PIN_PWR, HIGH);
+        delay(100);
     }
 
-#if 1
+#if 0
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE, false);
     uint16_t adr = 1;
     while (adr <= 0xFF)

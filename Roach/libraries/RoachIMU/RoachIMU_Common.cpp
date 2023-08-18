@@ -10,6 +10,11 @@ void RoachIMU_Common::doMath(void)
         has_new = false;
         #endif
 
+        #ifdef ROACHIMU_PROFILE_MATH_TIME
+        volatile uint32_t mathtime_tstart = millis();
+        volatile uint32_t mathtime_tend;
+        #endif
+
         euler_t eu;
         writeEuler(&eu);
         // BNO085 will just copy from the event data
@@ -122,6 +127,11 @@ void RoachIMU_Common::doMath(void)
         //if (is_inverted) {
         //    heading *= -1;
         //}
+
+        #ifdef ROACHIMU_PROFILE_MATH_TIME
+        mathtime_tend = millis();
+        math_time = mathtime_tend - mathtime_tstart;
+        #endif
     }
 }
 

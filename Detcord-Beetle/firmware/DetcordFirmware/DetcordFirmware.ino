@@ -101,11 +101,10 @@ void setup()
     battery.begin();
 
     #ifdef BOARD_IS_XIAOBLE
-    pinMode(ROACHIMU_DEF_PIN_PWR, OUTPUT);
-    digitalWrite(ROACHIMU_DEF_PIN_PWR, HIGH);
+    XiaoBleSenseLsm_powerOn(ROACHIMU_DEF_PIN_PWR);
     #endif
 
-    nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE);
+    nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE, DETCORDHW_I2C_FAST);
     imu.begin();
 
     pid.cfg = &(nvm.pid_heading);
@@ -242,7 +241,11 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
 
 void rtmgr_taskPreStart(void)
 {
-
+    #ifndef ROACHIMU_AUTO_MATH
+    if (imu.hasNew(false)) {
+        imu.doMath();
+    }
+    #endif
 }
 
 void rtmgr_onPreFailed(void)
@@ -308,6 +311,7 @@ void rtmgr_onSafe(bool full_init)
 
 void calibgyro_func(void* cmd, char* argstr, Stream* stream)
 {
+    #ifdef BOARD_IS_XIAOBLE
     if (atoi(argstr) == 123) {
         if (imu.calib != NULL) {
             Serial.printf("[%u] IMU calib = [ %d , %d , %d ]\r\n", millis(), imu.calib->x, imu.calib->y, imu.calib->z);
@@ -317,6 +321,7 @@ void calibgyro_func(void* cmd, char* argstr, Stream* stream)
         }
         return;
     }
+    #endif
     imu.tare();
     heading_mgr.setReset();
     pid.reset();

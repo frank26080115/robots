@@ -24,6 +24,7 @@
 #define ROACHIMU_DEF_PIN_INT     PIN_LSM6DS3TR_C_INT1
 
 #define ROACHIMU_EXTRA_DATA
+//#define ROACHIMU_AUTO_MATH
 
 enum
 {
@@ -34,6 +35,8 @@ enum
     ROACHIMU_SM_RUN_WAIT1,
     ROACHIMU_SM_RUN_WAIT2,
     ROACHIMU_SM_ERROR,
+    ROACHIMU_SM_PWROFF,
+    ROACHIMU_SM_I2CRESET,
 };
 
 typedef struct
@@ -74,7 +77,9 @@ class RoachIMU_LSM : public RoachIMU_Common
 
         // these are for calibration
         uint32_t tare_time = 0, tare_cnt = 0;
-        int32_t tare_x, tare_y, tare_z;
+        int32_t tare_x = 0, tare_y = 0, tare_z = 0;
 };
+
+void XiaoBleSenseLsm_powerOn(int pin);
 
 #endif

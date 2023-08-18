@@ -11,7 +11,7 @@
 #define ROACHIMU_USE_LSM6DS3
 #endif
 
-//#define ROACHIMU_AUTO_MATH
+//#define ROACHIMU_PROFILE_MATH_TIME
 
 enum
 {
@@ -55,6 +55,7 @@ class RoachIMU_Common
         inline bool getErrorOccured(bool clr) { bool x = err_occured; if (clr) { err_occured = false; } return x || hasFailed(); };
 
         void doMath(void);
+        uint32_t math_time;
 
         euler_t euler; // units in real degrees
         bool has_new;

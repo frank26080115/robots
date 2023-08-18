@@ -183,9 +183,12 @@ void readbatt_func(void* cmd, char* argstr, Stream* stream)
 
 void readimu_func(void* cmd, char* argstr, Stream* stream)
 {
+    uint32_t last_t = 0;
     bool forever = atoi(argstr);
     do
     {
+        uint32_t now = millis();
+        RoachWdt_feed();
         nbtwi_task();
         imu.task();
         #ifndef ROACHIMU_AUTO_MATH
@@ -193,9 +196,19 @@ void readimu_func(void* cmd, char* argstr, Stream* stream)
             imu.doMath();
         }
         #endif
-        stream->printf("[%u] ROLL: %4.1f    PITCH: %4.1f    YAW: %4.1f\r\n", millis(), imu.euler.roll, imu.euler.pitch, imu.euler.yaw);
-        if (forever) {
-            waitFor(250);
+        if ((now - last_t) >= 250) {
+            if (imu.isReady() == false) {
+                stream->printf("[%u] IMU is not ready\r\n", now);
+            }
+            if (imu.hasFailed()) {
+                stream->printf("[%u] IMU has failed\r\n", now);
+            }
+            stream->printf("[%u] ROLL: %4.1f    PITCH: %4.1f    YAW: %4.1f", now, imu.euler.roll, imu.euler.pitch, imu.euler.yaw);
+            #ifdef ROACHIMU_PROFILE_MATH_TIME
+            stream->printf("    T: %u", imu.math_time);
+            #endif
+            stream->printf("\r\n");
+            last_t = now;
         }
     }
     while (forever);

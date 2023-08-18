@@ -5,16 +5,20 @@
 #include "RoachIMU_LSM.h"
 #include "lsm_reg.h"
 
-//#define debug_printf(...)            // do nothing
-#define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
+#define debug_printf(...)                 // do nothing
+//#define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
+//#define dbgcalib_printf(...)            // do nothing
+#define dbgcalib_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
+//#define dbgerr_printf(...)            // do nothing
+#define dbgerr_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
 
 static const uint8_t lsm6ds3_init_table[][2] = 
 {
     { LSM6DS3_REG_CTRL4_C , 0x08 }, // enable DA timer
     { LSM6DS3_REG_CTRL8_XL, 0x09 }, // set the accel filter to ODR/4
-    { LSM6DS3_REG_CTRL1_XL, 0x4C }, // set the accelerometer control register to work at 104 Hz, 8 g
+    { LSM6DS3_REG_CTRL1_XL, 0x48 }, // set the accelerometer control register to work at 104 Hz, 4 g
     { LSM6DS3_REG_CTRL7_G , 0x00 }, // set gyroscope power mode to high performance and bandwidth to 16 MHz
-    { LSM6DS3_REG_CTRL2_G , 0x4A }, // set the gyroscope control register to work at 104 Hz, 2000 dps and in bypass mode
+    { LSM6DS3_REG_CTRL2_G , 0x4C }, // set the gyroscope control register to work at 104 Hz, 2000 dps and in bypass mode
 
     { LSM6DS3_REG_CTRL3_C , 0x44 }, // enable BDU block update, enable auto-inc address, interrupt pin active-high push-pull
 
@@ -45,9 +49,10 @@ typedef struct
 __attribute__ ((packed))
 lsm_data_t;
 
-#define ROACHIMU_TARE_CNT 16
+#define ROACHIMU_TARE_CNT 64
 
 void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees);
+extern int roach_div_rounded(const int n, const int d);
 
 static RoachIMU_LSM* instance = NULL;
 
@@ -73,8 +78,7 @@ void RoachIMU_LSM::begin(void)
         sample_interval = 11;
     }
     if (pin_pwr >= 0) {
-        pinMode(pin_pwr, OUTPUT);
-        digitalWrite(pin_pwr, HIGH);
+        XiaoBleSenseLsm_powerOn(pin_pwr);
     }
 
     state_machine = ROACHIMU_SM_PWR;
@@ -91,7 +95,7 @@ void RoachIMU_LSM::task(void)
     switch (state_machine)
     {
         case ROACHIMU_SM_PWR:
-            if ((millis() - pwr_time) >= 100) {
+            if ((millis() - pwr_time) >= 25) {
                 state_machine = ROACHIMU_SM_SETUP;
                 init_idx = 0;
                 debug_printf("RoachIMU entering SETUP state\r\n");
@@ -99,6 +103,7 @@ void RoachIMU_LSM::task(void)
             break;
         case ROACHIMU_SM_SETUP:
             {
+                ahrs->reset();
                 fail_cnt = 0;
                 has_new = false;
                 tx_buff[0] = lsm6ds3_init_table[init_idx][0];
@@ -120,20 +125,23 @@ void RoachIMU_LSM::task(void)
             {
                 if (nbtwi_isBusy() == false)
                 {
-                    if (nbtwi_hasError(true) == false) {
+                    if (nbtwi_hasError(false) == false) {
                         debug_printf("RoachIMU SETUP sent %u\r\n", init_idx);
                         init_idx++;
                     }
                     else {
-                        debug_printf("RoachIMU SETUP I2C error\r\n");
+                        nbtwi_hasError(true);
+                        dbgerr_printf("RoachIMU SETUP I2C error\r\n");
                         init_idx = 0;
-                        if (fail_cnt > 0)
-                        {
-                            perm_fail++;
-                        }
+                        perm_fail++;
                         err_occured = true;
                     }
-                    state_machine = ROACHIMU_SM_SETUP;
+                    if (perm_fail < 3) {
+                        state_machine = ROACHIMU_SM_SETUP;
+                    }
+                    else {
+                        state_machine = ROACHIMU_SM_ERROR;
+                    }
                 }
             }
             break;
@@ -187,7 +195,7 @@ void RoachIMU_LSM::task(void)
                 {
                     if (nbtwi_isBusy() == false)
                     {
-                        if (nbtwi_hasError(true) == false)
+                        if (nbtwi_hasError(false) == false)
                         {
                             debug_printf("RoachIMU READ addr sent\r\n");
                             nbtwi_read(i2c_addr, sizeof(lsm_data_t));
@@ -209,17 +217,19 @@ void RoachIMU_LSM::task(void)
                         has_new = true;
                         #ifdef ROACHIMU_AUTO_MATH
                         doMath();
+                        has_new = true;
                         #endif
                         suc = true;
                     }
                 }
                 if (suc == false)
                 {
-                    if ((millis() - sample_time) >= 1000)
+                    if ((millis() - sample_time) >= 200)
                     {
-                        debug_printf("RoachIMU READ I2C ERROR\r\n");
+                        nbtwi_hasError(true);
+                        dbgerr_printf("RoachIMU READ I2C ERROR 0x%04X\r\n", nbtwi_lastError());
                         total_fails++;
-                        if (fail_cnt < 5)
+                        if (fail_cnt < 2)
                         {
                             fail_cnt++;
                             state_machine = ROACHIMU_SM_RUN;
@@ -236,7 +246,37 @@ void RoachIMU_LSM::task(void)
             {
                 err_occured = true;
                 init_idx = 0;
-                state_machine = ROACHIMU_SM_SETUP;
+                tare_time = 0;
+                dbgerr_printf("RoachIMU too many errors\r\n");
+                state_machine = ROACHIMU_SM_I2CRESET;
+                pwr_time = millis();
+                nbtwi_forceStop();
+            }
+            break;
+        case ROACHIMU_SM_I2CRESET:
+            {
+                if (nbtwi_isBusy() == false)
+                {
+                    pwr_time = millis();
+                    if (pin_pwr >= 0) {
+                        state_machine = ROACHIMU_SM_PWROFF;
+                        digitalWrite(pin_pwr, LOW);
+                        dbgerr_printf("RoachIMU pwr off\r\n");
+                    }
+                    else {
+                        state_machine = ROACHIMU_SM_PWR;
+                    }
+                }
+            }
+            break;
+        case ROACHIMU_SM_PWROFF:
+            {
+                if ((millis() - pwr_time) >= 25) {
+                    pwr_time = millis();
+                    XiaoBleSenseLsm_powerOn(pin_pwr);
+                    state_machine = ROACHIMU_SM_PWR;
+                    dbgerr_printf("RoachIMU pwr on again\r\n");
+                }
             }
             break;
     }
@@ -263,18 +303,22 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
         tare_y += gyro_y32;
         tare_z += gyro_z32;
         tare_cnt++;
-        if (tare_cnt >= ROACHIMU_TARE_CNT
-         // || (millis() - tare_time) >= 1000
-         )
+        if (tare_cnt > 0 && (tare_cnt >= ROACHIMU_TARE_CNT
+          || (millis() - tare_time) >= 500
+        ))
         {
             tare_time = 0; // stop calibration
             if (calib == NULL) { // if missing, create new
                 calib = (imu_lsm_cal_t*)malloc(sizeof(imu_lsm_cal_t));
             }
             if (calib != NULL) {
-                calib->x = (tare_x + (tare_cnt / 2)) / tare_cnt;
-                calib->y = (tare_y + (tare_cnt / 2)) / tare_cnt;
-                calib->z = (tare_z + (tare_cnt / 2)) / tare_cnt;
+                dbgcalib_printf("IMU calib done [ %d , %d , %d ]", gyro_x32, gyro_y32, gyro_z32);
+                dbgcalib_printf(" -> [ %d , %d , %d ] / %d", tare_x, tare_y, tare_z, tare_cnt);
+                calib->x = roach_div_rounded(tare_x, tare_cnt);
+                calib->y = roach_div_rounded(tare_y, tare_cnt);
+                calib->z = roach_div_rounded(tare_z, tare_cnt);
+                dbgcalib_printf(" = [ %d , %d , %d ] \r\n", calib->x, calib->y, calib->z);
+                ahrs->reset();
             }
         }
     }
@@ -316,6 +360,24 @@ void RoachIMU_LSM::tare(void)
     tare_x = 0;
     tare_y = 0;
     tare_z = 0;
+}
+
+static volatile uint32_t* pincfg_reg(uint32_t pin)
+{
+    NRF_GPIO_Type * port = nrf_gpio_pin_port_decode(&pin);
+    return &port->PIN_CNF[pin];
+}
+
+void XiaoBleSenseLsm_powerOn(int pin)
+{
+    pinMode(pin, OUTPUT);
+    *pincfg_reg(g_ADigitalPinMap[pin]) =
+                                ((uint32_t)NRF_GPIO_PIN_DIR_OUTPUT << GPIO_PIN_CNF_DIR_Pos)
+                              | ((uint32_t)NRF_GPIO_PIN_INPUT_DISCONNECT << GPIO_PIN_CNF_INPUT_Pos)
+                              | ((uint32_t)NRF_GPIO_PIN_NOPULL << GPIO_PIN_CNF_PULL_Pos)
+                              | ((uint32_t)NRF_GPIO_PIN_H0H1 << GPIO_PIN_CNF_DRIVE_Pos)
+                              | ((uint32_t)NRF_GPIO_PIN_NOSENSE << GPIO_PIN_CNF_SENSE_Pos);
+    digitalWrite(pin, HIGH);
 }
 
 #endif

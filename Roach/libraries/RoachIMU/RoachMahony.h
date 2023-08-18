@@ -24,6 +24,17 @@ class RoachMahony
             invSampleFreq = 1.0f / samp_freq;
         };
 
+        void reset(void)
+        {
+            q0 = 1.0f;
+            q1 = 0.0f;
+            q2 = 0.0f;
+            q3 = 0.0f;
+            integralFBx = 0.0f;
+            integralFBy = 0.0f;
+            integralFBz = 0.0f;
+        };
+
         // gx gy gz expects units deg/sec
         // ax ay az expects unit-less, will be normalized to 1G internally
         // dt specified in seconds

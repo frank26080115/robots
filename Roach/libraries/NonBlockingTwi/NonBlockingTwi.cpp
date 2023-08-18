@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NBTWI_ENABLE_DEBUG
+//#define NBTWI_ENABLE_DEBUG
 
 #ifdef NBTWI_ENABLE_DEBUG
 extern uint32_t getFreeRam(void);
@@ -22,6 +22,9 @@ enum
     NBTWI_SM_SUSPEND,
     NBTWI_SM_ERROR,
     NBTWI_SM_TIMEOUT,
+    NBTWI_SM_FORCESTOP,
+    NBTWI_SM_FORCESTOP_WAIT,
+    NBTWI_SM_FORCESTOP_WAIT2,
 };
 
 static uint32_t pin_scl, pin_sda;
@@ -316,13 +319,60 @@ static void nbtwi_checkTimeout(void)
 
 static void nbtwi_runStateMachine(void)
 {
+    if (nbtwi_statemachine == NBTWI_SM_FORCESTOP)
+    {
+        NRF_TWIM0->TASKS_STOP = 0x1UL;
+        taskstop_time = millis();
+        nbtwi_statemachine = NBTWI_SM_FORCESTOP_WAIT;
+        return;
+    }
+    else if (nbtwi_statemachine == NBTWI_SM_FORCESTOP_WAIT)
+    {
+        if (NRF_TWIM0->EVENTS_STOPPED)
+        {
+            NRF_TWIM0->EVENTS_STOPPED = 0;
+            nbtwi_statemachine = NBTWI_SM_FORCESTOP_WAIT2;
+            
+        }
+        else if ((millis() - taskstop_time) >= 200 && taskstop_time > 0)
+        {
+            nbtwi_statemachine = NBTWI_SM_FORCESTOP_WAIT2;
+            xfer_done = true;
+            idle_timestamp = millis();
+        }
+        if (nbtwi_statemachine != NBTWI_SM_FORCESTOP_WAIT)
+        {
+            NRF_TWIM0->EVENTS_STOPPED   = 0;
+            NRF_TWIM0->EVENTS_ERROR     = 0;
+            NRF_TWIM0->EVENTS_TXSTARTED = 0;
+            NRF_TWIM0->EVENTS_RXSTARTED = 0;
+            NRF_TWIM0->EVENTS_LASTTX    = 0;
+            NRF_TWIM0->EVENTS_LASTRX    = 0;
+            NRF_TWIM0->EVENTS_SUSPENDED = 0;
+            NRF_TWIM0->ENABLE           = 0;
+            taskstop_time = millis();
+        }
+        return;
+    }
+    else if (nbtwi_statemachine == NBTWI_SM_FORCESTOP_WAIT2)
+    {
+        if ((millis() - taskstop_time) >= 25)
+        {
+            NRF_TWIM0->ENABLE = (TWIM_ENABLE_ENABLE_Enabled << TWIM_ENABLE_ENABLE_Pos);
+            xfer_done = true;
+            idle_timestamp = millis();
+            nbtwi_statemachine = NBTWI_SM_IDLE;
+        }
+        return;
+    }
+
     if (nbtwi_statemachine == NBTWI_SM_STARTED)
     {
         if (NRF_TWIM0->EVENTS_ERROR)
         {
             NRF_TWIM0->EVENTS_ERROR = 0;
             xfer_err = NRF_TWIM0->ERRORSRC;
-            NRF_TWIM0->ERRORSRC = xfer_err;
+            NRF_TWIM0->ERRORSRC = 0;
             NRF_TWIM0->TASKS_STOP = 0x1UL;
             nbtwi_statemachine = NBTWI_SM_ERROR;
             taskstop_time = millis();
@@ -351,7 +401,7 @@ static void nbtwi_runStateMachine(void)
         {
             NRF_TWIM0->EVENTS_ERROR = 0;
             xfer_err = NRF_TWIM0->ERRORSRC;
-            NRF_TWIM0->ERRORSRC = xfer_err;
+            NRF_TWIM0->ERRORSRC = 0;
             NRF_TWIM0->TASKS_STOP = 0x1UL;
             nbtwi_statemachine = NBTWI_SM_ERROR;
             taskstop_time = millis();
@@ -414,7 +464,7 @@ static void nbtwi_runStateMachine(void)
             xfer_done = true;
             idle_timestamp = millis();
         }
-        else if ((millis() - taskstop_time) >= 10 && taskstop_time > 0)
+        else if ((millis() - taskstop_time) >= 50 && taskstop_time > 0)
         {
             xfer_err_last = (nbtwi_statemachine == NBTWI_SM_ERROR) ? xfer_err : 0;
             nbtwi_statemachine = NBTWI_SM_IDLE;
@@ -560,6 +610,23 @@ bool nbtwi_hasError(bool clr)
 int nbtwi_lastError(void)
 {
     return xfer_err_last;
+}
+
+void nbtwi_forceStop(void)
+{
+    nbtwi_statemachine = NBTWI_SM_FORCESTOP;
+    xfer_done = false;
+    while (tx_head != NULL)
+    {
+        if (tx_tail == tx_head)
+        {
+            tx_tail = NULL;
+        }
+        nbtwi_node_t* next = (nbtwi_node_t*)(tx_head->next);
+        free(tx_head->data);
+        free(tx_head);
+        tx_head = next;
+    }
 }
 
 uint8_t nbtwi_scan(uint8_t start)

@@ -23,6 +23,7 @@ int  nbtwi_lastError(void);
 bool nbtwi_hasResult(void);
 bool nbtwi_readResult(uint8_t* data, int len, bool clr);
 void nbtwi_transfer(void);
+void nbtwi_forceStop(void);
 
 uint8_t nbtwi_scan(uint8_t start);
 
