@@ -44,6 +44,9 @@ typedef struct
     int32_t x;
     int32_t y;
     int32_t z;
+    float roll;
+    float pitch;
+    float yaw;
 }
 __attribute__ ((packed))
 imu_lsm_cal_t;

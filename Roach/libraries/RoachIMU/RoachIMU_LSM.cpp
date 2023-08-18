@@ -297,6 +297,8 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
     int32_t gyro_y32 = pkt->gyro_y;
     int32_t gyro_z32 = pkt->gyro_z;
 
+    bool need_cal = false;
+
     if (tare_time != 0) // calibration active
     {
         tare_x += gyro_x32;
@@ -319,6 +321,7 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
                 calib->z = roach_div_rounded(tare_z, tare_cnt);
                 dbgcalib_printf(" = [ %d , %d , %d ] \r\n", calib->x, calib->y, calib->z);
                 ahrs->reset();
+                need_cal = true;
             }
         }
     }
@@ -344,12 +347,28 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
 
     // accel data is unitless when used inside AHRS
 
-    ahrs->updateIMU(gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z);
+    if (need_cal == false) {
+        ahrs->updateIMU(gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z);
+    }
+    else {
+        ahrs->updateIMU(0, 0, 0, accel_x, accel_y, accel_z);
+    }
 
     // convert radians to degrees
     eu->roll  = ahrs->roll  * RAD_TO_DEG;
     eu->pitch = ahrs->pitch * RAD_TO_DEG;
     eu->yaw   = ahrs->yaw   * RAD_TO_DEG;
+
+    if (need_cal) { // remember angle calibration
+        calib->roll  = eu->roll;
+        calib->pitch = eu->pitch;
+        calib->yaw   = eu->yaw;
+    }
+    else if (calib != NULL) { // apply angle calibration if available
+        eu->roll  -= calib->roll;
+        eu->pitch -= calib->pitch;
+        eu->yaw   -= calib->yaw;
+    }
 }
 
 void RoachIMU_LSM::tare(void)
