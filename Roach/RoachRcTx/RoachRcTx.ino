@@ -60,11 +60,11 @@ RoachButton btn_d7     = RoachButton(ROACHHW_PIN_BTN_D7 , true, 0, 50);
 RoachButton btn_sw4    = RoachButton(ROACHHW_PIN_BTN_SW4);
 #endif
 
-RoachPot pot_throttle = RoachPot(ROACHHW_PIN_POT_THROTTLE, &(nvm_tx.pot_throttle));
-RoachPot pot_steering = RoachPot(ROACHHW_PIN_POT_STEERING, &(nvm_tx.pot_steering));
-RoachPot pot_weapon   = RoachPot(ROACHHW_PIN_POT_WEAPON  , &(nvm_tx.pot_weapon));
-RoachPot pot_aux      = RoachPot(ROACHHW_PIN_POT_AUX     , &(nvm_tx.pot_aux));
-RoachPot pot_battery  = RoachPot(ROACHHW_PIN_POT_BATTERY , &(nvm_tx.pot_battery));
+RoachPot pot_throttle = RoachPot(ROACHHW_PIN_POT_THROTTLE, &(nvm_tx.pot_throttle), ROACHHW_POT_GAIN_THROTTLE);
+RoachPot pot_steering = RoachPot(ROACHHW_PIN_POT_STEERING, &(nvm_tx.pot_steering), ROACHHW_POT_GAIN_STEERING);
+RoachPot pot_weapon   = RoachPot(ROACHHW_PIN_POT_WEAPON  , &(nvm_tx.pot_weapon  ), ROACHHW_POT_GAIN_WEAPON  );
+RoachPot pot_aux      = RoachPot(ROACHHW_PIN_POT_AUX     , &(nvm_tx.pot_aux     ), ROACHHW_POT_GAIN_AUX     );
+RoachPot pot_battery  = RoachPot(ROACHHW_PIN_POT_BATTERY , &(nvm_tx.pot_battery ), ROACHHW_POT_GAIN_BATTERY );
 
 extern roach_nvm_gui_desc_t cfgdesc_ctrler[];
 

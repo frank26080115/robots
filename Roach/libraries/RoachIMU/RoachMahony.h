@@ -10,7 +10,7 @@
 class RoachMahony
 {
     public:
-        RoachMahony(float prop_gain = twoKpDef, float int_gain = twoKiDef, float samp_freq = ROACHMAHONY_DEFAULT_SAMPLE_FREQ)
+        RoachMahony(float samp_freq = ROACHMAHONY_DEFAULT_SAMPLE_FREQ, float prop_gain = twoKpDef, float int_gain = twoKiDef)
         {
             twoKp = prop_gain; // 2 * proportional gain (Kp)
             twoKi = int_gain;  // 2 * integral gain (Ki)

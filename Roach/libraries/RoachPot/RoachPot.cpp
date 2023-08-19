@@ -103,7 +103,7 @@ void RoachPot::task(void)
     x32 = last_adc;
     if (state_machine == ROACHPOT_SM_CALIB_CENTER)
     {
-        calib_sum += last_val;
+        calib_sum += last_adc;
         calib_cnt += 1;
         if ((millis() - calib_start_time) >= 500)
         {

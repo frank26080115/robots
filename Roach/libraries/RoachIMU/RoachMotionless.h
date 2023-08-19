@@ -62,13 +62,10 @@ class RoachMotionless
             *z = _avg_gyro_z;
         };
 
-        inline bool isDone(void) {
-            return _done;
-        };
-
-        inline uint16_t getLastReason(void) {
-            return _reason_code;
-        };
+        inline bool     isDone             (void) { return _done;        };
+        inline uint16_t getLastReason      (void) { return _reason_code; };
+        inline uint32_t getAccumAccelDeltas(void) { return _dsum_accel;  };
+        inline uint32_t getAccumGyroDeltas (void) { return _dsum_gyro;   };
 
         bool update(uint32_t now, int32_t gx, int32_t gy, int32_t gz, int32_t ax, int32_t ay, int32_t az)
         {
@@ -91,10 +88,7 @@ class RoachMotionless
                 return true;
             }
 
-            if (now < _timewin_min) {
-                return false;
-            }
-            if (now > _timewin_max) {
+            if (now > _timewin_max && _timewin_max > 0) {
                 return false;
             }
 
@@ -211,7 +205,7 @@ class RoachMotionless
             _avg_gyro_z += gz;
             _sample_cnt += 1;
 
-            if ((now - _time_start) >= _time_ms && _sample_cnt >= _min_samples) {
+            if ((now - _time_start) >= _time_ms && _sample_cnt >= _min_samples && now > _timewin_min) {
                 _avg_gyro_x = roach_div_rounded(_avg_gyro_x, _sample_cnt);
                 _avg_gyro_y = roach_div_rounded(_avg_gyro_y, _sample_cnt);
                 _avg_gyro_z = roach_div_rounded(_avg_gyro_z, _sample_cnt);

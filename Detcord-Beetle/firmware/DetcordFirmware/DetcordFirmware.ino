@@ -78,9 +78,7 @@ bool log_active = true;
 
 void setup()
 {
-    sd_softdevice_disable();
-    // hmmm, the radio initialization also disables softdevice
-    // but if this is at the top of setup(), then the IMU seems drastically more reliable
+    //sd_softdevice_disable();
 
     #ifdef DEVMODE_WAIT_SERIAL_INIT
     Serial.begin(19200);
@@ -196,24 +194,29 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
             heading_mgr.setReset();
             pid.reset();
         }
-        #ifndef ROACHIMU_AUTO_MATH
-        else if (imu.hasNew(false)) {
-            imu.doMath();
+        else
+        {
+            mixer.setUpsideDown(imu.is_inverted);
+            #ifndef ROACHIMU_AUTO_MATH
+            if (imu.hasNew(false)) {
+                imu.doMath();
+            }
+            #endif
         }
-        #endif
         heading_mgr.task(&rx_pkt, imu.heading, radio.getSessionId());
 
         gyro_corr = pid.compute(heading_mgr.getCurHeading(), heading_mgr.getTgtHeading());
     }
     else
     {
+        mixer.setUpsideDown(false);
         gyro_corr = 0;
         heading_mgr.setReset();
         pid.reset();
     }
 
     mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
-    drive_left.writeMicroseconds (mixer.getLeft ());
+    drive_left .writeMicroseconds(mixer.getLeft ());
     drive_right.writeMicroseconds(mixer.getRight());
 
     if ((rx_pkt.flags & ROACHPKTFLAG_WEAPON) != 0)

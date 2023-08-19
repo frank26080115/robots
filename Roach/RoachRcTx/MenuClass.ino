@@ -318,7 +318,7 @@ void RoachMenuCfgItemEditor::onButton(uint8_t btn)
 void RoachMenuCfgItemEditor::checkButtons(void)
 {
     RoachMenu::checkButtons(); // this will call RoachMenuCfgItemEditor::onButton if needed
-    modVal(-RoachEnc_get(true));
+    modVal(RoachEnc_get(true));
 }
 
 void RoachMenuCfgItemEditor::modVal(int x)

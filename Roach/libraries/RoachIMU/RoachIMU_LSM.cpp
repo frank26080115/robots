@@ -5,6 +5,8 @@
 #include "RoachIMU_LSM.h"
 #include "lsm_reg.h"
 
+#define ROACHIMU_AUTO_MOTIONLESS_CALIB
+
 #define debug_printf(...)                 // do nothing
 //#define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)
 //#define dbgcalib_printf(...)            // do nothing
@@ -19,26 +21,14 @@ static const uint8_t lsm6ds3_init_table[][2] =
     { LSM6DS3_REG_CTRL1_XL, 0x54 }, // set the accelerometer control register to work at 208 Hz, 16 g
     { LSM6DS3_REG_CTRL7_G , 0x00 }, // set gyroscope power mode to high performance and bandwidth to 16 MHz
     { LSM6DS3_REG_CTRL2_G , 0x5C }, // set the gyroscope control register to work at 208 Hz, 2000 dps and in bypass mode
-
     { LSM6DS3_REG_CTRL3_C , 0x44 }, // enable BDU block update, enable auto-inc address, interrupt pin active-high push-pull
-
-    #ifdef LSM6DS3_USE_FIFO
-    { LSM6DS3_REG_FIFO_CTRL1, 0x05 },   // FIFO threshold low
-    { LSM6DS3_REG_FIFO_CTRL2, 0x00 },   // FIFO threshold high
-    { LSM6DS3_REG_FIFO_CTRL3, 0x09 },   // enable both gyro and accel, no decimation
-    //{ LSM6DS3_REG_FIFO_CTRL4, 0x00 }, // FIFO_CTRL4 not used
-    { LSM6DS3_REG_FIFO_CTRL5, 0x26 },   // 104 Hz, continuous mode
-    { LSM6DS3_REG_ORIENT_CFG_G, 0x00 }, // dataready in latched mode
-    { LSM6DS3_REG_INT1_CTRL, 0x08 },    // interrupt on FIFO threshold
-    #else
     //{ LSM6DS3_REG_INT1_CTRL, 0x02 },    // interrupt on gyro data // commented out, reliability issues when interrupt is being used
-    #endif
-
     { 0xFF, 0xFF }, // end of table
 };
 
 typedef struct
 {
+    //int16_t temperature;
     int16_t  gyro_x;
     int16_t  gyro_y;
     int16_t  gyro_z;
@@ -65,21 +55,23 @@ RoachIMU_LSM::RoachIMU_LSM(int orientation, int dev_addr, int pwr_pin, int irq_p
     instance = this;
     is_ready = false;
     ahrs = new RoachMahony();
+    #ifdef ROACHIMU_AUTO_MOTIONLESS_CALIB
     motionless = new RoachMotionless(
         200,         // instantaneous acceleration limit
-        0,           // limit on the sum of deltas
+        6000,        // limit on the sum of deltas
         12,          // limit on each individual delta
         16,          // limit on difference between min and max
         2250,        // instantaneous 3 axis acceleration magnitude limit
         32,          // instantaneous gyro limit
-        0,           // limit on the sum of deltas
+        1500,        // limit on the sum of deltas
         4,           // limit on each individual delta
         8,           // limit on difference between min and max
         50 * 100,    // time to hold still
         500,         // minimum samples required
         3000,        // time window millis minimum
-        20000        // time window millis maximum
+        0            // time window millis maximum
     );
+    #endif
 }
 
 void RoachIMU_LSM::begin(void)
@@ -110,7 +102,7 @@ void RoachIMU_LSM::task(void)
     switch (state_machine)
     {
         case ROACHIMU_SM_PWR:
-            if ((millis() - pwr_time) >= 15) {
+            if ((millis() - pwr_time) >= 25) { // this is time between power up and start of config
                 state_machine = ROACHIMU_SM_SETUP;
                 init_idx = 0;
                 debug_printf("RoachIMU entering SETUP state\r\n");
@@ -193,12 +185,9 @@ void RoachIMU_LSM::task(void)
                 if (to_read)
                 {
                     sample_time = now;
-                    #ifdef LSM6DS3_USE_FIFO
-                    tx_buff[0] = LSM6DS3_REG_FIFO_DATA_OUT_L;
-                    #else
                     tx_buff[0] = LSM6DS3_REG_OUTX_L_G;
-                    #endif
-                    nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 1, true);
+                    //tx_buff[0] = LSM6DS3_REG_OUT_TEMP_L;
+                    nbtwi_write(i2c_addr, (uint8_t*)tx_buff, 1, false);
                     nbtwi_read(i2c_addr, sizeof(lsm_data_t));
                     state_machine = ROACHIMU_SM_RUN_WAIT2;
                 }
@@ -288,11 +277,11 @@ void RoachIMU_LSM::task(void)
             break;
         case ROACHIMU_SM_PWROFF:
             {
-                if ((millis() - pwr_time) >= 15) {
+                if ((millis() - pwr_time) >= 25) { // this is time between power down and power up
                     pwr_time = millis();
                     XiaoBleSenseLsm_powerOn(pin_pwr);
                     state_machine = ROACHIMU_SM_PWR;
-                    dbgerr_printf("RoachIMU pwr on again\r\n");
+                    dbgerr_printf("RoachIMU pwr on again, %u\r\n", perm_fail);
                 }
             }
             break;
@@ -342,6 +331,7 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
             }
         }
     }
+    #ifdef ROACHIMU_AUTO_MOTIONLESS_CALIB
     else if (tare_time == 0 && calib == NULL && motionless->isDone() == false)
     {
         bool mlsuc = motionless->update(millis(), pkt->gyro_x, pkt->gyro_y, pkt->gyro_z, pkt->accel_x, pkt->accel_y, pkt->accel_z);
@@ -356,7 +346,7 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
                 calib->x = cx;
                 calib->y = cy;
                 calib->z = cz;
-                dbgcalib_printf("IMU motionless calib done [ %d , %d , %d ] \r\n", calib->x, calib->y, calib->z);
+                dbgcalib_printf("IMU motionless calib done [ %d , %d , %d ] (%u , %u)\r\n", calib->x, calib->y, calib->z, motionless->getAccumAccelDeltas(), motionless->getAccumGyroDeltas());
                 ahrs->reset();
                 need_cal = true;
             }
@@ -375,6 +365,7 @@ void RoachIMU_LSM::writeEuler(euler_t* eu)
             #endif
         }
     }
+    #endif
 
     // apply calibration if available
     if (calib != NULL)

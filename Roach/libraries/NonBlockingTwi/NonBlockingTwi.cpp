@@ -20,6 +20,7 @@ enum
     NBTWI_SM_WAIT,
     NBTWI_SM_STOP,
     NBTWI_SM_SUSPEND,
+    NBTWI_SM_RESUMED,
     NBTWI_SM_ERROR,
     NBTWI_SM_TIMEOUT,
     NBTWI_SM_FORCESTOP,
@@ -41,6 +42,8 @@ static volatile uint32_t xfer_err = 0;
 static volatile uint32_t xfer_err_last = 0;
 static volatile uint32_t xfer_time = 0;
 static volatile uint32_t xfer_time_est = 0;
+static volatile bool     resume_required = false;
+static volatile int      start_retry = 0;
 static volatile uint32_t idle_timestamp = 0;
 static volatile uint32_t taskstop_time = 0;
 static volatile uint16_t timeout_location;
@@ -80,6 +83,15 @@ static volatile uint32_t* pincfg_reg(uint32_t pin)
     NRF_GPIO_Type * port = nrf_gpio_pin_port_decode(&pin);
     return &port->PIN_CNF[pin];
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern nrfx_err_t nrfx_twi_twim_bus_recover(uint32_t scl_pin, uint32_t sda_pin);
+// note: this function does not help
+#ifdef __cplusplus
+}
+#endif
 
 void nbtwi_init(int scl, int sda, int bufsz, bool highspeed)
 {
@@ -343,10 +355,14 @@ static void nbtwi_checkTimeout(uint16_t location)
             | (((NRF_TWIM0->RXD.AMOUNT >= NRF_TWIM0->RXD.MAXCNT) ? 1 : 0) << 7)
         ;
 
+        #if 1
         if (timeout_flags == 0x80)
         {
             nbtwi_statemachine = NBTWI_SM_FORCESTOP;
         }
+        #else
+        nrfx_twi_twim_bus_recover(g_ADigitalPinMap[pin_scl], g_ADigitalPinMap[pin_sda]);
+        #endif
     }
 }
 
@@ -407,7 +423,7 @@ static void nbtwi_runStateMachine(void)
         return;
     }
 
-    if (nbtwi_statemachine == NBTWI_SM_STARTED)
+    if (nbtwi_statemachine == NBTWI_SM_STARTED || nbtwi_statemachine == NBTWI_SM_RESUMED)
     {
         if (NRF_TWIM0->EVENTS_ERROR)
         {
@@ -430,6 +446,26 @@ static void nbtwi_runStateMachine(void)
                 NRF_TWIM0->EVENTS_RXSTARTED = 0;
                 nbtwi_statemachine = NBTWI_SM_WAIT;
             }
+            else if (nbtwi_statemachine == NBTWI_SM_RESUMED)
+            {
+                NRF_TWIM0->TASKS_RESUME = 1UL;
+                nbtwi_statemachine = NBTWI_SM_STARTED;
+                resume_required = false;
+            }
+            #if 0
+            else if (start_retry < 2 && xfer_time_est != 0 && (millis() - xfer_time) >= xfer_time_est)
+            {
+                NRF_TWIM0->TASKS_RESUME = 1UL;
+                if (nbtwi_isTx) {
+                    NRF_TWIM0->TASKS_STARTTX = 1UL;
+                }
+                else {
+                    NRF_TWIM0->TASKS_STARTRX = 1UL;
+                }
+                start_retry++;
+                xfer_time = millis();
+            }
+            #endif
             else
             {
                 nbtwi_checkTimeout(__LINE__);
@@ -491,6 +527,7 @@ static void nbtwi_runStateMachine(void)
         {
             NRF_TWIM0->EVENTS_SUSPENDED = 0;
             nbtwi_statemachine = NBTWI_SM_IDLE;
+            resume_required = true;
             xfer_done = true;
             idle_timestamp = millis();
         }
@@ -605,12 +642,15 @@ void nbtwi_task(void)
             {
                 NRF_TWIM0->TASKS_STARTRX  = 0x1UL;
                 nbtwi_isTx = false;
-                nbtwi_statemachine = NBTWI_SM_STARTED;
+                nbtwi_statemachine = resume_required ? NBTWI_SM_RESUMED : NBTWI_SM_STARTED;
             }
             else
             {
                 Serial.printf("ERROR [%u] NBTWI did not actually start transaction\r\n", millis());
             }
+
+            resume_required = false;
+            start_retry = 0;
 
             #ifdef NBTWI_ENABLE_DEBUG
             if ((tx_head->flags & NBTWI_FLAG_RWMASK) == NBTWI_FLAG_WRITE)

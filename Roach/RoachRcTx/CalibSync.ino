@@ -58,6 +58,7 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            oled.clearDisplay();
             draw_title();
             draw_sidebar();
             int y = 11;
@@ -80,11 +81,11 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
         {
             pots_locked = true;
             RoachMenu::onEnter();
+            debug_printf("[%u] calib ADC centers\r\n", millis());
             pot_throttle.calib_center();
             pot_steering.calib_center();
             pot_weapon.calib_center();
             pot_aux.calib_center();
-            settings_markDirty();
         };
 
         virtual void onExit(void)
@@ -95,6 +96,7 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
             pot_aux.calib_stop();
             pots_locked = false;
             settings_markDirty();
+            debug_printf("[%u] calib ADC centers done\r\n", millis());
         };
 
         virtual void draw_sidebar(void)
@@ -125,7 +127,6 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
         };
 };
 
-
 class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
 {
     public:
@@ -135,33 +136,40 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
 
         virtual void draw(void)
         {
+            oled.clearDisplay();
             draw_title();
             draw_sidebar();
             int y = 11;
             oled.setCursor(0, y);
-            oled.printf("T: %d <> %d", pot_throttle.cfg->limit_min, pot_throttle.cfg->limit_max);
+            if (scroll == 0) { oled.write(GUISYMB_THIS_ARROW); } else { oled.write(' '); }
+            oled.printf("T: %d - %d", pot_throttle.cfg->limit_min, pot_throttle.cfg->limit_max);
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("S: %d <> %d", pot_steering.cfg->limit_min, pot_steering.cfg->limit_max);
+            if (scroll == 1) { oled.write(GUISYMB_THIS_ARROW); } else { oled.write(' '); }
+            oled.printf("S: %d - %d", pot_steering.cfg->limit_min, pot_steering.cfg->limit_max);
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("W: %d <> %d", pot_weapon.cfg->limit_min, pot_weapon.cfg->limit_max);
+            if (scroll == 2) { oled.write(GUISYMB_THIS_ARROW); } else { oled.write(' '); }
+            oled.printf("W: %d - %d", pot_weapon.cfg->limit_min, pot_weapon.cfg->limit_max);
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("A: %d <> %d", pot_aux.cfg->limit_min, pot_aux.cfg->limit_max);
+            if (scroll == 3) { oled.write(GUISYMB_THIS_ARROW); } else { oled.write(' '); }
+            oled.printf("A: %d - %d", pot_aux.cfg->limit_min, pot_aux.cfg->limit_max);
             y += ROACHGUI_LINE_HEIGHT;
         };
 
     protected:
+        uint8_t scroll = 0; // navigates items
+
         virtual void onEnter(void)
         {
             pots_locked = true;
             RoachMenu::onEnter();
+            debug_printf("[%u] calib ADC limits\r\n", millis());
             pot_throttle.calib_limits();
             pot_steering.calib_limits();
             pot_weapon.calib_limits();
             pot_aux.calib_limits();
-            settings_markDirty();
         };
 
         virtual void onExit(void)
@@ -172,6 +180,7 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
             pot_aux.calib_stop();
             pots_locked = false;
             settings_markDirty();
+            debug_printf("[%u] calib ADC limits done\r\n", millis());
         };
 
         virtual void draw_sidebar(void)
@@ -189,10 +198,27 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
             RoachMenuFunctionItem::onButton(btn);
             switch (btn)
             {
+                case BTNID_UP:
+                    scroll = scroll > 0 ? (scroll - 1) : 3;
+                    break;
+                case BTNID_DOWN:
+                    scroll = scroll < 4 ? (scroll + 1) : 0;
+                    break;
+                case BTNID_CENTER:
+                    {
+                        roach_nvm_pot_t* potcfg = get_potCfgAt(scroll);
+                        if (potcfg != NULL)
+                        {
+                            potcfg->limit_max = 0;
+                            potcfg->limit_min = 0x7FFF;
+                        }
+                    }
+                    break;
                 case BTNID_G6:
                     _exit = EXITCODE_BACK;
                     break;
                 case BTNID_G5:
+                    debug_printf("[%u] calib ADC redo\r\n", millis());
                     pot_throttle.calib_limits();
                     pot_steering.calib_limits();
                     pot_weapon.calib_limits();
@@ -517,6 +543,7 @@ class RoachMenuCalibSync : public RoachMenuLister
                         _exit = EXITCODE_RIGHT;
                         break;
                     case BTNID_CENTER:
+                    case BTNID_G5:
                         {
                             RoachMenuFunctionItem* itm = (RoachMenuFunctionItem*)getNodeAt(_list_idx);
                             itm->run();
@@ -530,4 +557,36 @@ class RoachMenuCalibSync : public RoachMenuLister
 void menu_install_calibSync(void)
 {
     menu_install(new RoachMenuCalibSync());
+}
+
+
+roach_nvm_pot_t* get_potCfgAt(int idx)
+{
+    switch(idx)
+    {
+        case 0: return pot_throttle.cfg;
+        case 1: return pot_steering.cfg;
+        case 2: return pot_weapon  .cfg;
+        case 3: return pot_aux     .cfg;
+    }
+    return NULL;
+}
+
+void debug_pot_calib(roach_nvm_pot_t* calib)
+{
+    int16_t* ptr = (int16_t*)calib;
+    int i, sz = sizeof(roach_nvm_pot_t) / sizeof(int16_t);
+    for (i = 0; i < sz; i++) {
+        Serial.printf("%d , ", ptr[i]);
+    }
+}
+
+void debug_pot_calib_all(void)
+{
+    Serial.printf("[%u] debug pot calib\r\n", millis());
+    Serial.printf("pot_throttle: "); debug_pot_calib(pot_throttle.cfg); Serial.printf("\r\n");
+    Serial.printf("pot_steering: "); debug_pot_calib(pot_throttle.cfg); Serial.printf("\r\n");
+    Serial.printf("pot_weapon:   "); debug_pot_calib(pot_throttle.cfg); Serial.printf("\r\n");
+    Serial.printf("pot_aux:      "); debug_pot_calib(pot_throttle.cfg); Serial.printf("\r\n");
+    Serial.printf("==============\r\n");
 }

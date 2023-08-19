@@ -21,6 +21,7 @@ const cmd_def_t cmds[] = {
     { "hwreport"    , hwreport_func },
     { "rptenc"      , rptenc_func },
     { "rptbtnisr"   , rptbtnisr_func },
+    { "rptpotcal"   , rptpotcal_func },
     { "", NULL }, // end of table
 };
 
@@ -135,10 +136,10 @@ void dfuenter_func(void* cmd, char* argstr, Stream* stream)
     stream->printf("ENTERING DFU\r\n");
     waitFor(200);
     if (atoi(argstr) == 2) {
-        enterUf2Dfu();
+        enterSerialDfu();
     }
     else {
-        enterSerialDfu();
+        enterUf2Dfu();
     }
 }
 
@@ -253,4 +254,9 @@ void rptbtnisr_func(void* cmd, char* argstr, Stream* stream)
 void rptrosync_func(void* cmd, char* argstr, Stream* stream)
 {
     rosync_debugState(stream);
+}
+
+void rptpotcal_func(void* cmd, char* argstr, Stream* stream)
+{
+    debug_pot_calib_all();
 }
