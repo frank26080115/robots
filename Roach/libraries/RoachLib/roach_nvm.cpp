@@ -78,10 +78,12 @@ void roachnvm_setval_inner(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm, 
     int typecode_len;
     strcpy(typecode, desc_itm->type_code);
     typecode_len = strlen(typecode);
-    for (int i = 2; i < typecode_len; i++) {
-        if (typecode[i] == 'x') {
-            typecode[i] = 0;
-            break;
+    if (strcmp("hex", typecode) != 0) {
+        for (int i = 2; i < typecode_len; i++) {
+            if (typecode[i] == 'x') {
+                typecode[i] = 0;
+                break;
+            }
         }
     }
 
@@ -174,10 +176,12 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
     int typecode_len;
     strcpy(typecode, desc_itm->type_code);
     typecode_len = strlen(typecode);
-    for (int i = 2; i < typecode_len; i++) {
-        if (typecode[i] == 'x') {
-            typecode[i] = 0;
-            break;
+    if (strcmp("hex", typecode) != 0) {
+        for (int i = 2; i < typecode_len; i++) {
+            if (typecode[i] == 'x') {
+                typecode[i] = 0;
+                break;
+            }
         }
     }
 
@@ -345,10 +349,12 @@ void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* d
     int typecode_len;
     strcpy(typecode, desc_itm->type_code);
     typecode_len = strlen(typecode);
-    for (int i = 2; i < typecode_len; i++) {
-        if (typecode[i] == 'x') {
-            typecode[i] = 0;
-            break;
+    if (strcmp("hex", typecode) != 0) {
+        for (int i = 2; i < typecode_len; i++) {
+            if (typecode[i] == 'x') {
+                typecode[i] = 0;
+                break;
+            }
         }
     }
 

@@ -139,7 +139,7 @@ bool settings_saveToFile(const char* fname)
 {
     debug_printf("[%u] settings_saveToFile \"%s\"\r\n", millis(), fname);
     RoachFile f;
-    bool suc = f.open(fname, O_RDWR | O_CREAT);
+    bool suc = f.open(fname, O_RDWR | O_CREAT | O_TRUNC);
     debug_printf("f.open = %u\r\n", suc);
     uint8_t flags = 0;
     if (memcmp(fname, "rf", 2) == 0) {
@@ -191,7 +191,7 @@ bool roachnvm_fileCopy(const char* fin_name, const char* fout_name)
         Serial.printf("ERR[%u]: roachnvm_fileCopy cannot open fin \"%s\"\r\n", millis(), fin_name);
         return false;
     }
-    suc = fout.open(fout_name, O_RDWR | O_CREAT);
+    suc = fout.open(fout_name, O_RDWR | O_CREAT | O_TRUNC);
     if (suc == false) {
         Serial.printf("ERR[%u]: roachnvm_fileCopy cannot open fout \"%s\"\r\n", millis(), fout_name);
         fin.close();
