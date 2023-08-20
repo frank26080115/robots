@@ -28,6 +28,12 @@
 #include "nrfx_qspi.h"
 #include <Arduino.h>
 
+// adding watchdog feeding here so long file operations don't crash
+// this is probably a bad idea
+#include "nrf_wdt.h"
+//#define ROACH_WDT_FEED()
+#define ROACH_WDT_FEED()    do { NRF_WDT->RR[0] = NRF_WDT_RR_VALUE; } while (0)
+
 Adafruit_FlashTransport_QSPI::Adafruit_FlashTransport_QSPI(void)
     : Adafruit_FlashTransport_QSPI(PIN_QSPI_SCK, PIN_QSPI_CS, PIN_QSPI_IO0,
                                    PIN_QSPI_IO1, PIN_QSPI_IO2, PIN_QSPI_IO3) {}
@@ -108,6 +114,7 @@ bool Adafruit_FlashTransport_QSPI::runCommand(uint8_t command) {
                                        .wipwait = false,
                                        .wren = false};
 
+  ROACH_WDT_FEED();
   return nrfx_qspi_cinstr_xfer(&cinstr_cfg, NULL, NULL) == NRFX_SUCCESS;
 }
 
@@ -121,6 +128,8 @@ bool Adafruit_FlashTransport_QSPI::readCommand(uint8_t command,
                                        .io3_level = true,
                                        .wipwait = false,
                                        .wren = false};
+
+  ROACH_WDT_FEED();
   return nrfx_qspi_cinstr_xfer(&cinstr_cfg, NULL, response) == NRFX_SUCCESS;
 }
 
@@ -135,6 +144,8 @@ bool Adafruit_FlashTransport_QSPI::writeCommand(uint8_t command,
       .wipwait = false,
       .wren = false // We do this manually.
   };
+
+  ROACH_WDT_FEED();
   return nrfx_qspi_cinstr_xfer(&cinstr_cfg, data, NULL) == NRFX_SUCCESS;
 }
 
@@ -150,6 +161,7 @@ bool Adafruit_FlashTransport_QSPI::eraseCommand(uint8_t command,
     return false;
   }
 
+  ROACH_WDT_FEED();
   return NRFX_SUCCESS == nrfx_qspi_erase(erase_len, address);
 }
 
@@ -158,11 +170,13 @@ bool Adafruit_FlashTransport_QSPI::eraseCommand(uint8_t command,
 //--------------------------------------------------------------------+
 static uint32_t read_write_odd(bool read_op, uint32_t addr, uint8_t *data,
                                uint32_t len) {
+  ROACH_WDT_FEED();
   uint8_t buf4[4] __attribute__((aligned(4)));
   uint32_t count = 4 - (((uint32_t)data) & 0x03);
   count = min(count, len);
 
   if (read_op) {
+    ROACH_WDT_FEED();
     if (NRFX_SUCCESS != nrfx_qspi_read(buf4, 4, addr)) {
       return 0;
     }
@@ -172,6 +186,7 @@ static uint32_t read_write_odd(bool read_op, uint32_t addr, uint8_t *data,
     memset(buf4, 0xff, 4);
     memcpy(buf4, data, count);
 
+    ROACH_WDT_FEED();
     if (NRFX_SUCCESS != nrfx_qspi_write(buf4, 4, addr)) {
       return 0;
     }
@@ -184,6 +199,7 @@ static bool read_write_memory(bool read_op, uint32_t addr, uint8_t *data,
                               uint32_t len) {
   // buffer is not 4-byte aligned
   if (((uint32_t)data) & 3) {
+    ROACH_WDT_FEED();
     uint32_t const count = read_write_odd(read_op, addr, data, len);
     if (!count) {
       return false;
@@ -201,10 +217,12 @@ static bool read_write_memory(bool read_op, uint32_t addr, uint8_t *data,
     uint32_t const len4 = len & ~(uint32_t)3;
 
     if (read_op) {
+      ROACH_WDT_FEED();
       if (NRFX_SUCCESS != nrfx_qspi_read(data, len4, addr)) {
         return 0;
       }
     } else {
+      ROACH_WDT_FEED();
       if (NRFX_SUCCESS != nrfx_qspi_write(data, len4, addr)) {
         return 0;
       }
@@ -218,6 +236,7 @@ static bool read_write_memory(bool read_op, uint32_t addr, uint8_t *data,
   // Now, if we have any bytes left over, we must do a final read of 4
   // bytes and copy 1, 2, or 3 bytes to data.
   if (len) {
+    ROACH_WDT_FEED();
     if (!read_write_odd(read_op, addr, data, len)) {
       return false;
     }
@@ -228,12 +247,14 @@ static bool read_write_memory(bool read_op, uint32_t addr, uint8_t *data,
 
 bool Adafruit_FlashTransport_QSPI::readMemory(uint32_t addr, uint8_t *data,
                                               uint32_t len) {
+  ROACH_WDT_FEED();
   return read_write_memory(true, addr, data, len);
 }
 
 bool Adafruit_FlashTransport_QSPI::writeMemory(uint32_t addr,
                                                uint8_t const *data,
                                                uint32_t len) {
+  ROACH_WDT_FEED();
   return read_write_memory(false, addr, (uint8_t *)data, len);
 }
 

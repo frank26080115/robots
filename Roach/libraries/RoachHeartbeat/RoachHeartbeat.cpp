@@ -1,5 +1,4 @@
 #include "RoachHeartbeat.h"
-#include "RoachHeartbeat.h"
 #include "nrf_wdt.h"
 #include "wiring_private.h"
 
