@@ -522,6 +522,7 @@ class RoachMenuCalibSync : public RoachMenuLister
             addNode((RoachMenuListItem*)(new RoachMenuFuncUsbMsd()));
             addNode((RoachMenuListItem*)(new RoachMenuFuncRegenRf()));
             //addNode((RoachMenuListItem*)(new RoachMenuFuncFactoryReset()));
+            _can_autoexit = true;
         };
 
     protected:

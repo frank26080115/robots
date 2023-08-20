@@ -23,6 +23,7 @@ const cmd_def_t cmds[] = {
     { "rptenc"      , rptenc_func },
     { "rptbtnisr"   , rptbtnisr_func },
     { "rptpotcal"   , rptpotcal_func },
+    { "rptbatt"     , rptbatt_func },
     { "", NULL }, // end of table
 };
 
@@ -41,14 +42,18 @@ void hwreport_func(void* cmd, char* argstr, Stream* stream)
 void factory_reset_func(void* cmd, char* argstr, Stream* stream)
 {
     settings_factoryReset();
-    if (atoi(argstr) == 2)
+    if (atoi(argstr) == 123)
     {
+        volatile uint32_t t_start = millis();
+        volatile uint32_t t_end;
         if (settings_save()) {
             stream->println("factory reset performed and saved");
         }
         else {
             stream->println("factory reset saving failed");
         }
+        t_end = millis();
+        stream->printf("time taken = %u ms\r\n", t_end - t_start);
     }
     else
     {
@@ -58,6 +63,13 @@ void factory_reset_func(void* cmd, char* argstr, Stream* stream)
 
 void nvmdebug_func(void* cmd, char* argstr, Stream* stream)
 {
+    stream->printf("flash JEDEC ID 0x%08X\r\n", RoachUsbMsd_getJedecId());
+    stream->printf("FS can save? %u\r\n", RoachUsbMsd_canSave());
+    stream->printf("flash size = %u\r\n", RoachUsbMsd_getFlashSize());
+    if (RoachUsbMsd_canSave()) {
+        stream->printf("FS free space = %u\r\n", RoachUsbMsd_getFreeSpace());
+    }
+
     settings_debugNvm(stream);
     settings_debugListFiles(stream);
 }
@@ -272,4 +284,9 @@ void rptrosync_func(void* cmd, char* argstr, Stream* stream)
 void rptpotcal_func(void* cmd, char* argstr, Stream* stream)
 {
     debug_pot_calib_all();
+}
+
+void rptbatt_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("[%u]: batt ADC %u\r\n", millis(), pot_battery.getAdcRaw());
 }

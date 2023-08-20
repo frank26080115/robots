@@ -2,6 +2,7 @@
 
 RoachMenuFileOpenList::RoachMenuFileOpenList() : RoachMenuLister(MENUID_CONFIG_FILELOAD)
 {
+    _can_autoexit = false;
 }
 
 void RoachMenuFileOpenList::draw_sidebar(void)
@@ -81,7 +82,8 @@ void RoachMenuFileOpenList::onButton(uint8_t btn)
 
 RoachMenuFileSaveList::RoachMenuFileSaveList(const char* filter) : RoachMenuLister(0)
 {
-    strncpy(_filter, filter, 14);
+    strncpy0(_filter, filter, 14);
+    _can_autoexit = false;
 }
 
 void RoachMenuFileSaveList::draw_sidebar(void)
@@ -151,30 +153,39 @@ void RoachMenuFileSaveList::onButton(uint8_t btn)
 
                     if (strcmp(x, "NEW FILE") == 0 && _filter[0] != 0)
                     {
-                        _newfilename[0] = '/'; // optional space with the root slash
-                        bool can_save = false;
-                        int i;
-                        for (i = 1; i <= 9999; i++)
+                        if (fatroot.open("/"))
                         {
-                            sprintf(&(_newfilename[1]), "%s_%u.txt", _filter, i);
-                            if (fatroot.exists(&(_newfilename[1])) == false)
+                            _newfilename[0] = '/'; // optional space with the root slash
+                            bool can_save = false;
+                            int i;
+                            for (i = 1; i <= 9999; i++)
                             {
-                                can_save = true;
-                                break;
+                                sprintf(&(_newfilename[1]), "%s_%u.txt", _filter, i);
+                                if (fatroot.exists(&(_newfilename[1])) == false)
+                                {
+                                    can_save = true;
+                                    debug_printf("[%u] new file name generated \"%s\"\r\n", millis(), _newfilename);
+                                    break;
+                                }
                             }
-                        }
-                        if (can_save)
-                        {
-                            if (settings_saveToFile(_newfilename)) {
-                                showMessage("new file saved to", _newfilename);
+                            if (can_save)
+                            {
+                                if (settings_saveToFile(&(_newfilename[1]))) {
+                                    showMessage("new file saved to", _newfilename);
+                                }
+                                else {
+                                    showError("can't write new file");
+                                }
                             }
-                            else {
+                            else
+                            {
                                 showError("cannot save new file");
                             }
+                            fatroot.close();
                         }
                         else
                         {
-                            showError("cannot save new file");
+                            showError("can't open FS root");
                         }
                     }
                     else if (memcmp(x, "ctrler", 6) == 0 || memcmp(x, "robot", 5) == 0) {

@@ -62,12 +62,14 @@ uint8_t switches_getFlags(void)
     f |= btn_sw4.isHeld() > 0 ? ROACHPKTFLAG_BTN4 : 0;
     #endif
     if (released == false) {
-        if (f == (nvm_tx.startup_switches & nvm_tx.startup_switches_mask)) {
+        if ((f & nvm_tx.startup_switches_mask) == (nvm_tx.startup_switches & nvm_tx.startup_switches_mask)) {
             switches_alarm = false;
             released = true;
         }
         else {
-            f = nvm_tx.startup_switches;
+            uint8_t inv = ~nvm_tx.startup_switches_mask;
+            f &= inv;
+            f |= nvm_tx.startup_switches & nvm_tx.startup_switches_mask;
             switches_alarm = true;
         }
     }
@@ -94,5 +96,5 @@ void waitFor(uint32_t x)
 
 float batt_get(void)
 {
-    return 0;
+    return ((float)roach_value_map(pot_battery.getAdcFiltered(), 0, nvm_tx.pot_battery.limit_max, 0, 4200, false)) / 1000.0f;
 }

@@ -10,42 +10,63 @@ extern roach_nvm_gui_desc_t* rosync_desc_tbl;
 
 roach_nvm_gui_desc_t cfgdesc_ctrler[] = {
     { ((uint32_t)(&(nvm_tx.heading_multiplier      )) - (uint32_t)(&nvm_tx)), "H scale"     , "s32"    ,                   225,                 INT_MIN, INT_MAX               , 1, },
-    //{ ((uint32_t)(&(nvm_tx.cross_mix               )) - (uint32_t)(&nvm_tx)), "X mix"       , "s32"    ,                      0,                 INT_MIN, INT_MAX               , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_throttle.center     )) - (uint32_t)(&nvm_tx)), "T center"    , "s16"    ,          ROACH_ADC_MID,                       0, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_throttle.deadzone   )) - (uint32_t)(&nvm_tx)), "T deadzone"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_throttle.center     )) - (uint32_t)(&nvm_tx)), "T center"    , "s16"    ,
+                                                                                                                //ROACH_ADC_MID,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            461,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_throttle.deadzone   )) - (uint32_t)(&nvm_tx)), "T deadzone"  , "s16"    ,
+                                                                                                              //ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
+                                                                                                                             64,                       0, ROACH_ADC_MID / 4     , 1, },
     { ((uint32_t)(&(nvm_tx.pot_throttle.boundary   )) - (uint32_t)(&nvm_tx)), "T boundary"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_throttle.scale      )) - (uint32_t)(&nvm_tx)), "T scale"     , "s16"    , ROACH_SCALE_MULTIPLIER,                 INT_MIN, INT_MAX               , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_throttle.limit_min  )) - (uint32_t)(&nvm_tx)), "T lim min"   , "s16"    ,                      0,                       0, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_throttle.limit_max  )) - (uint32_t)(&nvm_tx)), "T lim max"   , "s16"    ,          ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_throttle.scale      )) - (uint32_t)(&nvm_tx)), "T scale"     , "s16"    , 
+                                                                                                       //ROACH_SCALE_MULTIPLIER,                 INT_MIN, INT_MAX               , 1, },
+                                                                                                        -ROACH_SCALE_MULTIPLIER,                 INT_MIN, INT_MAX               , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_throttle.limit_min  )) - (uint32_t)(&nvm_tx)), "T lim min"   , "s16"    ,
+                                                                                                        //                    0,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            105,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_throttle.limit_max  )) - (uint32_t)(&nvm_tx)), "T lim max"   , "s16"    ,
+                                                                                                                //ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            850,                       0, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_throttle.expo       )) - (uint32_t)(&nvm_tx)), "T expo"      , "s16"    ,                      0, -ROACH_SCALE_MULTIPLIER, ROACH_SCALE_MULTIPLIER, 1, },
     { ((uint32_t)(&(nvm_tx.pot_throttle.filter     )) - (uint32_t)(&nvm_tx)), "T filter"    , "s16"    ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
-    { ((uint32_t)(&(nvm_tx.pot_steering.center     )) - (uint32_t)(&nvm_tx)), "S center"    , "s16"    ,          ROACH_ADC_MID,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_steering.center     )) - (uint32_t)(&nvm_tx)), "S center"    , "s16"    ,
+                                                                                                                //ROACH_ADC_MID,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            619,                       0, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_steering.deadzone   )) - (uint32_t)(&nvm_tx)), "S deadzone"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
     { ((uint32_t)(&(nvm_tx.pot_steering.boundary   )) - (uint32_t)(&nvm_tx)), "S boundary"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
     { ((uint32_t)(&(nvm_tx.pot_steering.scale      )) - (uint32_t)(&nvm_tx)), "S scale"     , "s16"    , ROACH_SCALE_MULTIPLIER,                 INT_MIN, INT_MAX               , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_steering.limit_min  )) - (uint32_t)(&nvm_tx)), "S lim min"   , "s16"    ,                      0,                       0, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_steering.limit_max  )) - (uint32_t)(&nvm_tx)), "S lim max"   , "s16"    ,          ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_steering.limit_min  )) - (uint32_t)(&nvm_tx)), "S lim min"   , "s16"    ,                      
+                                                                                                        //                    0,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            392,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_steering.limit_max  )) - (uint32_t)(&nvm_tx)), "S lim max"   , "s16"    ,
+                                                                                                                //ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            862,                       0, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_steering.expo       )) - (uint32_t)(&nvm_tx)), "S expo"      , "s16"    ,                      0, -ROACH_SCALE_MULTIPLIER, ROACH_SCALE_MULTIPLIER, 1, },
     { ((uint32_t)(&(nvm_tx.pot_steering.filter     )) - (uint32_t)(&nvm_tx)), "S filter"    , "s16"    ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .center     )) - (uint32_t)(&nvm_tx)), "WC center"   , "s16"    ,                     -1,                      -1, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .deadzone   )) - (uint32_t)(&nvm_tx)), "WC deadzone" , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .boundary   )) - (uint32_t)(&nvm_tx)), "WC boundary" , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .scale      )) - (uint32_t)(&nvm_tx)), "WC scale"    , "s16"    , ROACH_SCALE_MULTIPLIER,                 INT_MIN, INT_MAX               , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .limit_min  )) - (uint32_t)(&nvm_tx)), "WC lim min"  , "s16"    ,                      0,                       0, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .limit_max  )) - (uint32_t)(&nvm_tx)), "WC lim max"  , "s16"    ,          ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .expo       )) - (uint32_t)(&nvm_tx)), "WC expo"     , "s16"    ,                      0, -ROACH_SCALE_MULTIPLIER, ROACH_SCALE_MULTIPLIER, 1, },
-    { ((uint32_t)(&(nvm_tx.pot_weapon  .filter     )) - (uint32_t)(&nvm_tx)), "WC filter"   , "s16"    ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .center     )) - (uint32_t)(&nvm_tx)), "W center"    , "s16"    ,                     -1,                      -1, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .deadzone   )) - (uint32_t)(&nvm_tx)), "W deadzone"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .boundary   )) - (uint32_t)(&nvm_tx)), "W boundary"  , "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .scale      )) - (uint32_t)(&nvm_tx)), "W scale"     , "s16"    , ROACH_SCALE_MULTIPLIER,                 INT_MIN, INT_MAX               , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .limit_min  )) - (uint32_t)(&nvm_tx)), "W lim min"   , "s16"    ,                      0,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .limit_max  )) - (uint32_t)(&nvm_tx)), "W lim max"   , "s16"    ,
+                                                                                                                //ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            948,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .expo       )) - (uint32_t)(&nvm_tx)), "W expo"      , "s16"    ,                      0, -ROACH_SCALE_MULTIPLIER, ROACH_SCALE_MULTIPLIER, 1, },
+    { ((uint32_t)(&(nvm_tx.pot_weapon  .filter     )) - (uint32_t)(&nvm_tx)), "W filter"    , "s16"    ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .center     )) - (uint32_t)(&nvm_tx)), "POT center"  , "s16"    ,                     -1,                      -1, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .deadzone   )) - (uint32_t)(&nvm_tx)), "POT deadzone", "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .boundary   )) - (uint32_t)(&nvm_tx)), "POT boundary", "s16"    ,        ROACH_ADC_NOISE,                       0, ROACH_ADC_MID / 4     , 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .scale      )) - (uint32_t)(&nvm_tx)), "POT scale"   , "s16"    , ROACH_SCALE_MULTIPLIER,                 INT_MIN, INT_MAX               , 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .limit_min  )) - (uint32_t)(&nvm_tx)), "POT lim min" , "s16"    ,                      0,                       0, ROACH_ADC_MAX         , 1, },
-    { ((uint32_t)(&(nvm_tx.pot_aux     .limit_max  )) - (uint32_t)(&nvm_tx)), "POT lim max" , "s16"    ,          ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
+    { ((uint32_t)(&(nvm_tx.pot_aux     .limit_max  )) - (uint32_t)(&nvm_tx)), "POT lim max" , "s16"    ,
+                                                                                                                //ROACH_ADC_MAX,                       0, ROACH_ADC_MAX         , 1, },
+                                                                                                                            948,                       0, ROACH_ADC_MAX         , 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .expo       )) - (uint32_t)(&nvm_tx)), "POT expo"    , "s16"    ,                      0, -ROACH_SCALE_MULTIPLIER, ROACH_SCALE_MULTIPLIER, 1, },
     { ((uint32_t)(&(nvm_tx.pot_aux     .filter     )) - (uint32_t)(&nvm_tx)), "POT filter"  , "s16"    ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
+    { ((uint32_t)(&(nvm_tx.pot_battery .limit_max  )) - (uint32_t)(&nvm_tx)), "BAT 4200mV"  , "s16"    ,                    600,                       0,          ROACH_ADC_MAX, 1, },
     { ((uint32_t)(&(nvm_tx.pot_battery .filter     )) - (uint32_t)(&nvm_tx)), "BAT filter"  , "s16"    ,   ROACH_FILTER_DEFAULT,                       0, ROACH_SCALE_MULTIPLIER, 1, },
-    { ((uint32_t)(&(nvm_tx.startup_switches        )) - (uint32_t)(&nvm_tx)), "ST SW"       , "hex"    ,                   0x01,                       0,                   0x07, 1, },
+    { ((uint32_t)(&(nvm_tx.startup_switches        )) - (uint32_t)(&nvm_tx)), "ST SW"       , "hex"    ,                   0x00,                       0,                   0x07, 1, },
     { ((uint32_t)(&(nvm_tx.startup_switches_mask   )) - (uint32_t)(&nvm_tx)), "ST SW mask"  , "hex"    ,                   0x01,                       0,                   0x07, 1, },
+    //{ ((uint32_t)(&(nvm_tx.startup_switches_def    )) - (uint32_t)(&nvm_tx)), "ST SW def"   , "hex"    ,                   0x00,                       0,                   0x07, 1, },
     ROACH_NVM_GUI_DESC_END,
 };
 
@@ -74,11 +95,19 @@ void settings_saveIfNeeded(uint32_t span)
     if (nvm_dirty > 0)
     {
         uint32_t now = millis();
-        if ((now - nvm_dirty) >= span && RoachUsbMsd_canSave())
+        if ((now - nvm_dirty) >= span)
         {
-            Serial.printf("[%u]:autosaving startup file\r\n", millis());
-            settings_save();
-            nvm_dirty = 0;
+            if (RoachUsbMsd_canSave())
+            {
+                Serial.printf("[%u]:autosaving startup file\r\n", millis());
+                settings_save();
+                nvm_dirty = 0;
+            }
+            else
+            {
+                Serial.printf("[%u]:autosave not yet possible, defering\r\n", millis());
+                nvm_dirty = now;
+            }
         }
     }
 }
@@ -138,6 +167,7 @@ bool settings_loadFile(const char* fname)
 bool settings_saveToFile(const char* fname)
 {
     debug_printf("[%u] settings_saveToFile \"%s\"\r\n", millis(), fname);
+    RoachWdt_feed();
     RoachFile f;
     bool suc = f.open(fname, O_RDWR | O_CREAT | O_TRUNC);
     debug_printf("f.open = %u\r\n", suc);
@@ -170,6 +200,7 @@ bool settings_saveToFile(const char* fname)
             }
         }
         debug_printf("write done, closing file\r\n");
+        RoachWdt_feed();
         f.close();
         return true;
     }
@@ -186,11 +217,13 @@ bool roachnvm_fileCopy(const char* fin_name, const char* fout_name)
     RoachFile fin;
     RoachFile fout;
     bool suc;
+    RoachWdt_feed();
     suc = fin.open(fin_name);
     if (suc == false) {
         Serial.printf("ERR[%u]: roachnvm_fileCopy cannot open fin \"%s\"\r\n", millis(), fin_name);
         return false;
     }
+    RoachWdt_feed();
     suc = fout.open(fout_name, O_RDWR | O_CREAT | O_TRUNC);
     if (suc == false) {
         Serial.printf("ERR[%u]: roachnvm_fileCopy cannot open fout \"%s\"\r\n", millis(), fout_name);
@@ -208,7 +241,9 @@ bool roachnvm_fileCopy(const char* fin_name, const char* fout_name)
         }
         else
         {
+            RoachWdt_feed();
             fin.close();
+            RoachWdt_feed();
             fout.close();
             debug_printf("[%u] roachnvm_fileCopy \"%s\" -> \"%s\"\r\n", millis(), fin_name, fout_name);
             return true;
@@ -245,6 +280,7 @@ void settings_debugListFiles(Stream* stream)
     int i = 1;
     while (fatfile.openNext(&fatroot, O_RDONLY))
     {
+        RoachWdt_feed();
         if (fatfile.isDir() == false)
         {
             char sfname[64];

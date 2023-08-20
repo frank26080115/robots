@@ -188,7 +188,7 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
     #endif
 
     int32_t gyro_corr = 0;
-    if ((rx_pkt.flags & ROACHPKTFLAG_GYROACTIVE) != 0)
+    if ((rx_pkt.flags & ROACHPKTFLAG_IMU) != 0)
     {
         if (imu.isReady() == false || imu.hasFailed() || imu.getErrorOccured(true)) {
             heading_mgr.setReset();
@@ -215,11 +215,20 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         pid.reset();
     }
 
-    mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
+    if ((rx_pkt.flags & ROACHPKTFLAG_SAFE) == 0)
+    {
+        mixer.mix(rx_pkt.throttle, rx_pkt.steering, gyro_corr);
+    }
+    else
+    {
+        heading_mgr.setReset();
+        pid.reset();
+        mixer.mix(0, 0, 0);
+    }
     drive_left .writeMicroseconds(mixer.getLeft ());
     drive_right.writeMicroseconds(mixer.getRight());
 
-    if ((rx_pkt.flags & ROACHPKTFLAG_WEAPON) != 0)
+    if ((rx_pkt.flags & ROACHPKTFLAG_WEAPON) != 0 && (rx_pkt.flags & ROACHPKTFLAG_SAFE) == 0)
     {
         weapon.
         #ifdef USE_DSHOT

@@ -15,7 +15,7 @@ enum
     ROACHPKTFLAG_BTN2 = 0x02,
     ROACHPKTFLAG_BTN3 = 0x04,
     ROACHPKTFLAG_BTN4 = 0x08,
-    ROACHPKTFLAG_GYROACTIVE = 0x10,
+    ROACHPKTFLAG_SAFE = 0x80,
 };
 
 enum
@@ -138,8 +138,8 @@ typedef struct
 {
     uint32_t magic;
 
-    uint8_t startup_switches;
-    uint8_t startup_switches_mask;
+    uint8_t startup_switches;      // what the start-up switch positions need to be to unlock
+    uint8_t startup_switches_mask; // which bits we care about
 
     roach_nvm_pot_t pot_throttle;
     roach_nvm_pot_t pot_steering;

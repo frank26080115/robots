@@ -77,6 +77,8 @@ int headingx = 0, heading = 0;
 bool weap_sw_warning = false;
 uint8_t encoder_mode = 0;
 bool pots_locked = false;
+bool move_locked = true;
+int move_zero_cnt = 0;
 
 RoachHeartbeat hb_red = RoachHeartbeat(ROACHHW_PIN_LED_RED);
 RoachHeartbeat hb_blu = RoachHeartbeat(ROACHHW_PIN_LED_BLU);
@@ -228,6 +230,23 @@ void ctrler_buildPkt(void)
     tx_pkt.pot_aux  = (pots_locked == false) ? pot_aux.get()    : 0;
 
     tx_pkt.flags = switches_getFlags();
+
+    if (move_locked)
+    {
+        if (tx_pkt.throttle == 0 && tx_pkt.steering == 0) {
+            move_zero_cnt += 1;
+        }
+        else {
+            move_zero_cnt = 0;
+        }
+        if (move_zero_cnt > 10) {
+            move_locked = false;
+        }
+    }
+    if (move_locked)
+    {
+        tx_pkt.flags |= ROACHPKTFLAG_SAFE;
+    }
 }
 
 void ctrler_pktDebug(void)

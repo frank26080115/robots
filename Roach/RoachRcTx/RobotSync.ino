@@ -292,6 +292,7 @@ bool rosync_downloadDescChunk(radio_binpkt_t* pkt)
 
         for (i = 0; i < dlen; i++)
         {
+            RoachWdt_feed();
             rosync_descDlFile.write(pkt->data[i]);
             rosync_descDlFileSize += 1;
         }
@@ -384,6 +385,7 @@ bool rosync_loadDescFileId(uint32_t id)
 bool rosync_loadDescFile(const char* fname, uint32_t id)
 {
     RoachFile f;
+    RoachWdt_feed();
     bool x = f.open(fname, O_RDONLY);
     if (x == false) {
         Serial.printf("ERR[%u]: tried loading robot desc file \"%s\" but file does not exist\r\n", millis(), fname);
@@ -430,9 +432,11 @@ bool rosync_loadDescFileObj(RoachFile* f, uint32_t id)
     int i, j;
     for (i = 0, j = 1; i < sz && j > 0; i += j)
     {
+        RoachWdt_feed();
         j = f->read((void*)rosync_desc_tbl, chunk_sz);
     }
 
+    RoachWdt_feed();
     f->close();
     debug_printf("[%u] rosync_loadDescFileObj finished loading the file (%u)\r\n", millis(), sz);
 
@@ -495,6 +499,7 @@ bool rosync_loadNvmFile(const char* fname)
     {
         sprintf(fname_buf, fname);
     }
+    RoachWdt_feed();
     bool x = f.open(fname_buf, O_RDONLY);
     if (x == false) {
         Serial.printf("ERR[%u]: unable to find robot NVM file \"%s\"\r\n", millis(), fname_buf);
@@ -505,6 +510,7 @@ bool rosync_loadNvmFile(const char* fname)
 
     roachnvm_readfromfile(&f, (uint8_t*)rosync_nvm, rosync_desc_tbl);
 
+    RoachWdt_feed();
     f.close();
 
     rosync_checksum_nvm = roachnvm_getConfCrc(rosync_nvm, rosync_desc_tbl);
@@ -548,6 +554,7 @@ void rosync_uploadNextChunk(void)
 
 bool rosync_markOnlyFile(void)
 {
+    RoachWdt_feed();
     if (!fatroot.open("/"))
     {
         Serial.println("open root failed");
@@ -559,6 +566,7 @@ bool rosync_markOnlyFile(void)
     char sfname_only[64];
     while (fatfile.openNext(&fatroot, O_RDONLY))
     {
+        RoachWdt_feed();
         if (fatfile.isDir() == false)
         {
             fatfile.getName7(sfname, 62);
@@ -575,6 +583,7 @@ bool rosync_markOnlyFile(void)
             }
         }
     }
+    RoachWdt_feed();
     fatfile.close();
     fatroot.close();
     if (has_startup == false || cnt == 1)

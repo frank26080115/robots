@@ -30,7 +30,7 @@ void RoachMenu::taskHP(void)
 void RoachMenu::taskLP(void)
 {
     #ifdef ROACHTX_AUTOSAVE
-    settings_saveIfNeeded(10 * 1000);
+    settings_saveIfNeeded(ROACHTX_AUTOSAVE_INTERVAL_LONG);
     #endif
 };
 
@@ -52,15 +52,14 @@ void RoachMenu::run(void)
         checkButtons();
 
         #ifdef ROACHTX_AUTOEXIT
-        #ifndef DEVMODE_SUBMENU_FOREVER
-        if (gui_last_activity_time != 0 && _id != MENUID_HOME)
+        if (gui_last_activity_time != 0 && _id != MENUID_HOME && _can_autoexit)
         {
             if ((millis() - gui_last_activity_time) >= 10000) {
                 gui_last_activity_time = 0;
                 _exit = EXITCODE_HOME;
+                debug_printf("[%u] menu auto exited\r\n", millis());
             }
         }
-        #endif
         #endif
 
         if (_interrupt == EXITCODE_BACK) {
@@ -87,13 +86,11 @@ void RoachMenu::run(void)
 
 void RoachMenu::draw_sidebar(void)
 {
-    
-};
+}
 
 void RoachMenu::draw_title(void)
 {
-    
-};
+}
 
 void RoachMenu::onEnter(void)
 {
@@ -111,7 +108,6 @@ void RoachMenu::onButton(uint8_t btn)
 
 void RoachMenu::onButtonCheckExit(uint8_t btn)
 {
-    
 }
 
 void RoachMenu::checkButtons(void)
@@ -554,6 +550,7 @@ RoachMenuCfgLister::RoachMenuCfgLister(uint8_t id, const char* name, const char*
     _desc_tbl = desc_tbl;
     _list_cnt = roachnvm_cntgroup(desc_tbl);
     strncpy0(_title, name, 30);
+    strncpy0(_filter, filter, 16);
 }
 
 char* RoachMenuCfgLister::getItemText(int idx)

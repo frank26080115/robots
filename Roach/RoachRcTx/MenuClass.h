@@ -66,6 +66,7 @@ class RoachMenu
         int      _exit = 0;
         volatile int _interrupt = 0;
         bool _running = false;
+        bool _can_autoexit = false;
         virtual void draw(void);
         virtual void clear(void);
                 void display(void);
