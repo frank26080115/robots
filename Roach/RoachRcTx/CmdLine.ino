@@ -1,6 +1,7 @@
 const cmd_def_t cmds[] = {
     { "factoryreset", factory_reset_func},
     { "nvmdebug"    , nvmdebug_func},
+    { "nvmload"    , nvmload_func},
     { "echo"        , echo_func },
     { "mem"         , memcheck_func },
     { "perf"        , perfcheck_func },
@@ -59,6 +60,18 @@ void nvmdebug_func(void* cmd, char* argstr, Stream* stream)
 {
     settings_debugNvm(stream);
     settings_debugListFiles(stream);
+}
+
+void nvmload_func(void* cmd, char* argstr, Stream* stream)
+{
+    if (argstr == NULL || strlen(argstr) == 0)
+    {
+        settings_loadFile(ROACH_STARTUP_CONF_NAME);
+    }
+    else
+    {
+        settings_loadFile(argstr);
+    }
 }
 
 void save_func(void* cmd, char* argstr, Stream* stream)

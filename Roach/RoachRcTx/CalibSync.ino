@@ -68,12 +68,18 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
             oled.setCursor(0, y);
             oled.printf("S: %d", pot_steering.cfg->center);
             y += ROACHGUI_LINE_HEIGHT;
-            oled.setCursor(0, y);
-            oled.printf("W: %d", pot_weapon.cfg->center);
-            y += ROACHGUI_LINE_HEIGHT;
-            oled.setCursor(0, y);
-            oled.printf("A: %d", pot_aux.cfg->center);
-            y += ROACHGUI_LINE_HEIGHT;
+            if (pot_weapon.cfg->center >= 0)
+            {
+                oled.setCursor(0, y);
+                oled.printf("W: %d", pot_weapon.cfg->center);
+                y += ROACHGUI_LINE_HEIGHT;
+            }
+            if (pot_aux.cfg->center >= 0)
+            {
+                oled.setCursor(0, y);
+                oled.printf("A: %d", pot_aux.cfg->center);
+                y += ROACHGUI_LINE_HEIGHT;
+            }
         };
 
     protected:
@@ -156,6 +162,9 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
             if (scroll == 3) { oled.write(GUISYMB_THIS_ARROW); } else { oled.write(' '); }
             oled.printf("A: %d - %d", pot_aux.cfg->limit_min, pot_aux.cfg->limit_max);
             y += ROACHGUI_LINE_HEIGHT;
+            y += ROACHGUI_LINE_HEIGHT;
+            oled.setCursor(0, y);
+            oled.printf("Center BTN %c RST", GUISYMB_THIS_ARROW);
         };
 
     protected:
@@ -185,7 +194,7 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
 
         virtual void draw_sidebar(void)
         {
-            drawSideBar("OK", "REDO", true);
+            drawSideBar("OK", "", true);
         };
 
         virtual void draw_title(void)
@@ -217,13 +226,13 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
                 case BTNID_G6:
                     _exit = EXITCODE_BACK;
                     break;
-                case BTNID_G5:
-                    debug_printf("[%u] calib ADC redo\r\n", millis());
-                    pot_throttle.calib_limits();
-                    pot_steering.calib_limits();
-                    pot_weapon.calib_limits();
-                    pot_aux.calib_limits();
-                    break;
+                //case BTNID_G5:
+                //    debug_printf("[%u] calib ADC redo\r\n", millis());
+                //    pot_throttle.calib_limits();
+                //    pot_steering.calib_limits();
+                //    pot_weapon.calib_limits();
+                //    pot_aux.calib_limits();
+                //    break;
             }
         };
 };

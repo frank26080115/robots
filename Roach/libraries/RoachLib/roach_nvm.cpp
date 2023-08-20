@@ -308,35 +308,43 @@ bool roachnvm_parsecmd(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char
 
 void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
-    char temp_buff[64];
-    while (f->available())
+    char temp_buff[64]; // this contains one line of text
+    while (f->available()) // while not end of file
     {
-        int i = 0;
-        while (f->available())
+        int i = 0; // start reading new line
+        while (f->available()) // while not end of file
         {
             int c = f->read();
-            bool is_end = (c == 0 || c == '\n' || c == '\r' || c < 0);
+            bool is_end = (c == 0 || c == '\n' || c == '\r' || c < 0); // end of line
             if (is_end && i > 0)
             {
-                temp_buff[i] = 0;
+                temp_buff[i] = 0; // terminate the line
                 int j;
                 for (j = 1; j < i; j++)
                 {
+                    // find the divider and split the line there
                     char fc = temp_buff[j];
                     if (fc == '=' || fc == ':' || fc == ',') {
-                        temp_buff[j] = 0;
+                        temp_buff[j] = 0; // split the line at divider
                         j += 1;
+                        debug_printf("fread \"%s = %s\"\r\n", temp_buff, &(temp_buff[j]));
                         roachnvm_parseitem(struct_ptr, desc_tbl, temp_buff, &(temp_buff[j]));
                         break;
                     }
                 }
+                break; // next line, reset i to 0 at top of loop
             }
-            else
+            else if (is_end == false)
             {
-                temp_buff[i] = c;
-                temp_buff[i + 1] = 0;
+                // add char to line buffer
+                if (i < 62)
+                {
+                    temp_buff[i] = c;
+                    temp_buff[i + 1] = 0;
+                    i += 1;
+                }
             }
-            if (c < 0) {
+            if (c < 0) { // end of file
                 break;
             }
         }

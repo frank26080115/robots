@@ -103,15 +103,22 @@ void RoachPot::task(void)
     x32 = last_adc;
     if (state_machine == ROACHPOT_SM_CALIB_CENTER)
     {
-        calib_sum += last_adc;
-        calib_cnt += 1;
-        if ((millis() - calib_start_time) >= 500)
+        if (cfg->center < 0)
         {
-            int32_t avg = calib_sum + (calib_cnt / 2);
-            avg /= calib_cnt;
-            cfg->center = avg;
             state_machine = ROACHPOT_SM_NORMAL;
-            calib_done = true;
+        }
+        else
+        {
+            calib_sum += last_adc;
+            calib_cnt += 1;
+            if ((millis() - calib_start_time) >= 500)
+            {
+                int32_t avg = calib_sum + (calib_cnt / 2);
+                avg /= calib_cnt;
+                cfg->center = avg;
+                state_machine = ROACHPOT_SM_NORMAL;
+                calib_done = true;
+            }
         }
         last_val = 0;
     }
@@ -128,7 +135,8 @@ void RoachPot::task(void)
             //}
         }
 
-        x32 -= cfg->center;
+        int center = cfg->center < 0 ? 0 : cfg->center;
+        x32 -= center;
         if (x32 > 0)
         {
             if (x32 < cfg->deadzone)
@@ -137,7 +145,7 @@ void RoachPot::task(void)
             }
             else
             {
-                last_val = roach_value_map(x32 - cfg->deadzone, 0, cfg->limit_max - cfg->center - cfg->deadzone - cfg->boundary, 0, ROACH_SCALE_MULTIPLIER, true);
+                last_val = roach_value_map(x32 - cfg->deadzone, 0, cfg->limit_max - center - cfg->deadzone - cfg->boundary, 0, ROACH_SCALE_MULTIPLIER, true);
             }
         }
         else if (x32 < 0)
@@ -149,7 +157,7 @@ void RoachPot::task(void)
             else
             {
                 x32 *= -1;
-                last_val = -roach_value_map(x32 - cfg->deadzone, 0, cfg->center - cfg->limit_min - cfg->deadzone - cfg->boundary, 0, ROACH_SCALE_MULTIPLIER, true);
+                last_val = -roach_value_map(x32 - cfg->deadzone, 0, center - cfg->limit_min - cfg->deadzone - cfg->boundary, 0, ROACH_SCALE_MULTIPLIER, true);
             }
         }
         else
@@ -160,6 +168,10 @@ void RoachPot::task(void)
         if (cfg->expo != 0)
         {
             last_val = roach_expo_curve32(last_val, cfg->expo);
+        }
+        if (cfg->scale != 0)
+        {
+            last_val = roach_multiply_with_scale(last_val, cfg->scale);
         }
     }
 }
