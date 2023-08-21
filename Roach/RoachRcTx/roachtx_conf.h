@@ -23,7 +23,8 @@
 
 //#define DEVMODE_START_USBMSD_ONLY // use this to nuke a file system that's causing a no-boot
 //#define DEVMODE_NO_RADIO
-//#define DEVMODE_WAIT_SERIAL
+//#define DEVMODE_WAIT_SERIAL_PRE
+//#define DEVMODE_WAIT_SERIAL_POST
 //#define DEVMODE_SLOW_LOOP         200
 //#define DEVMODE_DEBUG_BUTTONS
 

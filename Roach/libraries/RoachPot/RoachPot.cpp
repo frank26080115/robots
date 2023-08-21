@@ -224,8 +224,8 @@ void RoachPot::calib_center(void)
 
 void RoachPot::calib_limits(void)
 {
-    cfg->limit_max -= cfg->boundary;
-    cfg->limit_min += cfg->boundary;
+    //cfg->limit_max -= cfg->boundary;
+    //cfg->limit_min += cfg->boundary;
     state_machine = ROACHPOT_SM_CALIB_LIMITS;
     calib_start_time = millis();
 }

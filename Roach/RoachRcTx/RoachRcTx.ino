@@ -89,6 +89,16 @@ void setup(void)
     safeboot_check(); // check if user wants to enter bootloader mode
     //hw_bringup();
 
+    #ifdef DEVMODE_WAIT_SERIAL_PRE
+    Serial.begin(115200);
+    while (Serial.available() == 0) {
+        Serial.println("waiting for input");
+        delay(100);
+    }
+    Serial.read();
+    Serial.println("GO GO GO");
+    #endif
+
     RoachWdt_init(ROACH_WDT_TIMEOUT_MS);
     hb_red.begin();
     hb_blu.begin();
@@ -121,7 +131,7 @@ void setup(void)
     // show splash screen for a short time, user can exit with a button
     // this will also ensure that the RNG buffer fills up
     while (millis() <= 3000
-        #ifdef DEVMODE_WAIT_SERIAL
+        #ifdef DEVMODE_WAIT_SERIAL_POST
         || cmdline.has_interaction() == false
         #endif
     )

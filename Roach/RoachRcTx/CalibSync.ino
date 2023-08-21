@@ -88,10 +88,6 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
             pots_locked = true;
             RoachMenu::onEnter();
             debug_printf("[%u] calib ADC centers\r\n", millis());
-            pot_throttle.calib_center();
-            pot_steering.calib_center();
-            pot_weapon.calib_center();
-            pot_aux.calib_center();
         };
 
         virtual void onExit(void)
@@ -107,7 +103,7 @@ class RoachMenuFuncCalibAdcCenter : public RoachMenuFunctionItem
 
         virtual void draw_sidebar(void)
         {
-            drawSideBar("OK", "REDO", true);
+            drawSideBar("OK", "CAL", true);
         };
 
         virtual void draw_title(void)
@@ -226,13 +222,6 @@ class RoachMenuFuncCalibAdcLimits : public RoachMenuFunctionItem
                 case BTNID_G6:
                     _exit = EXITCODE_BACK;
                     break;
-                //case BTNID_G5:
-                //    debug_printf("[%u] calib ADC redo\r\n", millis());
-                //    pot_throttle.calib_limits();
-                //    pot_steering.calib_limits();
-                //    pot_weapon.calib_limits();
-                //    pot_aux.calib_limits();
-                //    break;
             }
         };
 };

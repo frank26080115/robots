@@ -124,7 +124,12 @@ class RoachMenuHome : public RoachMenu
 
             y += ROACHGUI_LINE_HEIGHT;
             oled.setCursor(0, y);
-            oled.printf("BAT: ");
+            if (RoachUsbMsd_hasVbus()) {
+                oled.printf("BAT: ");
+            }
+            else {
+                oled.printf("Bat: ");
+            }
             oled.printf("%.1f  ", batt_get());
             if (radio.isConnected()) {
                 oled.printf("%.1f", ((float)telem_pkt.battery)/1000.0f);

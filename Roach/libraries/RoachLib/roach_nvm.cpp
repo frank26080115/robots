@@ -142,15 +142,23 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
 {
     roach_nvm_gui_desc_t* desc_itm = NULL;
 
+    while (name[0] == ' ' || name[0] == '\t' || name[0] == '\r' || name[0] == '\n') {
+        name = &name[1];
+    }
+
     int i;
     int slen = strlen(name);
     for (i = slen - 1; i > 0; i--) {
-        if (name[i] == ' ' || name[i] == '\t') {
+        if (name[i] == ' ' || name[i] == '\t' || name[i] == '\r' || name[i] == '\n') {
             name[i] = 0;
+        }
+        else {
+            break;
         }
     }
 
     // iterate through all items to look for a name match
+    bool name_matched = false;
     for (i = 0; i < 0xFFFF; i++)
     {
         desc_itm = &desc_tbl[i];
@@ -159,16 +167,18 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
             return false;
         }
         if (strncmp(desc_itm->name, name, 32) == 0) {
+            debug_printf(desc_itm->name);
+            name_matched = true;
             break; // name match
         }
     }
-    if (strncmp(desc_itm->name, name, 32) != 0) {
+    if (name_matched == false) {
         return false; // no name match
     }
 
     bool ret = false;
 
-    while (value[0] == ' ' || value[0] == '\t') {
+    while (value[0] == ' ' || value[0] == '\t' || value[0] == '\r' || value[0] == '\n') {
         value = &value[1];
     }
 
@@ -191,6 +201,7 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
         uint32_t* wptr = (uint32_t*)&struct_ptr[desc_itm->byte_offset];
         *wptr = x;
         ret = true;
+        debug_printf(" = 0x%08X", *wptr);
     }
     else if (typecode[0] == 'u' || typecode[0] == 's')
     {
@@ -221,6 +232,8 @@ bool roachnvm_parseitem(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, cha
 
         x = (x > desc_itm->limit_max) ? desc_itm->limit_max : x;
         x = (x < desc_itm->limit_min) ? desc_itm->limit_min : x;
+
+        debug_printf(" = %d", x);
 
         ret = true;
         switch (sz)
@@ -308,6 +321,10 @@ bool roachnvm_parsecmd(uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl, char
 
 void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_tbl)
 {
+    fspos_t pos = {0, 0};
+    f->fsetpos(&pos);
+    //f->fgetpos(&pos);
+    //debug_printf("f cluster %u\r\n", pos.cluster);
     char temp_buff[64]; // this contains one line of text
     while (f->available()) // while not end of file
     {
@@ -327,8 +344,9 @@ void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc
                     if (fc == '=' || fc == ':' || fc == ',') {
                         temp_buff[j] = 0; // split the line at divider
                         j += 1;
-                        debug_printf("fread \"%s = %s\"\r\n", temp_buff, &(temp_buff[j]));
+                        debug_printf("fread \"");
                         roachnvm_parseitem(struct_ptr, desc_tbl, temp_buff, &(temp_buff[j]));
+                        debug_printf("\"\r\n");
                         break;
                     }
                 }
@@ -349,6 +367,7 @@ void roachnvm_readfromfile(RoachFile* f, uint8_t* struct_ptr, roach_nvm_gui_desc
             }
         }
     }
+    f->fsetpos(&pos);
 }
 
 void roachnvm_formatitem(char* str, uint8_t* struct_ptr, roach_nvm_gui_desc_t* desc_itm)
