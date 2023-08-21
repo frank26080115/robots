@@ -47,6 +47,8 @@ typedef struct
     int16_t battery;
     int16_t rssi;
     int16_t loss_rate;
+    int16_t packet_rate;
+    int16_t rx_all;
     int16_t session_id;
 }
 PACK_STRUCT

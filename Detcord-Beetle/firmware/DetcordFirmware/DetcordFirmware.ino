@@ -42,12 +42,14 @@ RoachServo drive_right(DETCORDHW_PIN_SERVO_DRV_R);
 bool servos_has_inited = false;
 bool force_servo_outputs = false;
 
+#ifndef DEVMODE_DISABLE_IMU
 #ifdef ROACHIMU_USE_BNO085
 RoachIMU_BNO imu(5000, 0, ROACHIMU_ORIENTATION_XYZ, BNO08x_I2CADDR_DEFAULT, DETCORDHW_PIN_IMU_RST);
 #endif
 #ifdef ROACHIMU_USE_LSM6DS3
 //RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ);
 RoachIMU_LSM imu(ROACHIMU_ORIENTATION_XYZ, LSM6DS3_I2CADDR_DEFAULT, ROACHIMU_DEF_PIN_PWR, -1);
+#endif
 #endif
 
 RoachPID pid;
@@ -109,8 +111,10 @@ void setup()
     XiaoBleSenseLsm_powerOn(ROACHIMU_DEF_PIN_PWR);
     #endif
 
+    #ifndef DEVMODE_DISABLE_IMU
     nbtwi_init(DETCORDHW_PIN_I2C_SCL, DETCORDHW_PIN_I2C_SDA, ROACHIMU_BUFF_RX_SIZE, DETCORDHW_I2C_FAST);
     imu.begin();
+    #endif
 
     pid.cfg = &(nvm.pid_heading);
     mixer.cfg_left = &(nvm.drive_left);
@@ -157,8 +161,10 @@ void loop()
 void robot_tasks(uint32_t now) // short but high priority tasks
 {
     radio.task();
+    #ifndef DEVMODE_DISABLE_IMU
     nbtwi_task();
     imu.task();
+    #endif
     cmdline.task();
     RoachPot_allTask();
     #ifdef PERFCNT_ENABLED
@@ -172,6 +178,7 @@ void robot_lowPriorityTasks(void)
     settings_task();
     RoachUsbMsd_task();
     RoSync_task();
+    nrf5rand_task();
     #ifdef USE_DSHOT
     weapon.task();
     #endif
@@ -188,6 +195,7 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
     #endif
 
     int32_t gyro_corr = 0;
+    #ifndef DEVMODE_DISABLE_IMU
     if ((rx_pkt.flags & ROACHPKTFLAG_IMU) != 0)
     {
         if (imu.isReady() == false || imu.hasFailed() || imu.getErrorOccured(true)) {
@@ -214,6 +222,7 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         heading_mgr.setReset();
         pid.reset();
     }
+    #endif
 
     if ((rx_pkt.flags & ROACHPKTFLAG_SAFE) == 0)
     {
@@ -253,17 +262,23 @@ void rtmgr_taskPeriodic(bool has_cmd) // this either happens once per radio mess
         roachrobot_pipeCmdLine();
 
         telem_pkt.battery = roach_value_map(battery.getAdcFiltered(), 0, DETCORDHW_BATT_ADC_4200MV, 0, 4200, false);
+        #ifndef DEVMODE_DISABLE_IMU
         telem_pkt.heading = (imu.isReady() == false) ? ROACH_HEADING_INVALID_NOTREADY : ((imu.hasFailed()) ? ROACH_HEADING_INVALID_HASFAILED : ((uint16_t)lround(imu.heading * ROACH_ANGLE_MULTIPLIER)));
+        #else
+        telem_pkt.heading = ROACH_HEADING_INVALID_NOTREADY;
+        #endif
         roachrobot_telemTask(millis()); // this will fill out common fields in the telem packet and then send it off
     }
 }
 
 void rtmgr_taskPreStart(void)
 {
+    #ifndef DEVMODE_DISABLE_IMU
     #ifndef ROACHIMU_AUTO_MATH
     if (imu.hasNew(false)) {
         imu.doMath();
     }
+    #endif
     #endif
 }
 
@@ -330,6 +345,7 @@ void rtmgr_onSafe(bool full_init)
 
 void calibgyro_func(void* cmd, char* argstr, Stream* stream)
 {
+    #ifndef DEVMODE_DISABLE_IMU
     #ifdef BOARD_IS_XIAOBLE
     if (atoi(argstr) == 123) {
         if (imu.calib != NULL) {
@@ -345,6 +361,9 @@ void calibgyro_func(void* cmd, char* argstr, Stream* stream)
     heading_mgr.setReset();
     pid.reset();
     Serial.printf("[%u] IMU tare start\r\n", millis());
+    #else
+    Serial.printf("[%u] ERROR: IMU tare called when IMU is completely disabled\r\n", millis());
+    #endif
 }
 
 void robot_force_servos_on(void)
@@ -373,11 +392,13 @@ void logger_gather(void)
     dbglog.throttle    = rx_pkt.throttle;
     dbglog.steering    = rx_pkt.steering;
     dbglog.battery     = telem_pkt.battery;
+    #ifndef DEVMODE_NO_RADIO
     dbglog.rssi        = telem_pkt.rssi;
     dbglog.loss_rate   = telem_pkt.loss_rate;
     dbglog.imu_heading = telem_pkt.heading;
-    #ifndef DEVMODE_NO_RADIO
     dbglog.session_id  = radio.getSessionId();
+    dbglog.packet_rate = radio.stats_rate.drate;
+    dbglog.rx_all      = radio.stats_rate.calls;
     #endif
     #endif
 }
@@ -398,6 +419,14 @@ void logger_report(uint32_t now)
         for (log_i = 0; log_i < log_cnt; log_i++) {
             Serial.printf("%d , ", log_ptr[log_i]);
         }
+        #if defined(DEVMODE_DEBUG_RX_ERRORS) && defined(NRFRR_DEBUG_RX_ERRSTATS)
+            Serial.printf("rx-errs: ");
+            uint32_t* errptr = radio.getRxErrStat();
+            int err_i;
+            for (err_i = 0; err_i < 12; err_i++) {
+                Serial.printf("%u , ", errptr[err_i]);
+            }
+        #endif
         Serial.printf("\r\n");
     }
     #endif

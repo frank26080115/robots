@@ -135,6 +135,14 @@ void nRF52RcRadio::begin(int fem_tx, int fem_rx)
 
 void nRF52RcRadio::config(uint32_t chan_map, uint32_t uid, uint32_t salt)
 {
+    #ifdef NRFRR_DEVMODE_ZEROSECURITY
+    uid = 0;
+    salt = 0;
+    #endif
+    #ifdef NRFRR_DEVMODE_NOHOP
+    chan_map = NRFRR_CHAN_MAP_DEFAULT_SINGLE;
+    #endif
+
     if (_statemachine != NRFRR_SM_IDLE_WAIT) {
         pause();
     }
@@ -368,7 +376,7 @@ void nRF52RcRadio::gen_hop_table(void)
 void nRF52RcRadio::setChanMap(uint32_t x)
 {
     uint32_t i, m;
-    for (i = 0, m = 0; i < (sizeof(freq_lookup) / 2); i++)
+    for (i = 0, m = 0; i < (sizeof(freq_lookup) / sizeof(uint16_t)); i++)
     {
         m |= 1 << i;
     }
@@ -422,7 +430,7 @@ void nRF52RcRadio::prep_tx(void)
     Serial.printf("\r\n");
     #endif
 
-    stats_rate.tx++;
+    stats_tmp.tx++;
     _last_tx_time = millis();
 
     #ifdef NRFRR_DEBUG_HOP
@@ -492,6 +500,7 @@ void nRF52RcRadio::gen_header(void)
     ptr->s0 = 0;
     ptr->s1 = 0;
     ptr->len = sizeof(nrfrr_pkt_t);
+    _last_sent_length = ptr->len;
 
     uint32_t r =
         #ifdef NRFRR_FINGER_QUOTES_RANDOMNESS
@@ -1045,13 +1054,15 @@ bool nRF52RcRadio::validate_rx(void)
 
     #ifdef NRFRR_DEBUG_RX
     Serial.printf("RX[t %u]: ", millis());
-    int i;
+    int i, dbglen = parsed->len > 0 ? parsed->len : sizeof(nrfrr_pkt_t);
     for (i = 0; i < parsed->len; i++)
     {
         Serial.printf("0x%02X ", u8_ptr[i]);
     }
     Serial.printf("\r\n");
     #endif
+
+    _last_rx_length = parsed->len;
 
     if (parsed->len < sizeof(nrfrr_pkt_t) - 4 || parsed->len > sizeof(nrfrr_pkt_t) + 4) {
         #ifdef NRFRR_DEBUG_RX_ERRSTATS
@@ -1076,15 +1087,19 @@ bool nRF52RcRadio::validate_rx(void)
     {
         if (rx_uid != (_uid & 0x00FFFFFF)) { // UID must match
             #ifdef NRFRR_DEBUG_RX_ERRSTATS
-            _stat_rx_errs[2]++;
+            _stat_rx_errs[1]++;
             #endif
+            #ifndef NRFRR_DEVMODE_NOCHECK
             return false;
+            #endif
         }
         if (rx_sess == 0) { // invalid session ID
             #ifdef NRFRR_DEBUG_RX_ERRSTATS
-            _stat_rx_errs[3]++;
+            _stat_rx_errs[2]++;
             #endif
+            #ifndef NRFRR_DEVMODE_NOCHECK
             return false;
+            #endif
         }
     }
 
@@ -1099,9 +1114,11 @@ bool nRF52RcRadio::validate_rx(void)
     #endif
     {
         #ifdef NRFRR_DEBUG_RX_ERRSTATS
-        _stat_rx_errs[4]++;
+        _stat_rx_errs[3]++;
         #endif
+        #ifndef NRFRR_DEVMODE_NOCHECK
         return false;
+        #endif
     }
     // checksum needs to be valid for the next few security features to work and not be overwhelmed
 
@@ -1137,9 +1154,11 @@ bool nRF52RcRadio::validate_rx(void)
                     _last_rx_time = now;
                 }
                 #ifdef NRFRR_DEBUG_RX_ERRSTATS
-                _stat_rx_errs[5]++;
+                _stat_rx_errs[4]++;
                 #endif
+                #ifndef NRFRR_DEVMODE_NOCHECK
                 return false;
+                #endif
             }
 
             // calculate how many packets were lost
@@ -1159,9 +1178,13 @@ bool nRF52RcRadio::validate_rx(void)
                 uint32_t j = invalid_sessions[i];
                 if (j == rx_sess) { // is invalid
                     #ifdef NRFRR_DEBUG_RX_ERRSTATS
-                    _stat_rx_errs[6]++;
+                    _stat_rx_errs[5]++;
                     #endif
+                    #ifndef NRFRR_DEVMODE_NOCHECK
                     return false;
+                    #else
+                    break;
+                    #endif
                 }
                 else if (j == 0) {
                     break;
@@ -1220,9 +1243,11 @@ bool nRF52RcRadio::validate_rx(void)
             }
 
             #ifdef NRFRR_DEBUG_RX_ERRSTATS
-            _stat_rx_errs[7]++;
+            _stat_rx_errs[6]++;
             #endif
+            #ifndef NRFRR_DEVMODE_NOCHECK
             return false;
+            #endif
         }
         _reply_bad_session = 0;
 
@@ -1230,9 +1255,11 @@ bool nRF52RcRadio::validate_rx(void)
         {
             // ignore duplicate or replay-attack
             #ifdef NRFRR_DEBUG_RX_ERRSTATS
-            _stat_rx_errs[8]++;
+            _stat_rx_errs[7]++;
             #endif
+            #ifndef NRFRR_DEVMODE_NOCHECK
             return false;
+            #endif
         }
         _seq_num_prev = rx_seq;
     }

@@ -58,6 +58,8 @@ class nRF52RcRadio
         #ifdef NRFRR_DEBUG_RX_ERRSTATS
         inline uint32_t* getRxErrStat(void) { return _stat_rx_errs; };
         #endif
+        inline uint8_t getLastSentLength(void) { return _last_sent_length; };
+        inline uint8_t getLastRxLength  (void) { return _last_rx_length  ; };
 
         void contTxTest(uint16_t f, bool mod, void(*loop_cb)(void) = NULL); // continuous transmission test, modulated or unmodulated carrier
 
@@ -93,6 +95,7 @@ class nRF52RcRadio
         bool     _reply_requested;
         bool     _reply_request_latch;
         uint16_t _reply_request_rate;
+        uint8_t  _last_sent_length, _last_rx_length;
 
         int8_t   _rssi;
         radiostats_t stats_tmp;

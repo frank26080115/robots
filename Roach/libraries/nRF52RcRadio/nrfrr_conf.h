@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+//#define NRFRR_DEVMODE_ZEROSECURITY
+//#define NRFRR_DEVMODE_NOCHECK       // DO NOT USE, incoming bad packets seems to cause crashes
+//#define NRFRR_DEVMODE_NOHOP
+
 #define RH_NRF51_MAX_PAYLOAD_LEN 254
 #define NRFRR_PAYLOAD_SIZE   (64 * 1)
 #define NRFRR_PAYLOAD_SIZE2  (64 * 3)
@@ -22,7 +26,7 @@
 
 #define NRFRR_REM_USED_SESSIONS 32
 
-#define NRFRR_FINGER_QUOTES_RANDOMNESS
+//#define NRFRR_FINGER_QUOTES_RANDOMNESS
 #define NRFRR_USE_NRF_RNG
 //#define NRFRR_USE_MANUAL_CRC
 
@@ -44,7 +48,7 @@
 
 //#define NRFRR_DEBUG_HOPTABLE
 //#define NRFRR_DEBUG_TX
-//#define NRFRR_DEBUG_RX
+#define NRFRR_DEBUG_RX
 //#define NRFRR_DEBUG_HOP
 #define NRFRR_DEBUG_RX_ERRSTATS
 

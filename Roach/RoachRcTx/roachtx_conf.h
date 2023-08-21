@@ -27,6 +27,7 @@
 //#define DEVMODE_WAIT_SERIAL_POST
 //#define DEVMODE_SLOW_LOOP         200
 //#define DEVMODE_DEBUG_BUTTONS
+//#define DEVMODE_DEBUG_PACKET
 
 //#define debug_printf(...)            // do nothing
 #define debug_printf(format, ...)    do { Serial.printf((format), ##__VA_ARGS__); } while (0)

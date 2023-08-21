@@ -5,6 +5,8 @@
 #include <RoachLib.h>
 #include <nRF52RcRadio.h>
 
+#define NRF5RAND_BUFF_SIZE    128 // the robot receiver doesn't really need much
+
 extern nRF52RcRadio radio;                   // declared from this library
 extern roach_ctrl_pkt_t  rx_pkt;             // declared from this library
 extern roach_telem_pkt_t telem_pkt;          // declared from this library

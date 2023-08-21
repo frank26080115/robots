@@ -17,6 +17,7 @@ const cmd_def_t cmds[] = {
     { "conttx"      , conttx_func },
     { "regenrf"     , regenrf_func },
     { "readrf"      , readrf_func },
+    { "rfstats"     , rfstats_func },
     { "nvmdebug"    , nvmdebug_func},
     { "save"        , save_func },
     { "esclink"     , esclink_func },
@@ -159,6 +160,20 @@ void regenrf_func(void* cmd, char* argstr, Stream* stream)
 void readrf_func(void* cmd, char* argstr, Stream* stream)
 {
     stream->printf("RF params: 0x%08X 0x%08X 0x%08X\r\n", nvm_rf.uid, nvm_rf.salt, nvm_rf.chan_map);
+    stream->printf("sizeof(nrfrr_pkt_t) = %u, NRFRR_PAYLOAD_SIZE = %u, last pkt len = %u, sizeof(roach_ctrl_pkt_t) = %u\r\n", sizeof(nrfrr_pkt_t), NRFRR_PAYLOAD_SIZE, radio.getLastRxLength(), sizeof(roach_ctrl_pkt_t));
+}
+
+void rfstats_func(void* cmd, char* argstr, Stream* stream)
+{
+    stream->printf("RF stats: drate %u , good %u , calls %u , loss %u , seq_miss %u , rx_miss %u , pktlen %u\r\n"
+        , radio.stats_rate.drate
+        , radio.stats_rate.good
+        , radio.stats_rate.calls
+        , radio.stats_rate.loss
+        , radio.stats_rate.seq_miss
+        , radio.stats_rate.rx_miss
+        , radio.getLastRxLength()
+        );
 }
 
 void esclink_func(void* cmd, char* argstr, Stream* stream)
@@ -183,6 +198,7 @@ void readbatt_func(void* cmd, char* argstr, Stream* stream)
 
 void readimu_func(void* cmd, char* argstr, Stream* stream)
 {
+    #ifndef DEVMODE_DISABLE_IMU
     uint32_t first_t = millis();
     uint32_t last_t = 0;
     int forever = atoi(argstr);
@@ -216,6 +232,9 @@ void readimu_func(void* cmd, char* argstr, Stream* stream)
         }
     }
     while (1);
+    #else
+    stream->printf("[%u] ERROR: IMU is disabled, cannot read\r\n", millis());
+    #endif
 }
 
 void rtmgrsim_func(void* cmd, char* argstr, Stream* stream)

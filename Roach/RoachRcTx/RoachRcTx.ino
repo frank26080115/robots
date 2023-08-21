@@ -96,7 +96,6 @@ void setup(void)
         delay(100);
     }
     Serial.read();
-    Serial.println("GO GO GO");
     #endif
 
     RoachWdt_init(ROACH_WDT_TIMEOUT_MS);
@@ -104,6 +103,7 @@ void setup(void)
     hb_blu.begin();
 
     nrf5rand_init(NRF5RAND_BUFF_SIZE, true, false);
+    nrf5rand_seed(false);
     Serial.begin(115200);
     RoachUsbMsd_begin();
     settings_init();
@@ -153,7 +153,11 @@ void loop(void)
 
 void radio_init(void)
 {
-    radio.begin();
+    radio.begin(
+        #if defined(ROACHHW_PIN_FEM_TX) && defined(ROACHHW_PIN_FEM_RX)
+        ROACHHW_PIN_FEM_TX, ROACHHW_PIN_FEM_RX
+        #endif
+    );
     radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
 }
 
@@ -261,19 +265,25 @@ void ctrler_buildPkt(void)
 
 void ctrler_pktDebug(void)
 {
-    return;
+    #ifdef DEVMODE_DEBUG_PACKET
     static uint32_t last_time = 0;
     uint32_t now = millis();
-    if ((now - last_time) >= 1000)
+    if ((now - last_time) >= 250)
     {
         last_time = now;
-        Serial.printf("TX[%u]:  %d , %d , %d , %d , 0x%08X\r\n"
+        Serial.printf("TX[%u]:  %d , %d , %d , %d , 0x%08X , drate %u"
             , now
             , tx_pkt.throttle
             , tx_pkt.steering
             , tx_pkt.pot_weap
             , tx_pkt.pot_aux
             , tx_pkt.flags
+            , radio.stats_rate.drate
             );
+        if (radio.isConnected()) {
+            Serial.printf(" , rssi %d", radio.getRssi());
+        }
+        Serial.printf("\r\n");
     }
+    #endif
 }

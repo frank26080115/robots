@@ -2,6 +2,7 @@
 #include "RoachRobotPrivate.h"
 #include <RoachLib.h>
 #include <nRF52RcRadio.h>
+#include <nRF5Rand.h>
 #include <RoachCmdLine.h>
 
 extern RoachCmdLine cmdline;
@@ -18,6 +19,9 @@ void roachrobot_init(uint8_t* nvm_ptr, uint32_t nvm_size, roach_nvm_gui_desc_t* 
     cfg_desc_sz   = desc_size;
     roachrobot_recalcChecksum();
     roachrobot_calcDescChecksum();
+
+    nrf5rand_init(NRF5RAND_BUFF_SIZE, true, false);
+    nrf5rand_seed(false);
 
     radio.begin();
     radio.config(nvm_rf.chan_map, nvm_rf.uid, nvm_rf.salt);
