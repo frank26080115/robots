@@ -8,6 +8,8 @@
 #include <nRF52OneWireSerial.h>
 #include <nRF52UicrWriter.h>
 
+//#define USE_DSHOT
+
 #define ROACHHW_PIN_LED_RED  3
 #define ROACHHW_PIN_LED_BLU  4
 #define ROACHHW_PIN_LED_NEO  8
@@ -19,7 +21,11 @@ RoachButton btn1   = RoachButton(13);
 RoachButton btn2   = RoachButton(12);
 RoachPot    pot    = RoachPot(A0, NULL);
 RoachServo  drive  = RoachServo(PIN_SERVO_DRIVE);
+#ifdef USE_DSHOT
 nRF52Dshot  weapon = nRF52Dshot(PIN_SERVO_WEAPON, DSHOT_SPEED_600);
+#else
+RoachServo  weapon = RoachServo(PIN_SERVO_WEAPON);
+#endif
 
 const uint8_t hb_short[] = { 0x18, 0x00, };
 const uint8_t hb_long[]  = { 0x42, 0x00, };
@@ -50,7 +56,11 @@ void setup()
     drive.begin();
     drive.writeMicroseconds(1500);
     weapon.begin();
+    #ifdef USE_DSHOT
     weapon.setThrottle(0);
+    #else
+    weapon.writeMicroseconds(1000);
+    #endif
     RoachWdt_init(100);
     Serial.println("Servo Tester Hello World");
     while (btn1.isHeld() || btn2.isHeld())
@@ -64,7 +74,9 @@ void all_tasks()
     cmdline.task();
     RoachPot_allTask();
     RoachButton_allTask();
+    #ifdef USE_DSHOT
     weapon.task();
+    #endif
     hb.task();
     RoachWdt_feed();
 }
@@ -87,19 +99,31 @@ void loop()
     static const int32_t roof = 1023 - (32 * 5);
 
     int32_t us = constrain(map(fx, deadzone, roof, 0,  500), 0, 500);
-    int32_t th = constrain(map(fx, deadzone, roof, 0, 2047), 0, 2047 - 48);
-    
+    int32_t th = 
+        #ifdef USE_DSHOT
+            constrain(map(fx, deadzone, roof, 0, 2047), 0, 2047 - 48);
+        #else
+            constrain(map(fx, deadzone, roof, 0,  1000), 0, 1000);
+        #endif
 
     if (btn1.isHeld() && btn2.isHeld())
     {
         hb.queue(hb_long);
+        #ifdef USE_DSHOT
         weapon.setThrottle(th);
+        #else
+        weapon.writeMicroseconds(1000 + th);
+        #endif
         drive.writeMicroseconds(1500);
         did = 2;
     }
     else
     {
+        #ifdef USE_DSHOT
         weapon.setThrottle(0);
+        #else
+        weapon.writeMicroseconds(1000);
+        #endif
 
         if (btn1.isHeld())
         {
