@@ -6,7 +6,7 @@
 <setting alwaysvectorfont="no"/>
 <setting verticaltext="up"/>
 </settings>
-<grid distance="0.1" unitdist="mm" unit="mm" style="lines" multiple="10" display="yes" altdistance="0.05" altunitdist="mm" altunit="mm"/>
+<grid distance="1" unitdist="mm" unit="mm" style="lines" multiple="1" display="yes" altdistance="0.1" altunitdist="mm" altunit="mm"/>
 <layers>
 <layer number="1" name="Top" color="4" fill="1" visible="yes" active="yes"/>
 <layer number="2" name="Route2" color="1" fill="3" visible="no" active="yes"/>
@@ -1631,12 +1631,14 @@ Commonly used for small ceramic capacitors. Like our 0.1uF (http://www.sparkfun.
 <hole x="15.7" y="9" drill="6"/>
 <pad name="A1" x="7.85" y="9" drill="3"/>
 <pad name="A2" x="23.55" y="9" drill="3"/>
-<pad name="B2" x="19.3" y="12.89" drill="0.6" diameter="2"/>
-<pad name="B1" x="12.1" y="12.89" drill="0.6" diameter="2"/>
+<pad name="B2" x="19" y="12.347" drill="0.6" diameter="2"/>
+<pad name="B1" x="12.4" y="12.347" drill="0.6" diameter="2"/>
 <rectangle x1="5.85" y1="1" x2="9.85" y2="9" layer="16"/>
 <rectangle x1="5.85" y1="0" x2="9.85" y2="9" layer="30"/>
 <rectangle x1="21.55" y1="1" x2="25.55" y2="9" layer="16"/>
 <rectangle x1="21.55" y1="0" x2="25.55" y2="9" layer="30"/>
+<smd name="P$1" x="12.4" y="13.3" dx="2" dy="2" layer="16"/>
+<smd name="P$2" x="19" y="13.3" dx="2" dy="2" layer="16"/>
 </package>
 <package name="SODFL3718X102N">
 <wire x1="-1.375" y1="0.9" x2="-1.375" y2="-0.9" width="0.127" layer="51"/>
