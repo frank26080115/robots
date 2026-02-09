@@ -435,12 +435,12 @@ Yageo CFR series &lt;a href="http://www.yageo.com/pdf/yageo/Leaded-R_CFR_2008.pd
 <description>1W Resistor, 0.6" wide&lt;p&gt;
 
 Yageo CFR series &lt;a href="http://www.yageo.com/pdf/yageo/Leaded-R_CFR_2008.pdf"&gt;http://www.yageo.com/pdf/yageo/Leaded-R_CFR_2008.pdf&lt;/a&gt;</description>
-<wire x1="-5.75" y1="-2.25" x2="-5.75" y2="2.25" width="0.2032" layer="21"/>
-<wire x1="-5.75" y1="2.25" x2="5.75" y2="2.25" width="0.2032" layer="21"/>
-<wire x1="5.75" y1="2.25" x2="5.75" y2="-2.25" width="0.2032" layer="21"/>
-<wire x1="5.75" y1="-2.25" x2="-5.75" y2="-2.25" width="0.2032" layer="21"/>
-<pad name="P$1" x="-7.62" y="0" drill="1.2" diameter="1.8796"/>
-<pad name="P$2" x="7.62" y="0" drill="1.2" diameter="1.8796"/>
+<wire x1="-5.75" y1="-2.25" x2="-5.75" y2="2.25" width="0.2032" layer="48"/>
+<wire x1="-5.75" y1="2.25" x2="5.75" y2="2.25" width="0.2032" layer="48"/>
+<wire x1="5.75" y1="2.25" x2="5.75" y2="-2.25" width="0.2032" layer="48"/>
+<wire x1="5.75" y1="-2.25" x2="-5.75" y2="-2.25" width="0.2032" layer="48"/>
+<pad name="P$1" x="-7.62" y="0" drill="1" diameter="1.8796"/>
+<pad name="P$2" x="7.62" y="0" drill="1" diameter="1.8796"/>
 <text x="-5.715" y="3.175" size="0.8128" layer="25" font="vector" ratio="15">&gt;Name</text>
 <text x="-4.064" y="-0.381" size="0.8128" layer="21" font="vector" ratio="15">&gt;Value</text>
 </package>
@@ -1614,7 +1614,13 @@ Commonly used for small ceramic capacitors. Like our 0.1uF (http://www.sparkfun.
 <wire x1="28.15" y1="0" x2="31.4" y2="3.25" width="0.05" layer="20" curve="90"/>
 <wire x1="31.4" y1="3.25" x2="31.4" y2="14.75" width="0.05" layer="20"/>
 <wire x1="31.4" y1="14.75" x2="28.15" y2="18" width="0.05" layer="20" curve="90"/>
-<wire x1="28.15" y1="18" x2="3.25" y2="18" width="0.05" layer="20"/>
+<wire x1="28.15" y1="18" x2="21.7" y2="18" width="0.05" layer="20"/>
+<wire x1="21.7" y1="18" x2="21.7" y2="16" width="0.05" layer="20"/>
+<wire x1="21.7" y1="16" x2="20.7" y2="15" width="0.05" layer="20" curve="-90"/>
+<wire x1="20.7" y1="15" x2="10.7" y2="15" width="0.05" layer="20"/>
+<wire x1="10.7" y1="15" x2="9.7" y2="16" width="0.05" layer="20" curve="-90"/>
+<wire x1="9.7" y1="16" x2="9.7" y2="18" width="0.05" layer="20"/>
+<wire x1="9.7" y1="18" x2="3.25" y2="18" width="0.05" layer="20"/>
 <wire x1="3.25" y1="18" x2="0" y2="14.75" width="0.05" layer="20" curve="90"/>
 <hole x="3.25" y="3.25" drill="3"/>
 <circle x="3.25" y="3.25" radius="3.178046875" width="0" layer="41"/>
@@ -1629,8 +1635,8 @@ Commonly used for small ceramic capacitors. Like our 0.1uF (http://www.sparkfun.
 <circle x="28.15" y="14.75" radius="3.178046875" width="0" layer="41"/>
 <circle x="28.15" y="14.75" radius="3.178046875" width="0" layer="42"/>
 <hole x="15.7" y="9" drill="6"/>
-<pad name="A1" x="7.85" y="9" drill="3"/>
-<pad name="A2" x="23.55" y="9" drill="3"/>
+<pad name="A1" x="7.85" y="9" drill="3" diameter="4"/>
+<pad name="A2" x="23.55" y="9" drill="3" diameter="4"/>
 <pad name="B2" x="19" y="12.347" drill="0.6" diameter="2"/>
 <pad name="B1" x="12.4" y="12.347" drill="0.6" diameter="2"/>
 <rectangle x1="5.85" y1="1" x2="9.85" y2="9" layer="16"/>
